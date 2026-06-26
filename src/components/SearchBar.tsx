@@ -142,6 +142,9 @@ export default function SearchBar() {
   const [qualityCheck, setQualityCheck] = useState("");
   const [copySuccess, setCopySuccess] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const [copiedMessageIndex, setCopiedMessageIndex] = useState<number | null>(
+    null
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -224,6 +227,7 @@ export default function SearchBar() {
     setQualityCheck("");
     setCopySuccess(false);
     setDownloadSuccess(false);
+    setCopiedMessageIndex(null);
 
     try {
       const response = await fetch("/api/diagnose", {
@@ -270,6 +274,7 @@ export default function SearchBar() {
     setQualityCheck("");
     setCopySuccess(false);
     setDownloadSuccess(false);
+    setCopiedMessageIndex(null);
     setError("");
     localStorage.removeItem(STORAGE_KEY);
   }
@@ -352,6 +357,7 @@ ${chatText}
       await navigator.clipboard.writeText(buildCaseReport());
       setCopySuccess(true);
       setDownloadSuccess(false);
+      setCopiedMessageIndex(null);
 
       window.setTimeout(() => {
         setCopySuccess(false);
@@ -359,6 +365,22 @@ ${chatText}
     } catch (error) {
       console.error(error);
       setError("Fallbericht konnte nicht in die Zwischenablage kopiert werden.");
+    }
+  }
+
+  async function copySingleMessage(content: string, index: number) {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedMessageIndex(index);
+      setCopySuccess(false);
+      setDownloadSuccess(false);
+
+      window.setTimeout(() => {
+        setCopiedMessageIndex(null);
+      }, 2500);
+    } catch (error) {
+      console.error(error);
+      setError("Antwort konnte nicht in die Zwischenablage kopiert werden.");
     }
   }
 
@@ -392,6 +414,7 @@ ${chatText}
 
       setDownloadSuccess(true);
       setCopySuccess(false);
+      setCopiedMessageIndex(null);
 
       window.setTimeout(() => {
         setDownloadSuccess(false);
@@ -641,9 +664,20 @@ ${chatText}
                   : "mr-auto max-w-4xl rounded-2xl border border-slate-800 bg-slate-950/70 px-5 py-4 text-slate-300"
               }
             >
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide opacity-70">
-                {message.role === "user" ? "Du" : "DiagnoseHUB"}
-              </p>
+              <div className="mb-2 flex items-center justify-between gap-4">
+                <p className="text-xs font-semibold uppercase tracking-wide opacity-70">
+                  {message.role === "user" ? "Du" : "DiagnoseHUB"}
+                </p>
+
+                {message.role === "assistant" && (
+                  <button
+                    onClick={() => copySingleMessage(message.content, index)}
+                    className="rounded-lg border border-slate-700 px-3 py-1 text-xs font-semibold text-slate-400 transition hover:border-blue-500 hover:text-blue-300"
+                  >
+                    {copiedMessageIndex === index ? "Kopiert" : "Antwort kopieren"}
+                  </button>
+                )}
+              </div>
 
               <div className="whitespace-pre-wrap leading-8">
                 {message.content}

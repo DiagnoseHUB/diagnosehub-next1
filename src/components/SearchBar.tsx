@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 
 type EngineContext = {
   engineType: string;
@@ -29,14 +29,109 @@ type ChatMessage = {
   content: string;
 };
 
-const quickQuestions = [
-  "Ladedruck Sollwert?",
+const STORAGE_KEY = "diagnosehub-current-case";
+
+const baseQuickQuestions = [
   "Welche Messwerte prüfen?",
   "Was prüfe ich als erstes?",
   "Häufigste Ursache eingrenzen",
+  "Welche Live-Daten sind wichtig?",
 ];
 
-const STORAGE_KEY = "diagnosehub-current-case";
+function buildDynamicQuickQuestions(
+  engineContext: EngineContext | null,
+  faultCodeContext: FaultCodeContext | null
+) {
+  const questions: string[] = [...baseQuickQuestions];
+
+  if (engineContext?.engineType === "Diesel") {
+    questions.push(
+      "Raildruck Soll/Ist prüfen?",
+      "Injektor-Rücklaufmenge prüfen?",
+      "Ladedruck Soll/Ist prüfen?",
+      "DPF-Differenzdruck prüfen?",
+      "AGR Soll/Ist prüfen?"
+    );
+  }
+
+  if (engineContext?.engineType === "Benziner") {
+    questions.push(
+      "Fuel Trims prüfen?",
+      "Zündaussetzer je Zylinder prüfen?",
+      "Falschluft prüfen?",
+      "Kraftstoffdruck prüfen?",
+      "Ladedruck Soll/Ist prüfen?"
+    );
+  }
+
+  const firstFaultCode = faultCodeContext?.foundCodes[0];
+
+  if (firstFaultCode) {
+    questions.unshift(
+      `Was bedeutet ${firstFaultCode.code}?`,
+      `Prüfplan für ${firstFaultCode.code}`,
+      `Messwerte zu ${firstFaultCode.code}`
+    );
+
+    const system = firstFaultCode.system.toLowerCase();
+
+    if (system.includes("ladedruck") || system.includes("aufladung")) {
+      questions.push(
+        "Ladeluftstrecke abdrücken?",
+        "VTG/Wastegate prüfen?",
+        "Ladedrucksensor plausibel?",
+        "Unterdrucksystem prüfen?"
+      );
+    }
+
+    if (system.includes("raildruck") || system.includes("kraftstoffdruck")) {
+      questions.push(
+        "Raildruck beim Starten?",
+        "Niederdruckversorgung prüfen?",
+        "Mengenregelventil prüfen?",
+        "Kraftstofffilter prüfen?"
+      );
+    }
+
+    if (system.includes("agr")) {
+      questions.push(
+        "AGR Stellgliedtest?",
+        "LMM Reaktion bei AGR prüfen?",
+        "AGR Strecke verkokt?",
+        "AGR Soll/Ist vergleichen?"
+      );
+    }
+
+    if (system.includes("dieselpartikelfilter")) {
+      questions.push(
+        "DPF Differenzdruck Sollwert?",
+        "Rußmasse und Aschemasse prüfen?",
+        "Regeneration möglich?",
+        "Differenzdrucksensor prüfen?"
+      );
+    }
+
+    if (system.includes("gemisch")) {
+      questions.push(
+        "Short Term Fuel Trim?",
+        "Long Term Fuel Trim?",
+        "Ansaugsystem abnebeln?",
+        "Lambdasonde plausibel?"
+      );
+    }
+
+    if (system.includes("verbrennung") || system.includes("laufunruhe")) {
+      questions.push(
+        "Aussetzerzähler prüfen?",
+        "Zylinder eingrenzen?",
+        "Kompression prüfen?",
+        "Injektor/Zündung quer prüfen?"
+      );
+    }
+  }
+
+  return Array.from(new Set(questions)).slice(0, 12);
+}
 
 export default function SearchBar() {
   const [search, setSearch] = useState("");
@@ -52,6 +147,10 @@ export default function SearchBar() {
 
   const messageEndRef = useRef<HTMLDivElement | null>(null);
   const hasLoadedCaseRef = useRef(false);
+
+  const quickQuestions = useMemo(() => {
+    return buildDynamicQuickQuestions(engineContext, faultCodeContext);
+  }, [engineContext, faultCodeContext]);
 
   useEffect(() => {
     messageEndRef.current?.scrollIntoView({
@@ -380,17 +479,23 @@ ${chatText}
       )}
 
       {messages.length > 0 && (
-        <div className="mt-5 flex flex-wrap gap-3">
-          {quickQuestions.map((question) => (
-            <button
-              key={question}
-              onClick={() => sendDiagnosis(question)}
-              disabled={loading}
-              className="rounded-full border border-slate-700 bg-slate-900 px-4 py-2 text-sm text-slate-300 transition hover:border-blue-500 hover:text-blue-300 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {question}
-            </button>
-          ))}
+        <div className="mt-5">
+          <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+            Schnellfragen
+          </p>
+
+          <div className="flex flex-wrap gap-3">
+            {quickQuestions.map((question) => (
+              <button
+                key={question}
+                onClick={() => sendDiagnosis(question)}
+                disabled={loading}
+                className="rounded-full border border-slate-700 bg-slate-900 px-4 py-2 text-sm text-slate-300 transition hover:border-blue-500 hover:text-blue-300 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {question}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { Session, User } from "@supabase/supabase-js";
+import type {
+  AuthChangeEvent,
+  Session,
+  User,
+} from "@supabase/supabase-js";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { createClient } from "@/lib/supabase/client";
@@ -16,6 +20,17 @@ type DemoAccount = {
   plan: UserPlan;
   updatedAt: string;
   supabaseUserId?: string;
+};
+
+type WorkshopProfile = {
+  id: string;
+  full_name: string;
+  workshop_name: string;
+  email: string;
+  role: string;
+  plan: UserPlan;
+  created_at: string;
+  updated_at: string;
 };
 
 const DEMO_ACCOUNT_STORAGE_KEY = "diagnosehub-demo-account";
@@ -76,6 +91,21 @@ function formatDateTime(value: string) {
   });
 }
 
+function convertProfileToLocalAccount(
+  profile: WorkshopProfile,
+  userId: string
+): DemoAccount {
+  return {
+    name: profile.full_name,
+    workshop: profile.workshop_name,
+    email: profile.email,
+    role: profile.role,
+    plan: profile.plan,
+    updatedAt: profile.updated_at,
+    supabaseUserId: userId,
+  };
+}
+
 export default function LoginPage() {
   const supabase = useMemo(() => createClient(), []);
 
@@ -94,23 +124,30 @@ export default function LoginPage() {
   const [role, setRole] = useState("Inhaber / Werkstatt");
   const [plan, setPlan] = useState<UserPlan>("free");
   const [savedAccount, setSavedAccount] = useState<DemoAccount | null>(null);
+  const [databaseProfile, setDatabaseProfile] =
+    useState<WorkshopProfile | null>(null);
 
+  const [profileLoading, setProfileLoading] = useState(false);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
-
-  const currentPlan = planOptions[plan];
 
   const accountStatus = useMemo(() => {
     if (!user) {
       return "Nicht eingeloggt";
     }
 
-    if (!savedAccount) {
-      return "Eingeloggt, aber Werkstattdaten fehlen";
+    if (!databaseProfile && !savedAccount) {
+      return "Eingeloggt, aber Werkstattprofil fehlt";
     }
 
-    return `${savedAccount.workshop} · ${planOptions[savedAccount.plan].label}`;
-  }, [savedAccount, user]);
+    const account = savedAccount;
+
+    if (!account) {
+      return "Werkstattprofil vorhanden";
+    }
+
+    return `${account.workshop} · ${planOptions[account.plan].label}`;
+  }, [databaseProfile, savedAccount, user]);
 
   useEffect(() => {
     loadLocalAccount();
@@ -129,20 +166,32 @@ export default function LoginPage() {
       if (data.session?.user?.email) {
         setAuthEmail(data.session.user.email);
       }
+
+      if (data.session?.user) {
+        await loadWorkshopProfile(data.session.user);
+      }
     }
 
     loadSession();
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession);
-      setUser(nextSession?.user ?? null);
+    } = supabase.auth.onAuthStateChange(
+      async (_event: AuthChangeEvent, nextSession: Session | null) => {
+        setSession(nextSession);
+        setUser(nextSession?.user ?? null);
 
-      if (nextSession?.user?.email) {
-        setAuthEmail(nextSession.user.email);
+        if (nextSession?.user?.email) {
+          setAuthEmail(nextSession.user.email);
+        }
+
+        if (nextSession?.user) {
+          await loadWorkshopProfile(nextSession.user);
+        } else {
+          setDatabaseProfile(null);
+        }
       }
-    });
+    );
 
     return () => {
       subscription.unsubscribe();
@@ -176,6 +225,49 @@ export default function LoginPage() {
     }
   }
 
+  function syncProfileToLocalStorage(profile: WorkshopProfile, userId: string) {
+    const localAccount = convertProfileToLocalAccount(profile, userId);
+
+    setSavedAccount(localAccount);
+    setName(localAccount.name);
+    setWorkshop(localAccount.workshop);
+    setRole(localAccount.role);
+    setPlan(localAccount.plan);
+    setDatabaseProfile(profile);
+
+    localStorage.setItem(DEMO_ACCOUNT_STORAGE_KEY, JSON.stringify(localAccount));
+    localStorage.setItem(USER_PLAN_STORAGE_KEY, localAccount.plan);
+  }
+
+  async function loadWorkshopProfile(currentUser: User) {
+    setProfileLoading(true);
+    setError("");
+
+    try {
+      const { data, error } = await supabase
+        .from("workshop_profiles")
+        .select("*")
+        .eq("id", currentUser.id)
+        .maybeSingle();
+
+      if (error) {
+        setError(error.message);
+        return;
+      }
+
+      if (!data) {
+        setDatabaseProfile(null);
+        return;
+      }
+
+      const profile = data as WorkshopProfile;
+
+      syncProfileToLocalStorage(profile, currentUser.id);
+    } finally {
+      setProfileLoading(false);
+    }
+  }
+
   function showSuccess(message: string) {
     setSuccess(message);
 
@@ -184,7 +276,7 @@ export default function LoginPage() {
     }, 3000);
   }
 
-  function resetAuthMessages() {
+  function resetMessages() {
     setAuthError("");
     setAuthMessage("");
     setError("");
@@ -192,7 +284,7 @@ export default function LoginPage() {
   }
 
   async function handleRegister() {
-    resetAuthMessages();
+    resetMessages();
 
     const cleanEmail = authEmail.trim().toLowerCase();
 
@@ -231,6 +323,11 @@ export default function LoginPage() {
         setSession(data.session);
         setUser(data.user);
         setAuthMessage("Registrierung erfolgreich. Du bist eingeloggt.");
+
+        if (data.user) {
+          await loadWorkshopProfile(data.user);
+        }
+
         return;
       }
 
@@ -243,7 +340,7 @@ export default function LoginPage() {
   }
 
   async function handleLogin() {
-    resetAuthMessages();
+    resetMessages();
 
     const cleanEmail = authEmail.trim().toLowerCase();
 
@@ -273,13 +370,17 @@ export default function LoginPage() {
       setSession(data.session);
       setUser(data.user);
       setAuthMessage("Login erfolgreich.");
+
+      if (data.user) {
+        await loadWorkshopProfile(data.user);
+      }
     } finally {
       setAuthLoading(false);
     }
   }
 
   async function handleLogout() {
-    resetAuthMessages();
+    resetMessages();
     setAuthLoading(true);
 
     try {
@@ -292,6 +393,7 @@ export default function LoginPage() {
 
       setSession(null);
       setUser(null);
+      setDatabaseProfile(null);
       setAuthPassword("");
       setAuthMessage("Du wurdest ausgeloggt.");
     } finally {
@@ -299,7 +401,7 @@ export default function LoginPage() {
     }
   }
 
-  function saveAccount() {
+  async function saveAccount() {
     setError("");
     setSuccess("");
 
@@ -328,38 +430,87 @@ export default function LoginPage() {
       return;
     }
 
-    const nextAccount: DemoAccount = {
-      name: cleanName,
-      workshop: cleanWorkshop,
-      email: authUserEmail,
-      role: cleanRole || "Werkstatt",
-      plan,
-      updatedAt: new Date().toISOString(),
-      supabaseUserId: user.id,
-    };
+    setProfileLoading(true);
 
-    setSavedAccount(nextAccount);
-    localStorage.setItem(DEMO_ACCOUNT_STORAGE_KEY, JSON.stringify(nextAccount));
-    localStorage.setItem(USER_PLAN_STORAGE_KEY, plan);
+    try {
+      const profilePayload = {
+        id: user.id,
+        full_name: cleanName,
+        workshop_name: cleanWorkshop,
+        email: authUserEmail,
+        role: cleanRole || "Werkstatt",
+        plan,
+      };
 
-    showSuccess(
-      "Werkstattdaten wurden lokal gespeichert und mit dem Supabase-Login verknüpft."
-    );
+      const { data, error } = await supabase
+        .from("workshop_profiles")
+        .upsert(profilePayload, {
+          onConflict: "id",
+        })
+        .select("*")
+        .single();
+
+      if (error) {
+        setError(error.message);
+        return;
+      }
+
+      const profile = data as WorkshopProfile;
+
+      syncProfileToLocalStorage(profile, user.id);
+
+      showSuccess(
+        "Werkstattprofil wurde in Supabase gespeichert und lokal synchronisiert."
+      );
+    } finally {
+      setProfileLoading(false);
+    }
   }
 
-  function clearLocalAccount() {
-    setName("");
-    setWorkshop("");
-    setRole("Inhaber / Werkstatt");
-    setPlan("free");
-    setSavedAccount(null);
+  async function deleteDatabaseProfile() {
     setError("");
     setSuccess("");
 
-    localStorage.removeItem(DEMO_ACCOUNT_STORAGE_KEY);
-    localStorage.setItem(USER_PLAN_STORAGE_KEY, "free");
+    if (!user) {
+      setError("Bitte zuerst einloggen.");
+      return;
+    }
 
-    showSuccess("Lokale Werkstattdaten wurden gelöscht.");
+    const confirmed = window.confirm(
+      "Werkstattprofil wirklich aus Supabase löschen? Der Login-Account bleibt bestehen."
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setProfileLoading(true);
+
+    try {
+      const { error } = await supabase
+        .from("workshop_profiles")
+        .delete()
+        .eq("id", user.id);
+
+      if (error) {
+        setError(error.message);
+        return;
+      }
+
+      setDatabaseProfile(null);
+      setSavedAccount(null);
+      setName("");
+      setWorkshop("");
+      setRole("Inhaber / Werkstatt");
+      setPlan("free");
+
+      localStorage.removeItem(DEMO_ACCOUNT_STORAGE_KEY);
+      localStorage.setItem(USER_PLAN_STORAGE_KEY, "free");
+
+      showSuccess("Werkstattprofil wurde aus Supabase gelöscht.");
+    } finally {
+      setProfileLoading(false);
+    }
   }
 
   function changePlan(nextPlan: UserPlan) {
@@ -389,7 +540,7 @@ export default function LoginPage() {
         <section className="grid gap-10 lg:grid-cols-[0.9fr_1fr] lg:items-start">
           <div>
             <div className="inline-flex rounded-full border border-green-500/30 bg-green-500/10 px-5 py-2 text-sm font-semibold text-green-300">
-              Echter Supabase Login
+              Supabase Login + Datenbank
             </div>
 
             <h1 className="mt-6 text-5xl font-black tracking-tight md:text-6xl">
@@ -397,15 +548,17 @@ export default function LoginPage() {
             </h1>
 
             <p className="mt-6 text-lg leading-8 text-slate-400">
-              Diese Seite nutzt jetzt Supabase Auth für echten Login und echte
-              Sessions. Werkstattdaten und Plan bleiben in diesem Schritt noch
-              lokal gespeichert. Als Nächstes verschieben wir diese Daten in die
-              Supabase-Datenbank.
+              Login und Werkstattprofil laufen jetzt über Supabase. Das
+              Werkstattprofil wird in der Tabelle{" "}
+              <span className="font-mono text-slate-300">
+                workshop_profiles
+              </span>{" "}
+              gespeichert.
             </p>
 
             <div className="mt-8 rounded-3xl border border-slate-800 bg-slate-900/70 p-6">
               <p className="text-sm font-semibold uppercase tracking-wide text-blue-400">
-                Login-Status
+                Account-Status
               </p>
 
               <h2 className="mt-3 text-2xl font-bold">{accountStatus}</h2>
@@ -426,33 +579,37 @@ export default function LoginPage() {
                     </span>
                   </p>
 
-                  {savedAccount && (
+                  {databaseProfile ? (
                     <>
                       <p>
                         Werkstatt:{" "}
                         <span className="font-semibold text-white">
-                          {savedAccount.workshop}
+                          {databaseProfile.workshop_name}
                         </span>
                       </p>
                       <p>
                         Bearbeiter:{" "}
                         <span className="font-semibold text-white">
-                          {savedAccount.name}
+                          {databaseProfile.full_name}
                         </span>
                       </p>
                       <p>
                         Plan:{" "}
                         <span className="font-semibold text-white">
-                          {planOptions[savedAccount.plan].label}
+                          {planOptions[databaseProfile.plan].label}
                         </span>
                       </p>
                       <p>
                         Aktualisiert:{" "}
                         <span className="font-semibold text-white">
-                          {formatDateTime(savedAccount.updatedAt)}
+                          {formatDateTime(databaseProfile.updated_at)}
                         </span>
                       </p>
                     </>
+                  ) : (
+                    <p className="text-yellow-300">
+                      Noch kein Werkstattprofil in Supabase gespeichert.
+                    </p>
                   )}
                 </div>
               ) : (
@@ -480,12 +637,12 @@ export default function LoginPage() {
             </div>
 
             <div className="mt-8 rounded-3xl border border-yellow-500/20 bg-yellow-500/10 p-6">
-              <p className="font-bold text-yellow-300">Wichtig</p>
+              <p className="font-bold text-yellow-300">Aktueller Stand</p>
 
               <p className="mt-3 leading-7 text-slate-300">
-                Wenn Supabase E-Mail-Bestätigung aktiviert hat, musst du nach
-                der Registrierung erst den Link in der E-Mail bestätigen. Danach
-                kannst du dich normal einloggen.
+                Login und Werkstattprofil sind jetzt echt. Fallhistorie,
+                Nutzungszähler und Premium-Vormerkungen liegen noch lokal. Die
+                verschieben wir danach schrittweise ebenfalls in Supabase.
               </p>
             </div>
           </div>
@@ -506,7 +663,7 @@ export default function LoginPage() {
                     <button
                       onClick={() => {
                         setAuthMode("login");
-                        resetAuthMessages();
+                        resetMessages();
                       }}
                       className={
                         authMode === "login"
@@ -520,7 +677,7 @@ export default function LoginPage() {
                     <button
                       onClick={() => {
                         setAuthMode("register");
-                        resetAuthMessages();
+                        resetMessages();
                       }}
                       className={
                         authMode === "register"
@@ -620,12 +777,15 @@ export default function LoginPage() {
               </p>
 
               <h2 className="mt-3 text-3xl font-bold">
-                Werkstattdaten speichern
+                In Supabase speichern
               </h2>
 
               <p className="mt-3 leading-7 text-slate-400">
-                Noch lokal gespeichert. Die Daten sind aber jetzt bereits mit der
-                Supabase-User-ID verknüpft.
+                Diese Daten werden jetzt in{" "}
+                <span className="font-mono text-slate-300">
+                  workshop_profiles
+                </span>{" "}
+                gespeichert und zusätzlich lokal synchronisiert.
               </p>
 
               <div className="mt-8 grid gap-4">
@@ -637,7 +797,7 @@ export default function LoginPage() {
                     value={name}
                     onChange={(event) => setName(event.target.value)}
                     placeholder="Max Mustermann"
-                    disabled={!user}
+                    disabled={!user || profileLoading}
                     className="w-full rounded-2xl border border-slate-800 bg-slate-950 px-5 py-4 text-white outline-none placeholder:text-slate-600 focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
                   />
                 </div>
@@ -650,7 +810,7 @@ export default function LoginPage() {
                     value={workshop}
                     onChange={(event) => setWorkshop(event.target.value)}
                     placeholder="KFZ Musterbetrieb"
-                    disabled={!user}
+                    disabled={!user || profileLoading}
                     className="w-full rounded-2xl border border-slate-800 bg-slate-950 px-5 py-4 text-white outline-none placeholder:text-slate-600 focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
                   />
                 </div>
@@ -674,7 +834,7 @@ export default function LoginPage() {
                     value={role}
                     onChange={(event) => setRole(event.target.value)}
                     placeholder="Inhaber / Meister / Mechaniker"
-                    disabled={!user}
+                    disabled={!user || profileLoading}
                     className="w-full rounded-2xl border border-slate-800 bg-slate-950 px-5 py-4 text-white outline-none placeholder:text-slate-600 focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
                   />
                 </div>
@@ -689,7 +849,7 @@ export default function LoginPage() {
                       <button
                         key={planKey}
                         onClick={() => changePlan(planKey)}
-                        disabled={!user}
+                        disabled={!user || profileLoading}
                         className={
                           plan === planKey
                             ? "rounded-2xl border border-blue-500 bg-blue-500/10 p-5 text-left disabled:cursor-not-allowed disabled:opacity-50"
@@ -744,17 +904,20 @@ export default function LoginPage() {
               <div className="mt-8 flex flex-wrap gap-3">
                 <button
                   onClick={saveAccount}
-                  disabled={!user}
+                  disabled={!user || profileLoading}
                   className="rounded-2xl bg-blue-600 px-6 py-4 font-bold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Werkstattprofil speichern
+                  {profileLoading
+                    ? "Speichert..."
+                    : "Werkstattprofil speichern"}
                 </button>
 
                 <button
-                  onClick={clearLocalAccount}
-                  className="rounded-2xl border border-red-500/30 px-6 py-4 font-bold text-red-300 transition hover:bg-red-500/10"
+                  onClick={deleteDatabaseProfile}
+                  disabled={!user || profileLoading || !databaseProfile}
+                  className="rounded-2xl border border-red-500/30 px-6 py-4 font-bold text-red-300 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Lokale Daten löschen
+                  Profil aus Supabase löschen
                 </button>
               </div>
 

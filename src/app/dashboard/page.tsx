@@ -25,31 +25,45 @@ type ChatMessage = {
   content: string;
 };
 
+type EngineContext = {
+  engineType: string;
+  source: string;
+  label: string;
+  code: string | null;
+  notes?: string;
+};
+
+type FaultCodeInfo = {
+  code: string;
+  title: string;
+  system: string;
+  description: string;
+  typicalCauses: string[];
+  suggestedChecks: string[];
+};
+
+type FaultCodeContext = {
+  foundCodes: FaultCodeInfo[];
+  summary: string;
+};
+
 type SavedDiagnosisCase = {
   id: string;
   title: string;
   createdAt: string;
   updatedAt: string;
   messages: ChatMessage[];
-  engineContext: {
-    engineType: string;
-    source: string;
-    label: string;
-    code: string | null;
-    notes?: string;
-  } | null;
-  faultCodeContext: {
-    foundCodes: {
-      code: string;
-      title: string;
-      system: string;
-      description: string;
-      typicalCauses: string[];
-      suggestedChecks: string[];
-    }[];
-    summary: string;
-  } | null;
+  engineContext: EngineContext | null;
+  faultCodeContext: FaultCodeContext | null;
   qualityCheck: string;
+};
+
+type CurrentDiagnosisCase = {
+  messages: ChatMessage[];
+  engineContext: EngineContext | null;
+  faultCodeContext: FaultCodeContext | null;
+  qualityCheck: string;
+  openedCaseId?: string | null;
 };
 
 type PremiumLead = {
@@ -67,6 +81,7 @@ const DEMO_ACCOUNT_STORAGE_KEY = "diagnosehub-demo-account";
 const USER_PLAN_STORAGE_KEY = "diagnosehub-user-plan";
 const DIAGNOSIS_USAGE_STORAGE_KEY = "diagnosehub-diagnosis-usage";
 const SAVED_CASES_STORAGE_KEY = "diagnosehub-saved-cases";
+const CURRENT_CASE_STORAGE_KEY = "diagnosehub-current-case";
 const PREMIUM_LEADS_STORAGE_KEY = "diagnosehub-premium-leads";
 
 const planLimits: Record<
@@ -229,6 +244,14 @@ export default function DashboardPage() {
     loadDashboardData();
   }, []);
 
+  function showSuccess(message: string) {
+    setSuccess(message);
+
+    window.setTimeout(() => {
+      setSuccess("");
+    }, 2500);
+  }
+
   function loadDashboardData() {
     try {
       const savedAccount = localStorage.getItem(DEMO_ACCOUNT_STORAGE_KEY);
@@ -244,6 +267,8 @@ export default function DashboardPage() {
         if (isValidUserPlan(parsedAccount.plan)) {
           setUserPlan(parsedAccount.plan);
         }
+      } else {
+        setAccount(null);
       }
 
       if (isValidUserPlan(savedPlan)) {
@@ -262,6 +287,8 @@ export default function DashboardPage() {
           DIAGNOSIS_USAGE_STORAGE_KEY,
           JSON.stringify(normalizedSavedUsage)
         );
+      } else {
+        setUsage(getInitialUsage());
       }
 
       if (savedCaseList) {
@@ -270,6 +297,8 @@ export default function DashboardPage() {
         if (Array.isArray(parsedCases)) {
           setSavedCases(parsedCases);
         }
+      } else {
+        setSavedCases([]);
       }
 
       if (savedLeadList) {
@@ -278,10 +307,60 @@ export default function DashboardPage() {
         if (Array.isArray(parsedLeads)) {
           setPremiumLeads(parsedLeads);
         }
+      } else {
+        setPremiumLeads([]);
       }
     } catch (error) {
       console.error("Dashboard-Daten konnten nicht geladen werden:", error);
     }
+  }
+
+  function openSavedCase(savedCase: SavedDiagnosisCase) {
+    const currentCase: CurrentDiagnosisCase = {
+      messages: savedCase.messages,
+      engineContext: savedCase.engineContext,
+      faultCodeContext: savedCase.faultCodeContext,
+      qualityCheck: savedCase.qualityCheck,
+      openedCaseId: savedCase.id,
+    };
+
+    localStorage.setItem(CURRENT_CASE_STORAGE_KEY, JSON.stringify(currentCase));
+    window.location.href = "/#diagnose";
+  }
+
+  function deleteSavedCase(caseId: string) {
+    const updatedCases = savedCases.filter((savedCase) => {
+      return savedCase.id !== caseId;
+    });
+
+    setSavedCases(updatedCases);
+    localStorage.setItem(SAVED_CASES_STORAGE_KEY, JSON.stringify(updatedCases));
+
+    const currentCaseRaw = localStorage.getItem(CURRENT_CASE_STORAGE_KEY);
+
+    if (currentCaseRaw) {
+      try {
+        const currentCase = JSON.parse(currentCaseRaw) as CurrentDiagnosisCase;
+
+        if (currentCase.openedCaseId === caseId) {
+          localStorage.removeItem(CURRENT_CASE_STORAGE_KEY);
+        }
+      } catch {
+        localStorage.removeItem(CURRENT_CASE_STORAGE_KEY);
+      }
+    }
+
+    showSuccess("Diagnosefall wurde gelöscht.");
+  }
+
+  function deletePremiumLead(leadId: string) {
+    const updatedLeads = premiumLeads.filter((lead) => {
+      return lead.id !== leadId;
+    });
+
+    setPremiumLeads(updatedLeads);
+    localStorage.setItem(PREMIUM_LEADS_STORAGE_KEY, JSON.stringify(updatedLeads));
+    showSuccess("Premium-Vormerkung wurde gelöscht.");
   }
 
   function resetDailyUsage() {
@@ -289,11 +368,12 @@ export default function DashboardPage() {
 
     setUsage(nextUsage);
     localStorage.setItem(DIAGNOSIS_USAGE_STORAGE_KEY, JSON.stringify(nextUsage));
-    setSuccess("Tagesnutzung wurde zurückgesetzt.");
+    showSuccess("Tagesnutzung wurde zurückgesetzt.");
+  }
 
-    window.setTimeout(() => {
-      setSuccess("");
-    }, 2500);
+  function clearCurrentCase() {
+    localStorage.removeItem(CURRENT_CASE_STORAGE_KEY);
+    showSuccess("Aktuell geöffneter Diagnosefall wurde zurückgesetzt.");
   }
 
   function exportDashboardSummary() {
@@ -344,11 +424,7 @@ export default function DashboardPage() {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
-    setSuccess("Dashboard-Export wurde erstellt.");
-
-    window.setTimeout(() => {
-      setSuccess("");
-    }, 2500);
+    showSuccess("Dashboard-Export wurde erstellt.");
   }
 
   return (
@@ -368,8 +444,8 @@ export default function DashboardPage() {
               </h1>
 
               <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-400">
-                Lokales Dashboard für den Prototyp. Es zeigt Account, Plan,
-                Nutzung, gespeicherte Diagnosefälle und Premium-Vormerkungen.
+                Lokales Dashboard für den Prototyp. Fälle können direkt geöffnet
+                oder gelöscht werden.
               </p>
             </div>
 
@@ -507,12 +583,21 @@ export default function DashboardPage() {
                 muss das serverseitig über Benutzerkonto und Datenbank laufen.
               </p>
 
-              <button
-                onClick={resetDailyUsage}
-                className="mt-6 rounded-xl border border-yellow-500/40 px-5 py-3 font-semibold text-yellow-300 transition hover:bg-yellow-500 hover:text-slate-950"
-              >
-                Tageszähler zurücksetzen
-              </button>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <button
+                  onClick={resetDailyUsage}
+                  className="rounded-xl border border-yellow-500/40 px-5 py-3 font-semibold text-yellow-300 transition hover:bg-yellow-500 hover:text-slate-950"
+                >
+                  Tageszähler zurücksetzen
+                </button>
+
+                <button
+                  onClick={clearCurrentCase}
+                  className="rounded-xl border border-slate-700 px-5 py-3 font-semibold text-slate-300 transition hover:bg-slate-800"
+                >
+                  Aktuellen Fall leeren
+                </button>
+              </div>
             </div>
 
             {latestCase && (
@@ -533,12 +618,12 @@ export default function DashboardPage() {
                   Fehlercode: {getFaultCodeText(latestCase)}
                 </p>
 
-                <a
-                  href="/#diagnose"
-                  className="mt-6 inline-flex rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white transition hover:bg-blue-500"
+                <button
+                  onClick={() => openSavedCase(latestCase)}
+                  className="mt-6 rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white transition hover:bg-blue-500"
                 >
-                  In Diagnose öffnen
-                </a>
+                  Letzten Fall öffnen
+                </button>
               </div>
             )}
           </div>
@@ -570,12 +655,12 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {sortedCases.slice(0, 8).map((savedCase) => (
+                  {sortedCases.map((savedCase) => (
                     <div
                       key={savedCase.id}
                       className="rounded-2xl border border-slate-800 bg-slate-950/70 p-5"
                     >
-                      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                         <div>
                           <h3 className="font-bold text-white">
                             {savedCase.title}
@@ -587,7 +672,9 @@ export default function DashboardPage() {
                             </span>
 
                             {savedCase.engineContext?.code && (
-                              <span>Motorcode: {savedCase.engineContext.code}</span>
+                              <span>
+                                Motorcode: {savedCase.engineContext.code}
+                              </span>
                             )}
 
                             <span>Fehlercode: {getFaultCodeText(savedCase)}</span>
@@ -595,15 +682,25 @@ export default function DashboardPage() {
                             <span>{savedCase.messages.length} Nachrichten</span>
                           </div>
                         </div>
+
+                        <div className="flex flex-wrap gap-3">
+                          <button
+                            onClick={() => openSavedCase(savedCase)}
+                            className="rounded-xl border border-blue-500/40 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-300 transition hover:bg-blue-500 hover:text-white"
+                          >
+                            Öffnen
+                          </button>
+
+                          <button
+                            onClick={() => deleteSavedCase(savedCase.id)}
+                            className="rounded-xl border border-red-500/30 px-4 py-2 text-sm font-semibold text-red-300 transition hover:bg-red-500/10"
+                          >
+                            Löschen
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
-
-                  {sortedCases.length > 8 && (
-                    <p className="text-sm text-slate-500">
-                      Es werden nur die letzten 8 Fälle angezeigt.
-                    </p>
-                  )}
                 </div>
               )}
             </div>
@@ -634,38 +731,50 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {sortedLeads.slice(0, 5).map((lead) => (
+                  {sortedLeads.map((lead) => (
                     <div
                       key={lead.id}
                       className="rounded-2xl border border-slate-800 bg-slate-950/70 p-5"
                     >
-                      <div className="flex flex-wrap gap-3">
-                        <span className="rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-yellow-300">
-                          {premiumLeadPlanLabels[lead.plan]}
-                        </span>
+                      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                        <div>
+                          <div className="flex flex-wrap gap-3">
+                            <span className="rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-yellow-300">
+                              {premiumLeadPlanLabels[lead.plan]}
+                            </span>
 
-                        <span className="text-sm text-slate-500">
-                          {formatDateTime(lead.createdAt)}
-                        </span>
+                            <span className="text-sm text-slate-500">
+                              {formatDateTime(lead.createdAt)}
+                            </span>
+                          </div>
+
+                          <h3 className="mt-4 font-bold text-white">
+                            {lead.workshop}
+                          </h3>
+
+                          <p className="mt-2 text-slate-400">{lead.name}</p>
+
+                          <div className="mt-2 flex flex-wrap gap-3 text-sm text-slate-500">
+                            <span>{lead.email}</span>
+                            {lead.phone && <span>{lead.phone}</span>}
+                          </div>
+
+                          {lead.note && (
+                            <p className="mt-4 leading-7 text-slate-400">
+                              {lead.note}
+                            </p>
+                          )}
+                        </div>
+
+                        <button
+                          onClick={() => deletePremiumLead(lead.id)}
+                          className="rounded-xl border border-red-500/30 px-4 py-2 text-sm font-semibold text-red-300 transition hover:bg-red-500/10"
+                        >
+                          Löschen
+                        </button>
                       </div>
-
-                      <h3 className="mt-4 font-bold text-white">
-                        {lead.workshop}
-                      </h3>
-
-                      <p className="mt-2 text-slate-400">{lead.name}</p>
-
-                      <p className="mt-2 text-sm text-slate-500">
-                        {lead.email}
-                      </p>
                     </div>
                   ))}
-
-                  {sortedLeads.length > 5 && (
-                    <p className="text-sm text-slate-500">
-                      Es werden nur die letzten 5 Vormerkungen angezeigt.
-                    </p>
-                  )}
                 </div>
               )}
             </div>

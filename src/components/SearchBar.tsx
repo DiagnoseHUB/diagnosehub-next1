@@ -10,6 +10,20 @@ type EngineContext = {
   notes?: string;
 };
 
+type FaultCodeInfo = {
+  code: string;
+  title: string;
+  system: string;
+  description: string;
+  typicalCauses: string[];
+  suggestedChecks: string[];
+};
+
+type FaultCodeContext = {
+  foundCodes: FaultCodeInfo[];
+  summary: string;
+};
+
 type ChatMessage = {
   role: "user" | "assistant";
   content: string;
@@ -28,6 +42,8 @@ export default function SearchBar() {
   const [search, setSearch] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [engineContext, setEngineContext] = useState<EngineContext | null>(null);
+  const [faultCodeContext, setFaultCodeContext] =
+    useState<FaultCodeContext | null>(null);
   const [qualityCheck, setQualityCheck] = useState("");
   const [copySuccess, setCopySuccess] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
@@ -53,6 +69,7 @@ export default function SearchBar() {
 
         setMessages(parsedCase.messages || []);
         setEngineContext(parsedCase.engineContext || null);
+        setFaultCodeContext(parsedCase.faultCodeContext || null);
         setQualityCheck(parsedCase.qualityCheck || "");
       }
     } catch (error) {
@@ -75,11 +92,12 @@ export default function SearchBar() {
     const currentCase = {
       messages,
       engineContext,
+      faultCodeContext,
       qualityCheck,
     };
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(currentCase));
-  }, [messages, engineContext, qualityCheck]);
+  }, [messages, engineContext, faultCodeContext, qualityCheck]);
 
   async function sendDiagnosis(questionOverride?: string) {
     const currentInput = (questionOverride ?? search).trim();
@@ -133,6 +151,7 @@ export default function SearchBar() {
 
       setMessages([...nextMessages, assistantMessage]);
       setEngineContext(data.engineContext);
+      setFaultCodeContext(data.faultCodeContext || null);
       setQualityCheck(data.qualityCheck || "");
     } catch (error) {
       console.error(error);
@@ -148,6 +167,7 @@ export default function SearchBar() {
     setSearch("");
     setMessages([]);
     setEngineContext(null);
+    setFaultCodeContext(null);
     setQualityCheck("");
     setCopySuccess(false);
     setDownloadSuccess(false);
@@ -160,6 +180,26 @@ export default function SearchBar() {
       event.preventDefault();
       void sendDiagnosis();
     }
+  }
+
+  function buildFaultCodeReport() {
+    if (!faultCodeContext || faultCodeContext.foundCodes.length === 0) {
+      return "Keine bekannten Fehlercodes erkannt.";
+    }
+
+    return faultCodeContext.foundCodes
+      .map((faultCode) => {
+        return `${faultCode.code} - ${faultCode.title}
+System: ${faultCode.system}
+Beschreibung: ${faultCode.description}
+
+Typische Ursachen:
+${faultCode.typicalCauses.map((cause) => `- ${cause}`).join("\n")}
+
+Empfohlene Prüfungen:
+${faultCode.suggestedChecks.map((check) => `- ${check}`).join("\n")}`;
+      })
+      .join("\n\n---\n\n");
   }
 
   function buildCaseReport() {
@@ -190,7 +230,11 @@ export default function SearchBar() {
 Erstellt am:
 ${createdAt}
 
+Motorkontext:
 ${motorInfo}
+
+Fehlercode-Kontext:
+${buildFaultCodeReport()}
 
 Qualitätsprüfung:
 ${qualityCheck || "Keine Qualitätsprüfung vorhanden."}
@@ -235,7 +279,10 @@ ${chatText}
 
       const date = new Date().toISOString().slice(0, 10);
       const motorCode = engineContext?.code ?? "fall";
-      const fileName = `diagnosehub-${motorCode}-${date}.txt`;
+      const firstFaultCode = faultCodeContext?.foundCodes[0]?.code;
+      const fileName = firstFaultCode
+        ? `diagnosehub-${motorCode}-${firstFaultCode}-${date}.txt`
+        : `diagnosehub-${motorCode}-${date}.txt`;
 
       link.href = url;
       link.download = fileName;
@@ -265,7 +312,7 @@ ${chatText}
           onKeyDown={handleKeyDown}
           placeholder={
             messages.length === 0
-              ? "Beschreibe den Fehlerfall, z. B. Audi A4 B8 CDHB ruckelt im Leerlauf..."
+              ? "Beschreibe den Fehlerfall, z. B. VW Passat CBAB P0299 Leistungsverlust..."
               : "Folgefrage stellen, z. B. Ladedruck Sollwert?"
           }
           rows={4}
@@ -386,6 +433,81 @@ ${chatText}
               {engineContext.notes}
             </p>
           )}
+        </section>
+      )}
+
+      {faultCodeContext && faultCodeContext.foundCodes.length > 0 && (
+        <section className="mt-5 rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl shadow-blue-950/20">
+          <p className="mb-4 text-sm font-semibold uppercase tracking-wide text-blue-400">
+            Erkannte Fehlercodes
+          </p>
+
+          <div className="space-y-5">
+            {faultCodeContext.foundCodes.map((faultCode) => (
+              <div
+                key={faultCode.code}
+                className="rounded-2xl border border-slate-800 bg-slate-950/70 p-5"
+              >
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <p className="text-sm text-slate-500">Fehlercode</p>
+                    <h3 className="mt-1 text-2xl font-bold text-white">
+                      {faultCode.code}
+                    </h3>
+                  </div>
+
+                  <div className="md:text-right">
+                    <p className="text-sm text-slate-500">System</p>
+                    <p className="mt-1 font-semibold text-blue-300">
+                      {faultCode.system}
+                    </p>
+                  </div>
+                </div>
+
+                <h4 className="mt-5 text-xl font-bold text-white">
+                  {faultCode.title}
+                </h4>
+
+                <p className="mt-3 leading-7 text-slate-400">
+                  {faultCode.description}
+                </p>
+
+                <div className="mt-6 grid gap-6 lg:grid-cols-2">
+                  <div>
+                    <p className="mb-3 font-semibold text-white">
+                      Typische Ursachen
+                    </p>
+
+                    <ul className="space-y-2 text-slate-300">
+                      {faultCode.typicalCauses.map((cause) => (
+                        <li key={cause} className="flex gap-3">
+                          <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-blue-400" />
+                          <span>{cause}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div>
+                    <p className="mb-3 font-semibold text-white">
+                      Empfohlene Prüfungen
+                    </p>
+
+                    <ol className="space-y-2 text-slate-300">
+                      {faultCode.suggestedChecks.map((check, index) => (
+                        <li key={check} className="flex gap-3">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
+                            {index + 1}
+                          </span>
+                          <span>{check}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </section>
       )}
 

@@ -1,7 +1,21 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+type UserPlan = "free" | "werkstatt" | "pro";
+
+type DemoAccount = {
+  name: string;
+  workshop: string;
+  email: string;
+  role: string;
+  plan: UserPlan;
+  updatedAt: string;
+};
+
+const DEMO_ACCOUNT_STORAGE_KEY = "diagnosehub-demo-account";
+const USER_PLAN_STORAGE_KEY = "diagnosehub-user-plan";
 
 const navigationLinks = [
   { label: "Diagnose", href: "/#diagnose" },
@@ -10,12 +24,74 @@ const navigationLinks = [
   { label: "Hinweis", href: "/#hinweis" },
 ];
 
+const planLabels: Record<UserPlan, string> = {
+  free: "Free",
+  werkstatt: "Werkstatt Demo",
+  pro: "Pro Demo",
+};
+
+function isValidUserPlan(value: string | null): value is UserPlan {
+  return value === "free" || value === "werkstatt" || value === "pro";
+}
+
 function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [demoAccount, setDemoAccount] = useState<DemoAccount | null>(null);
+  const [userPlan, setUserPlan] = useState<UserPlan>("free");
 
   function closeMobileMenu() {
     setMobileMenuOpen(false);
   }
+
+  function loadAccountState() {
+    try {
+      const savedAccount = localStorage.getItem(DEMO_ACCOUNT_STORAGE_KEY);
+      const savedPlan = localStorage.getItem(USER_PLAN_STORAGE_KEY);
+
+      if (isValidUserPlan(savedPlan)) {
+        setUserPlan(savedPlan);
+      } else {
+        setUserPlan("free");
+      }
+
+      if (savedAccount) {
+        const parsedAccount = JSON.parse(savedAccount) as DemoAccount;
+
+        setDemoAccount(parsedAccount);
+
+        if (isValidUserPlan(parsedAccount.plan)) {
+          setUserPlan(parsedAccount.plan);
+        }
+
+        return;
+      }
+
+      setDemoAccount(null);
+    } catch (error) {
+      console.error("Accountstatus konnte nicht geladen werden:", error);
+      setDemoAccount(null);
+      setUserPlan("free");
+    }
+  }
+
+  useEffect(() => {
+    loadAccountState();
+
+    function handleStorageChange() {
+      loadAccountState();
+    }
+
+    window.addEventListener("storage", handleStorageChange);
+    window.addEventListener("focus", handleStorageChange);
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("focus", handleStorageChange);
+    };
+  }, []);
+
+  const accountLabel = demoAccount?.workshop || "Kein Account";
+  const planLabel = planLabels[userPlan];
 
   return (
     <header className="sticky top-0 z-50 border-b border-slate-800 bg-slate-950/90 backdrop-blur-xl">
@@ -65,9 +141,22 @@ function Header() {
           <div className="hidden items-center gap-3 md:flex">
             <a
               href="/login"
-              className="rounded-xl border border-slate-700 px-5 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-slate-800 hover:text-white"
+              className={
+                demoAccount
+                  ? "rounded-xl border border-blue-500/40 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-300 transition hover:bg-blue-500 hover:text-white"
+                  : "rounded-xl border border-slate-700 px-5 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-slate-800 hover:text-white"
+              }
             >
-              Login
+              {demoAccount ? (
+                <span className="flex items-center gap-2">
+                  <span className="max-w-40 truncate">{accountLabel}</span>
+                  <span className="rounded-full bg-slate-950/70 px-2 py-0.5 text-xs">
+                    {planLabel}
+                  </span>
+                </span>
+              ) : (
+                "Login"
+              )}
             </a>
 
             <a
@@ -100,6 +189,20 @@ function Header() {
         {mobileMenuOpen && (
           <div className="border-t border-slate-800 py-5 md:hidden">
             <nav className="grid gap-3">
+              {demoAccount && (
+                <a
+                  href="/login"
+                  onClick={closeMobileMenu}
+                  className="rounded-2xl border border-blue-500/40 bg-blue-500/10 px-5 py-4"
+                >
+                  <p className="text-sm font-semibold uppercase tracking-wide text-blue-300">
+                    Aktiver Account
+                  </p>
+                  <p className="mt-2 font-bold text-white">{accountLabel}</p>
+                  <p className="mt-1 text-sm text-slate-400">{planLabel}</p>
+                </a>
+              )}
+
               {navigationLinks.map((link) => (
                 <a
                   key={link.href}
@@ -124,7 +227,7 @@ function Header() {
                 onClick={closeMobileMenu}
                 className="rounded-2xl border border-slate-700 px-5 py-4 text-left font-semibold text-slate-300 transition hover:bg-slate-800 hover:text-white"
               >
-                Login
+                {demoAccount ? "Account verwalten" : "Login"}
               </a>
 
               <a

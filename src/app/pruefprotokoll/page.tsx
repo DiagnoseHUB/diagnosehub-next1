@@ -42,6 +42,15 @@ type CurrentDiagnosisCase = {
 
 type UserPlan = "free" | "werkstatt" | "pro";
 
+type DemoAccount = {
+  name: string;
+  workshop: string;
+  email: string;
+  role: string;
+  plan: UserPlan;
+  updatedAt: string;
+};
+
 type ProtocolProfile = {
   title: string;
   subtitle: string;
@@ -54,6 +63,7 @@ type ProtocolProfile = {
 
 const CURRENT_CASE_STORAGE_KEY = "diagnosehub-current-case";
 const USER_PLAN_STORAGE_KEY = "diagnosehub-user-plan";
+const DEMO_ACCOUNT_STORAGE_KEY = "diagnosehub-demo-account";
 
 const planLabels: Record<UserPlan, string> = {
   free: "Free",
@@ -650,6 +660,7 @@ export default function PruefprotokollPage() {
     null
   );
   const [userPlan, setUserPlan] = useState<UserPlan>("free");
+  const [demoAccount, setDemoAccount] = useState<DemoAccount | null>(null);
   const [generatedAt, setGeneratedAt] = useState("");
 
   useEffect(() => {
@@ -658,6 +669,7 @@ export default function PruefprotokollPage() {
     try {
       const savedCase = localStorage.getItem(CURRENT_CASE_STORAGE_KEY);
       const savedPlan = localStorage.getItem(USER_PLAN_STORAGE_KEY);
+      const savedAccount = localStorage.getItem(DEMO_ACCOUNT_STORAGE_KEY);
 
       if (savedCase) {
         const parsedCase = JSON.parse(savedCase);
@@ -666,6 +678,15 @@ export default function PruefprotokollPage() {
 
       if (isValidUserPlan(savedPlan)) {
         setUserPlan(savedPlan);
+      }
+
+      if (savedAccount) {
+        const parsedAccount = JSON.parse(savedAccount) as DemoAccount;
+        setDemoAccount(parsedAccount);
+
+        if (isValidUserPlan(parsedAccount.plan)) {
+          setUserPlan(parsedAccount.plan);
+        }
       }
     } catch (error) {
       console.error("Diagnosefall konnte nicht geladen werden:", error);
@@ -866,7 +887,22 @@ export default function PruefprotokollPage() {
           </header>
 
           <div className="space-y-8">
-            <ProtocolSection title="1. Fahrzeugdaten">
+            <ProtocolSection title="1. Werkstattdaten">
+              <div className="grid gap-4 md:grid-cols-2">
+                <LineField
+                  label="Werkstatt"
+                  value={demoAccount?.workshop || ""}
+                />
+                <LineField
+                  label="Bearbeiter"
+                  value={demoAccount?.name || ""}
+                />
+                <LineField label="E-Mail" value={demoAccount?.email || ""} />
+                <LineField label="Rolle" value={demoAccount?.role || ""} />
+              </div>
+            </ProtocolSection>
+
+            <ProtocolSection title="2. Fahrzeugdaten">
               <div className="grid gap-4 md:grid-cols-2">
                 <LineField label="Hersteller" />
                 <LineField label="Modell" />
@@ -890,7 +926,7 @@ export default function PruefprotokollPage() {
               </div>
             </ProtocolSection>
 
-            <ProtocolSection title="2. Prüfprofil">
+            <ProtocolSection title="3. Prüfprofil">
               <div className="rounded-xl border-2 border-slate-950 bg-slate-100 p-4">
                 <p className="text-xs font-bold uppercase tracking-wide text-slate-600">
                   {premiumAccess
@@ -940,7 +976,7 @@ export default function PruefprotokollPage() {
               )}
             </ProtocolSection>
 
-            <ProtocolSection title="3. Kundenbeanstandung / Fehlerbild">
+            <ProtocolSection title="4. Kundenbeanstandung / Fehlerbild">
               <div className="grid gap-4 md:grid-cols-2">
                 <TextAreaField label="Kundenbeanstandung" lines={4} />
                 <TextAreaField label="Wann tritt der Fehler auf?" lines={4} />
@@ -952,7 +988,7 @@ export default function PruefprotokollPage() {
               </div>
             </ProtocolSection>
 
-            <ProtocolSection title="4. Fehlerspeicher">
+            <ProtocolSection title="5. Fehlerspeicher">
               <div className="mb-4 grid gap-4 md:grid-cols-2">
                 <TextAreaField
                   label="Kurze KI-Zusammenfassung"
@@ -999,7 +1035,7 @@ export default function PruefprotokollPage() {
             </ProtocolSection>
 
             {premiumAccess && faultCodeCauses.length > 0 && (
-              <ProtocolSection title="5. Typische Ursachen laut Fehlercode">
+              <ProtocolSection title="6. Typische Ursachen laut Fehlercode">
                 <div className="grid gap-3 md:grid-cols-2">
                   {faultCodeCauses.map((cause) => (
                     <CheckItem key={cause} label={cause} />
@@ -1009,7 +1045,7 @@ export default function PruefprotokollPage() {
             )}
 
             {premiumAccess && faultCodeChecks.length > 0 && (
-              <ProtocolSection title="6. Empfohlene Prüfungen laut Fehlercode">
+              <ProtocolSection title="7. Empfohlene Prüfungen laut Fehlercode">
                 <div className="grid gap-3 md:grid-cols-2">
                   {faultCodeChecks.map((check) => (
                     <CheckItem key={check} label={check} />
@@ -1018,7 +1054,7 @@ export default function PruefprotokollPage() {
               </ProtocolSection>
             )}
 
-            <ProtocolSection title={premiumAccess ? "7. Sichtprüfung" : "5. Sichtprüfung"}>
+            <ProtocolSection title={premiumAccess ? "8. Sichtprüfung" : "6. Sichtprüfung"}>
               <div className="grid gap-3 md:grid-cols-2">
                 {visualChecks.map((check) => (
                   <CheckItem key={check} label={check} />
@@ -1030,7 +1066,7 @@ export default function PruefprotokollPage() {
               </div>
             </ProtocolSection>
 
-            <ProtocolSection title={premiumAccess ? "8. Messwerte" : "6. Messwerte"}>
+            <ProtocolSection title={premiumAccess ? "9. Messwerte" : "7. Messwerte"}>
               <table className="w-full border-collapse text-xs">
                 <thead>
                   <tr className="bg-slate-200">
@@ -1069,7 +1105,7 @@ export default function PruefprotokollPage() {
             </ProtocolSection>
 
             <ProtocolSection
-              title={premiumAccess ? "9. Diagnose-Checkliste" : "7. Diagnose-Checkliste"}
+              title={premiumAccess ? "10. Diagnose-Checkliste" : "8. Diagnose-Checkliste"}
             >
               <div className="grid gap-3 md:grid-cols-2">
                 {diagnosticChecks.map((check) => (
@@ -1079,7 +1115,7 @@ export default function PruefprotokollPage() {
             </ProtocolSection>
 
             <ProtocolSection
-              title={premiumAccess ? "10. Ergebnis / Reparaturempfehlung" : "8. Ergebnis / Reparaturempfehlung"}
+              title={premiumAccess ? "11. Ergebnis / Reparaturempfehlung" : "9. Ergebnis / Reparaturempfehlung"}
             >
               <div className="grid gap-4">
                 <TextAreaField label="Festgestellte Ursache" lines={4} />
@@ -1098,10 +1134,13 @@ export default function PruefprotokollPage() {
             </ProtocolSection>
 
             <ProtocolSection
-              title={premiumAccess ? "11. Freigabe / Unterschrift" : "9. Freigabe / Unterschrift"}
+              title={premiumAccess ? "12. Freigabe / Unterschrift" : "10. Freigabe / Unterschrift"}
             >
               <div className="grid gap-6 md:grid-cols-3">
-                <LineField label="Diagnose durchgeführt von" />
+                <LineField
+                  label="Diagnose durchgeführt von"
+                  value={demoAccount?.name || ""}
+                />
                 <LineField label="Datum" />
                 <LineField label="Unterschrift" />
               </div>

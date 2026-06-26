@@ -1,11 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type {
-  AuthChangeEvent,
-  Session,
-  User,
-} from "@supabase/supabase-js";
+import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { createClient } from "@/lib/supabase/client";
@@ -18,6 +14,13 @@ import {
   type FaultCodeContext,
   type SavedDiagnosisCase,
 } from "@/services/diagnosisCasesSupabase";
+import {
+  getInitialDiagnosisUsage,
+  loadDiagnosisUsageFromSupabase,
+  normalizeDiagnosisUsage,
+  resetDiagnosisUsageInSupabase,
+  type DiagnosisUsage,
+} from "@/services/diagnosisUsageSupabase";
 
 type UserPlan = "free" | "werkstatt" | "pro";
 
@@ -42,11 +45,6 @@ type WorkshopProfile = {
   updated_at: string;
 };
 
-type DiagnosisUsage = {
-  date: string;
-  count: number;
-};
-
 type CurrentDiagnosisCase = {
   messages: ChatMessage[];
   engineContext: EngineContext | null;
@@ -67,6 +65,7 @@ type PremiumLead = {
 };
 
 type CaseStorageSource = "local" | "supabase";
+type UsageStorageSource = "local" | "supabase";
 
 const DEMO_ACCOUNT_STORAGE_KEY = "diagnosehub-demo-account";
 const USER_PLAN_STORAGE_KEY = "diagnosehub-user-plan";
@@ -112,30 +111,6 @@ const premiumLeadPlanLabels: Record<"werkstatt" | "pro", string> = {
   werkstatt: "Werkstatt",
   pro: "Werkstatt Pro",
 };
-
-function getTodayKey() {
-  return new Date().toLocaleDateString("sv-SE");
-}
-
-function getInitialUsage(): DiagnosisUsage {
-  return {
-    date: getTodayKey(),
-    count: 0,
-  };
-}
-
-function normalizeUsage(usage: DiagnosisUsage): DiagnosisUsage {
-  const today = getTodayKey();
-
-  if (usage.date !== today) {
-    return {
-      date: today,
-      count: 0,
-    };
-  }
-
-  return usage;
-}
 
 function isValidUserPlan(value: string | null): value is UserPlan {
   return value === "free" || value === "werkstatt" || value === "pro";
@@ -212,6 +187,10 @@ function saveCasesToLocalStorage(savedCases: SavedDiagnosisCase[]) {
   localStorage.setItem(SAVED_CASES_STORAGE_KEY, JSON.stringify(savedCases));
 }
 
+function saveUsageToLocalStorage(usage: DiagnosisUsage) {
+  localStorage.setItem(DIAGNOSIS_USAGE_STORAGE_KEY, JSON.stringify(usage));
+}
+
 function StatCard({
   label,
   value,
@@ -244,7 +223,11 @@ export default function DashboardPage() {
 
   const [account, setAccount] = useState<DemoAccount | null>(null);
   const [userPlan, setUserPlan] = useState<UserPlan>("free");
-  const [usage, setUsage] = useState<DiagnosisUsage>(getInitialUsage());
+  const [usage, setUsage] = useState<DiagnosisUsage>(
+    getInitialDiagnosisUsage()
+  );
+  const [usageStorageSource, setUsageStorageSource] =
+    useState<UsageStorageSource>("local");
   const [savedCases, setSavedCases] = useState<SavedDiagnosisCase[]>([]);
   const [caseStorageSource, setCaseStorageSource] =
     useState<CaseStorageSource>("local");
@@ -253,9 +236,10 @@ export default function DashboardPage() {
   const [error, setError] = useState("");
   const [profileLoading, setProfileLoading] = useState(false);
   const [caseLoading, setCaseLoading] = useState(false);
+  const [usageLoading, setUsageLoading] = useState(false);
 
   const currentPlan = planLimits[userPlan];
-  const normalizedUsage = normalizeUsage(usage);
+  const normalizedUsage = normalizeDiagnosisUsage(usage);
 
   const remainingDiagnoses = Math.max(
     currentPlan.dailyLimit - normalizedUsage.count,
@@ -295,10 +279,13 @@ export default function DashboardPage() {
 
         if (nextSession?.user) {
           await loadWorkshopProfile(nextSession.user);
+          await loadSupabaseUsage(nextSession.user);
           await loadSupabaseCases(nextSession.user, false);
         } else {
           setDatabaseProfile(null);
+          setUsageStorageSource("local");
           loadLocalAccountFallback();
+          loadLocalUsageAndLeads();
           loadLocalCasesIntoState();
         }
       }
@@ -371,18 +358,17 @@ export default function DashboardPage() {
 
       if (savedUsage) {
         const parsedUsage = JSON.parse(savedUsage);
-        const normalizedSavedUsage = normalizeUsage({
-          date: parsedUsage.date || getTodayKey(),
+        const normalizedSavedUsage = normalizeDiagnosisUsage({
+          date: parsedUsage.date || getInitialDiagnosisUsage().date,
           count: Number(parsedUsage.count) || 0,
         });
 
         setUsage(normalizedSavedUsage);
-        localStorage.setItem(
-          DIAGNOSIS_USAGE_STORAGE_KEY,
-          JSON.stringify(normalizedSavedUsage)
-        );
+        saveUsageToLocalStorage(normalizedSavedUsage);
       } else {
-        setUsage(getInitialUsage());
+        const initialUsage = getInitialDiagnosisUsage();
+        setUsage(initialUsage);
+        saveUsageToLocalStorage(initialUsage);
       }
 
       if (savedLeadList) {
@@ -437,6 +423,31 @@ export default function DashboardPage() {
     }
   }
 
+  async function loadSupabaseUsage(currentUser: User) {
+    setUsageLoading(true);
+    setError("");
+
+    try {
+      const remoteUsage = await loadDiagnosisUsageFromSupabase(
+        supabase,
+        currentUser
+      );
+
+      setUsage(remoteUsage);
+      saveUsageToLocalStorage(remoteUsage);
+      setUsageStorageSource("supabase");
+    } catch (error) {
+      console.error("Supabase-Nutzung konnte nicht geladen werden:", error);
+      showError(
+        "Supabase-Nutzung konnte nicht geladen werden. Lokaler Zähler bleibt sichtbar."
+      );
+      setUsageStorageSource("local");
+      loadLocalUsageAndLeads();
+    } finally {
+      setUsageLoading(false);
+    }
+  }
+
   async function loadSupabaseCases(currentUser: User, migrateLocal: boolean) {
     setCaseLoading(true);
     setError("");
@@ -487,10 +498,12 @@ export default function DashboardPage() {
 
       if (sessionData.session?.user) {
         await loadWorkshopProfile(sessionData.session.user);
+        await loadSupabaseUsage(sessionData.session.user);
         await loadSupabaseCases(sessionData.session.user, false);
       } else {
         loadLocalAccountFallback();
         loadLocalCasesIntoState();
+        setUsageStorageSource("local");
       }
     } catch (error) {
       console.error("Dashboard-Daten konnten nicht geladen werden:", error);
@@ -565,12 +578,33 @@ export default function DashboardPage() {
     showSuccess("Premium-Vormerkung wurde gelöscht.");
   }
 
-  function resetDailyUsage() {
-    const nextUsage = getInitialUsage();
+  async function resetDailyUsage() {
+    if (user && usageStorageSource === "supabase") {
+      setUsageLoading(true);
+
+      try {
+        const nextUsage = await resetDiagnosisUsageInSupabase(supabase, user);
+
+        setUsage(nextUsage);
+        saveUsageToLocalStorage(nextUsage);
+        setUsageStorageSource("supabase");
+        showSuccess("Supabase-Tagesnutzung wurde zurückgesetzt.");
+      } catch (error) {
+        console.error("Supabase-Nutzung konnte nicht zurückgesetzt werden:", error);
+        showError("Supabase-Nutzung konnte nicht zurückgesetzt werden.");
+      } finally {
+        setUsageLoading(false);
+      }
+
+      return;
+    }
+
+    const nextUsage = getInitialDiagnosisUsage();
 
     setUsage(nextUsage);
-    localStorage.setItem(DIAGNOSIS_USAGE_STORAGE_KEY, JSON.stringify(nextUsage));
-    showSuccess("Tagesnutzung wurde zurückgesetzt.");
+    saveUsageToLocalStorage(nextUsage);
+    setUsageStorageSource("local");
+    showSuccess("Lokale Tagesnutzung wurde zurückgesetzt.");
   }
 
   function clearCurrentCase() {
@@ -596,6 +630,16 @@ export default function DashboardPage() {
 
     await loadSupabaseCases(user, false);
     showSuccess("Diagnosefälle wurden aus Supabase aktualisiert.");
+  }
+
+  async function refreshSupabaseUsage() {
+    if (!user) {
+      showError("Kein Supabase-User eingeloggt.");
+      return;
+    }
+
+    await loadSupabaseUsage(user);
+    showSuccess("Nutzungszähler wurde aus Supabase aktualisiert.");
   }
 
   async function migrateLocalCasesNow() {
@@ -649,6 +693,7 @@ export default function DashboardPage() {
       "----",
       `Aktiver Plan: ${currentPlan.label}`,
       `Diagnosen heute: ${normalizedUsage.count} / ${currentPlan.dailyLimit}`,
+      `Nutzungsquelle: ${usageStorageSource}`,
       `Gespeicherte Fälle: ${savedCases.length} / ${currentPlan.savedCaseLimit}`,
       `Fallquelle: ${caseStorageSource}`,
       "",
@@ -694,9 +739,10 @@ export default function DashboardPage() {
       : "Kein Profil";
 
   const caseSourceLabel =
-    caseStorageSource === "supabase"
-      ? "Supabase Fälle"
-      : "Lokale Fälle";
+    caseStorageSource === "supabase" ? "Supabase Fälle" : "Lokale Fälle";
+
+  const usageSourceLabel =
+    usageStorageSource === "supabase" ? "Supabase Nutzung" : "Lokale Nutzung";
 
   const activeWorkshop =
     databaseProfile?.workshop_name || account?.workshop || null;
@@ -705,6 +751,8 @@ export default function DashboardPage() {
   const activeEmail = databaseProfile?.email || account?.email || user?.email;
   const activeRole = databaseProfile?.role || account?.role || null;
   const activeUpdatedAt = databaseProfile?.updated_at || account?.updatedAt;
+
+  const isLoading = profileLoading || caseLoading || usageLoading;
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
@@ -723,19 +771,19 @@ export default function DashboardPage() {
               </h1>
 
               <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-400">
-                Das Dashboard liest Werkstattprofil und Diagnosefälle jetzt aus
-                Supabase. Nutzung und Premium-Vormerkungen laufen vorerst noch
-                lokal.
+                Dashboard mit Supabase-Werkstattprofil, Supabase-Fallhistorie
+                und Supabase-Nutzungszähler. Premium-Vormerkungen laufen
+                vorerst noch lokal.
               </p>
             </div>
 
             <div className="flex flex-wrap gap-3 lg:justify-end">
               <button
                 onClick={() => void loadDashboardData()}
-                disabled={profileLoading || caseLoading}
+                disabled={isLoading}
                 className="rounded-xl border border-slate-700 px-5 py-3 font-semibold text-slate-300 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Aktualisieren
+                {isLoading ? "Lädt..." : "Aktualisieren"}
               </button>
 
               <button
@@ -780,13 +828,11 @@ export default function DashboardPage() {
           />
 
           <StatCard
-            label="Fallquelle"
-            value={caseSourceLabel}
-            subtext={
-              user
-                ? "Supabase-Login erkannt."
-                : "Kein Login. Fallback auf lokale Fälle."
-            }
+            label="Datenquelle"
+            value={usageSourceLabel}
+            subtext={`${caseSourceLabel} · ${
+              user ? "Supabase-Login erkannt." : "Kein Login aktiv."
+            }`}
           />
         </section>
 
@@ -819,7 +865,8 @@ export default function DashboardPage() {
 
                   <p className="mt-2 leading-7 text-slate-300">
                     Melde dich an, damit das Dashboard dein echtes
-                    Werkstattprofil und deine Fälle aus Supabase laden kann.
+                    Werkstattprofil, deine Fälle und deine Nutzung aus Supabase
+                    laden kann.
                   </p>
                 </div>
               )}
@@ -926,18 +973,34 @@ export default function DashboardPage() {
               </p>
 
               <h2 className="mt-3 text-3xl font-bold">
-                Tageslimit überwachen
+                {usageSourceLabel}
               </h2>
 
               <p className="mt-4 leading-7 text-slate-400">
-                Die Nutzung wird noch lokal im Browser gezählt. Diagnosefälle
-                liegen bei aktivem Login jetzt bereits in Supabase.
+                Heute gezählt:{" "}
+                <span className="font-bold text-white">
+                  {normalizedUsage.count}
+                </span>{" "}
+                von{" "}
+                <span className="font-bold text-white">
+                  {currentPlan.dailyLimit}
+                </span>{" "}
+                Diagnosen. Bei aktivem Login kommt dieser Wert aus Supabase.
               </p>
 
               <div className="mt-6 flex flex-wrap gap-3">
                 <button
-                  onClick={resetDailyUsage}
-                  className="rounded-xl border border-yellow-500/40 px-5 py-3 font-semibold text-yellow-300 transition hover:bg-yellow-500 hover:text-slate-950"
+                  onClick={() => void refreshSupabaseUsage()}
+                  disabled={!user || usageLoading}
+                  className="rounded-xl border border-green-500/40 px-5 py-3 font-semibold text-green-300 transition hover:bg-green-500 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {usageLoading ? "Lädt..." : "Nutzung neu laden"}
+                </button>
+
+                <button
+                  onClick={() => void resetDailyUsage()}
+                  disabled={usageLoading}
+                  className="rounded-xl border border-yellow-500/40 px-5 py-3 font-semibold text-yellow-300 transition hover:bg-yellow-500 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Tageszähler zurücksetzen
                 </button>

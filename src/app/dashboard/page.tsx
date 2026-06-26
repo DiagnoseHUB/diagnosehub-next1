@@ -1,8 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type {
+  AuthChangeEvent,
+  Session,
+  User,
+} from "@supabase/supabase-js";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import { createClient } from "@/lib/supabase/client";
 
 type UserPlan = "free" | "werkstatt" | "pro";
 
@@ -13,6 +19,18 @@ type DemoAccount = {
   role: string;
   plan: UserPlan;
   updatedAt: string;
+  supabaseUserId?: string;
+};
+
+type WorkshopProfile = {
+  id: string;
+  full_name: string;
+  workshop_name: string;
+  email: string;
+  role: string;
+  plan: UserPlan;
+  created_at: string;
+  updated_at: string;
 };
 
 type DiagnosisUsage = {
@@ -181,6 +199,21 @@ function getFaultCodeText(savedCase: SavedDiagnosisCase) {
   return firstCode;
 }
 
+function convertProfileToLocalAccount(
+  profile: WorkshopProfile,
+  userId: string
+): DemoAccount {
+  return {
+    name: profile.full_name,
+    workshop: profile.workshop_name,
+    email: profile.email,
+    role: profile.role,
+    plan: profile.plan,
+    updatedAt: profile.updated_at,
+    supabaseUserId: userId,
+  };
+}
+
 function StatCard({
   label,
   value,
@@ -204,12 +237,21 @@ function StatCard({
 }
 
 export default function DashboardPage() {
+  const supabase = useMemo(() => createClient(), []);
+
+  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [databaseProfile, setDatabaseProfile] =
+    useState<WorkshopProfile | null>(null);
+
   const [account, setAccount] = useState<DemoAccount | null>(null);
   const [userPlan, setUserPlan] = useState<UserPlan>("free");
   const [usage, setUsage] = useState<DiagnosisUsage>(getInitialUsage());
   const [savedCases, setSavedCases] = useState<SavedDiagnosisCase[]>([]);
   const [premiumLeads, setPremiumLeads] = useState<PremiumLead[]>([]);
   const [success, setSuccess] = useState("");
+  const [error, setError] = useState("");
+  const [profileLoading, setProfileLoading] = useState(false);
 
   const currentPlan = planLimits[userPlan];
   const normalizedUsage = normalizeUsage(usage);
@@ -242,23 +284,57 @@ export default function DashboardPage() {
 
   useEffect(() => {
     loadDashboardData();
-  }, []);
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(
+      async (_event: AuthChangeEvent, nextSession: Session | null) => {
+        setSession(nextSession);
+        setUser(nextSession?.user ?? null);
+
+        if (nextSession?.user) {
+          await loadWorkshopProfile(nextSession.user);
+        } else {
+          setDatabaseProfile(null);
+          loadLocalAccountFallback();
+        }
+      }
+    );
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [supabase]);
 
   function showSuccess(message: string) {
     setSuccess(message);
+    setError("");
 
     window.setTimeout(() => {
       setSuccess("");
     }, 2500);
   }
 
-  function loadDashboardData() {
+  function showError(message: string) {
+    setError(message);
+    setSuccess("");
+  }
+
+  function syncProfileToLocalStorage(profile: WorkshopProfile, userId: string) {
+    const localAccount = convertProfileToLocalAccount(profile, userId);
+
+    setAccount(localAccount);
+    setUserPlan(localAccount.plan);
+    setDatabaseProfile(profile);
+
+    localStorage.setItem(DEMO_ACCOUNT_STORAGE_KEY, JSON.stringify(localAccount));
+    localStorage.setItem(USER_PLAN_STORAGE_KEY, localAccount.plan);
+  }
+
+  function loadLocalAccountFallback() {
     try {
       const savedAccount = localStorage.getItem(DEMO_ACCOUNT_STORAGE_KEY);
       const savedPlan = localStorage.getItem(USER_PLAN_STORAGE_KEY);
-      const savedUsage = localStorage.getItem(DIAGNOSIS_USAGE_STORAGE_KEY);
-      const savedCaseList = localStorage.getItem(SAVED_CASES_STORAGE_KEY);
-      const savedLeadList = localStorage.getItem(PREMIUM_LEADS_STORAGE_KEY);
 
       if (savedAccount) {
         const parsedAccount = JSON.parse(savedAccount) as DemoAccount;
@@ -267,13 +343,76 @@ export default function DashboardPage() {
         if (isValidUserPlan(parsedAccount.plan)) {
           setUserPlan(parsedAccount.plan);
         }
-      } else {
-        setAccount(null);
+
+        return;
       }
+
+      setAccount(null);
 
       if (isValidUserPlan(savedPlan)) {
         setUserPlan(savedPlan);
+      } else {
+        setUserPlan("free");
       }
+    } catch (error) {
+      console.error("Lokaler Account konnte nicht geladen werden:", error);
+      setAccount(null);
+      setUserPlan("free");
+    }
+  }
+
+  async function loadWorkshopProfile(currentUser: User) {
+    setProfileLoading(true);
+    setError("");
+
+    try {
+      const { data, error } = await supabase
+        .from("workshop_profiles")
+        .select("*")
+        .eq("id", currentUser.id)
+        .maybeSingle();
+
+      if (error) {
+        showError(error.message);
+        loadLocalAccountFallback();
+        return;
+      }
+
+      if (!data) {
+        setDatabaseProfile(null);
+        loadLocalAccountFallback();
+        return;
+      }
+
+      const profile = data as WorkshopProfile;
+
+      syncProfileToLocalStorage(profile, currentUser.id);
+    } finally {
+      setProfileLoading(false);
+    }
+  }
+
+  async function loadDashboardData() {
+    try {
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+
+      if (sessionError) {
+        showError(sessionError.message);
+      }
+
+      setSession(sessionData.session);
+      setUser(sessionData.session?.user ?? null);
+
+      if (sessionData.session?.user) {
+        await loadWorkshopProfile(sessionData.session.user);
+      } else {
+        loadLocalAccountFallback();
+      }
+
+      const savedUsage = localStorage.getItem(DIAGNOSIS_USAGE_STORAGE_KEY);
+      const savedCaseList = localStorage.getItem(SAVED_CASES_STORAGE_KEY);
+      const savedLeadList = localStorage.getItem(PREMIUM_LEADS_STORAGE_KEY);
 
       if (savedUsage) {
         const parsedUsage = JSON.parse(savedUsage);
@@ -312,6 +451,7 @@ export default function DashboardPage() {
       }
     } catch (error) {
       console.error("Dashboard-Daten konnten nicht geladen werden:", error);
+      showError("Dashboard-Daten konnten nicht geladen werden.");
     }
   }
 
@@ -376,19 +516,47 @@ export default function DashboardPage() {
     showSuccess("Aktuell geöffneter Diagnosefall wurde zurückgesetzt.");
   }
 
+  async function refreshSupabaseProfile() {
+    if (!user) {
+      showError("Kein Supabase-User eingeloggt.");
+      return;
+    }
+
+    await loadWorkshopProfile(user);
+    showSuccess("Werkstattprofil wurde aus Supabase aktualisiert.");
+  }
+
   function exportDashboardSummary() {
+    const activeWorkshop =
+      databaseProfile?.workshop_name || account?.workshop || "nicht eingerichtet";
+
+    const activeName =
+      databaseProfile?.full_name || account?.name || "nicht eingerichtet";
+
+    const activeEmail =
+      databaseProfile?.email || account?.email || user?.email || "nicht eingerichtet";
+
+    const activeRole =
+      databaseProfile?.role || account?.role || "nicht eingerichtet";
+
     const lines = [
       "DiagnoseHUB Dashboard Export",
       "============================",
       "",
       `Exportiert am: ${new Date().toLocaleString("de-DE")}`,
       "",
-      "Account",
-      "-------",
-      `Werkstatt: ${account?.workshop || "nicht eingerichtet"}`,
-      `Name: ${account?.name || "nicht eingerichtet"}`,
-      `E-Mail: ${account?.email || "nicht eingerichtet"}`,
-      `Rolle: ${account?.role || "nicht eingerichtet"}`,
+      "Supabase",
+      "--------",
+      `Login aktiv: ${user ? "ja" : "nein"}`,
+      `User-ID: ${user?.id || "nicht eingeloggt"}`,
+      "",
+      "Werkstattprofil",
+      "---------------",
+      `Quelle: ${databaseProfile ? "Supabase workshop_profiles" : "localStorage Fallback"}`,
+      `Werkstatt: ${activeWorkshop}`,
+      `Name: ${activeName}`,
+      `E-Mail: ${activeEmail}`,
+      `Rolle: ${activeRole}`,
       "",
       "Plan",
       "----",
@@ -427,32 +595,48 @@ export default function DashboardPage() {
     showSuccess("Dashboard-Export wurde erstellt.");
   }
 
+  const profileSourceLabel = databaseProfile
+    ? "Supabase Datenbank"
+    : account
+      ? "Lokaler Fallback"
+      : "Kein Profil";
+
+  const activeWorkshop =
+    databaseProfile?.workshop_name || account?.workshop || null;
+
+  const activeName = databaseProfile?.full_name || account?.name || null;
+  const activeEmail = databaseProfile?.email || account?.email || user?.email;
+  const activeRole = databaseProfile?.role || account?.role || null;
+  const activeUpdatedAt = databaseProfile?.updated_at || account?.updatedAt;
+
   return (
     <div className="min-h-screen bg-slate-950 text-white">
       <Header />
 
       <main className="mx-auto max-w-7xl px-6 py-14">
         <section className="mb-10">
-          <div className="inline-flex rounded-full border border-blue-500/30 bg-blue-500/10 px-5 py-2 text-sm font-semibold text-blue-300">
-            DiagnoseHUB Dashboard
+          <div className="inline-flex rounded-full border border-green-500/30 bg-green-500/10 px-5 py-2 text-sm font-semibold text-green-300">
+            Supabase Dashboard
           </div>
 
-          <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_0.45fr] lg:items-end">
+          <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_0.5fr] lg:items-end">
             <div>
               <h1 className="text-5xl font-black tracking-tight md:text-6xl">
                 Werkstatt-Übersicht.
               </h1>
 
               <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-400">
-                Lokales Dashboard für den Prototyp. Fälle können direkt geöffnet
-                oder gelöscht werden.
+                Das Dashboard liest das Werkstattprofil jetzt direkt aus
+                Supabase. Fallhistorie, Nutzungszähler und Vormerkungen laufen
+                vorerst noch lokal.
               </p>
             </div>
 
             <div className="flex flex-wrap gap-3 lg:justify-end">
               <button
                 onClick={loadDashboardData}
-                className="rounded-xl border border-slate-700 px-5 py-3 font-semibold text-slate-300 transition hover:bg-slate-800"
+                disabled={profileLoading}
+                className="rounded-xl border border-slate-700 px-5 py-3 font-semibold text-slate-300 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Aktualisieren
               </button>
@@ -470,6 +654,12 @@ export default function DashboardPage() {
         {success && (
           <div className="mb-8 rounded-xl border border-green-500/30 bg-green-500/10 px-6 py-4 text-green-300">
             {success}
+          </div>
+        )}
+
+        {error && (
+          <div className="mb-8 rounded-xl border border-red-500/30 bg-red-500/10 px-6 py-4 text-red-300">
+            {error}
           </div>
         )}
 
@@ -493,9 +683,13 @@ export default function DashboardPage() {
           />
 
           <StatCard
-            label="Vormerkungen"
-            value={`${premiumLeads.length}`}
-            subtext="Lokal gespeicherte Premium-Interessenten im Prototyp."
+            label="Profilquelle"
+            value={profileSourceLabel}
+            subtext={
+              user
+                ? "Supabase-Login erkannt."
+                : "Kein Supabase-Login aktiv."
+            }
           />
         </section>
 
@@ -503,51 +697,111 @@ export default function DashboardPage() {
           <div className="space-y-8">
             <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6">
               <p className="text-sm font-semibold uppercase tracking-wide text-blue-400">
-                Account
+                Supabase Account
               </p>
 
-              {account ? (
+              {user ? (
+                <div className="mt-3 rounded-2xl border border-green-500/30 bg-green-500/10 p-5">
+                  <p className="font-bold text-green-300">
+                    Supabase-Session aktiv
+                  </p>
+
+                  <p className="mt-2 break-all text-sm text-slate-300">
+                    {user.email}
+                  </p>
+
+                  <p className="mt-2 break-all font-mono text-xs text-slate-500">
+                    {user.id}
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-3 rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-5">
+                  <p className="font-bold text-yellow-300">
+                    Nicht eingeloggt
+                  </p>
+
+                  <p className="mt-2 leading-7 text-slate-300">
+                    Melde dich an, damit das Dashboard dein echtes
+                    Werkstattprofil aus Supabase laden kann.
+                  </p>
+                </div>
+              )}
+
+              <div className="mt-6 flex flex-wrap gap-3">
+                <a
+                  href="/login"
+                  className="rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white transition hover:bg-blue-500"
+                >
+                  Zum Login
+                </a>
+
+                <button
+                  onClick={refreshSupabaseProfile}
+                  disabled={!user || profileLoading}
+                  className="rounded-xl border border-green-500/40 px-5 py-3 font-semibold text-green-300 transition hover:bg-green-500 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Profil neu laden
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6">
+              <p className="text-sm font-semibold uppercase tracking-wide text-blue-400">
+                Werkstattprofil
+              </p>
+
+              {activeWorkshop ? (
                 <>
-                  <h2 className="mt-3 text-3xl font-bold">
-                    {account.workshop}
-                  </h2>
+                  <h2 className="mt-3 text-3xl font-bold">{activeWorkshop}</h2>
 
                   <div className="mt-6 space-y-3 text-slate-400">
                     <p>
-                      Bearbeiter:{" "}
+                      Quelle:{" "}
                       <span className="font-semibold text-white">
-                        {account.name}
+                        {profileSourceLabel}
                       </span>
                     </p>
+
+                    <p>
+                      Bearbeiter:{" "}
+                      <span className="font-semibold text-white">
+                        {activeName}
+                      </span>
+                    </p>
+
                     <p>
                       E-Mail:{" "}
                       <span className="font-semibold text-white">
-                        {account.email}
+                        {activeEmail}
                       </span>
                     </p>
+
                     <p>
                       Rolle:{" "}
                       <span className="font-semibold text-white">
-                        {account.role}
+                        {activeRole}
                       </span>
                     </p>
-                    <p>
-                      Aktualisiert:{" "}
-                      <span className="font-semibold text-white">
-                        {formatDateTime(account.updatedAt)}
-                      </span>
-                    </p>
+
+                    {activeUpdatedAt && (
+                      <p>
+                        Aktualisiert:{" "}
+                        <span className="font-semibold text-white">
+                          {formatDateTime(activeUpdatedAt)}
+                        </span>
+                      </p>
+                    )}
                   </div>
                 </>
               ) : (
                 <>
                   <h2 className="mt-3 text-3xl font-bold">
-                    Kein Account eingerichtet
+                    Kein Werkstattprofil
                   </h2>
 
                   <p className="mt-4 leading-7 text-slate-400">
-                    Lege zuerst einen lokalen Demo-Account an, damit Werkstatt
-                    und Bearbeiter automatisch in Berichte übernommen werden.
+                    Lege auf der Login-Seite dein Werkstattprofil an. Danach
+                    erscheint es hier direkt aus Supabase.
                   </p>
                 </>
               )}
@@ -557,7 +811,7 @@ export default function DashboardPage() {
                   href="/login"
                   className="rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white transition hover:bg-blue-500"
                 >
-                  Account verwalten
+                  Werkstattprofil bearbeiten
                 </a>
 
                 <a
@@ -579,8 +833,9 @@ export default function DashboardPage() {
               </h2>
 
               <p className="mt-4 leading-7 text-slate-400">
-                Im Prototyp wird die Nutzung lokal im Browser gezählt. Später
-                muss das serverseitig über Benutzerkonto und Datenbank laufen.
+                Die Nutzung wird noch lokal im Browser gezählt. Im nächsten
+                Ausbauschritt speichern wir Diagnosefälle und Nutzung ebenfalls
+                benutzerbezogen in Supabase.
               </p>
 
               <div className="mt-6 flex flex-wrap gap-3">
@@ -712,9 +967,7 @@ export default function DashboardPage() {
                     Premium
                   </p>
 
-                  <h2 className="mt-2 text-3xl font-bold">
-                    Vormerkungen
-                  </h2>
+                  <h2 className="mt-2 text-3xl font-bold">Vormerkungen</h2>
                 </div>
 
                 <a

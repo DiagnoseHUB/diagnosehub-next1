@@ -1,135 +1,19 @@
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
+import {
+  detectEngineContext,
+  type EngineContext,
+  type EngineType,
+} from "@/services/engineDatabase";
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-type EngineType = "Diesel" | "Benziner" | "Unbekannt";
-
-type EngineInfo = {
-  code: string;
-  engineType: EngineType;
-  label: string;
-  notes?: string;
-};
-
 type ChatMessage = {
   role: "user" | "assistant";
   content: string;
 };
-
-const ENGINE_CODE_DATABASE: Record<string, EngineInfo> = {
-  CDHB: {
-    code: "CDHB",
-    engineType: "Benziner",
-    label: "Audi/VW 1.8 TFSI Benziner",
-    notes: "EA888 TFSI, Ottomotor mit Zündkerzen/Zündspulen.",
-  },
-  CBAB: {
-    code: "CBAB",
-    engineType: "Diesel",
-    label: "VW/Audi 2.0 TDI Diesel",
-    notes: "Common-Rail-Diesel, keine Zündkerzen/Zündspulen.",
-  },
-  DDAA: {
-    code: "DDAA",
-    engineType: "Diesel",
-    label: "VW 2.0 TDI Diesel",
-    notes: "Common-Rail-Diesel, keine Zündkerzen/Zündspulen.",
-  },
-};
-
-function findEngineCode(input: string): EngineInfo | null {
-  const upperText = input.toUpperCase();
-
-  for (const code of Object.keys(ENGINE_CODE_DATABASE)) {
-    if (upperText.includes(code)) {
-      return ENGINE_CODE_DATABASE[code];
-    }
-  }
-
-  return null;
-}
-
-function detectEngineContext(input: string) {
-  const knownEngine = findEngineCode(input);
-
-  if (knownEngine) {
-    return {
-      engineType: knownEngine.engineType,
-      source: "Motorkennbuchstabe",
-      label: knownEngine.label,
-      code: knownEngine.code,
-      notes: knownEngine.notes,
-    };
-  }
-
-  const text = input.toLowerCase();
-
-  const dieselTerms = [
-    "diesel",
-    "tdi",
-    "cdi",
-    "dci",
-    "hdi",
-    "tdci",
-    "crdi",
-    "jtd",
-    "multijet",
-    "bluehdi",
-    "d-4d",
-    "d4d",
-    "dpf",
-    "common rail",
-    "raildruck",
-    "glühkerze",
-    "injektor",
-  ];
-
-  const petrolTerms = [
-    "benzin",
-    "benziner",
-    "tfsi",
-    "tsi",
-    "fsi",
-    "mpi",
-    "gdi",
-    "zündkerze",
-    "zündspule",
-  ];
-
-  const isDiesel = dieselTerms.some((term) => text.includes(term));
-  const isPetrol = petrolTerms.some((term) => text.includes(term));
-
-  if (isDiesel && !isPetrol) {
-    return {
-      engineType: "Diesel" as EngineType,
-      source: "Begriffe in der Eingabe",
-      label: "Diesel erkannt",
-      code: null,
-      notes: "Diesel anhand von Begriffen erkannt.",
-    };
-  }
-
-  if (isPetrol && !isDiesel) {
-    return {
-      engineType: "Benziner" as EngineType,
-      source: "Begriffe in der Eingabe",
-      label: "Benziner erkannt",
-      code: null,
-      notes: "Benziner anhand von Begriffen erkannt.",
-    };
-  }
-
-  return {
-    engineType: "Unbekannt" as EngineType,
-    source: "Nicht eindeutig",
-    label: "Motortyp unbekannt",
-    code: null,
-    notes: "Kraftstoffart/Motortyp nicht eindeutig erkannt.",
-  };
-}
 
 function formatHistory(messages: ChatMessage[]) {
   return messages
@@ -140,39 +24,90 @@ function formatHistory(messages: ChatMessage[]) {
     .join("\n\n");
 }
 
-function hasTechnicalConflict(engineType: EngineType, answer: string) {
+function termHasNegationContext(text: string, term: string) {
+  const normalizedText = text.toLowerCase();
+  const normalizedTerm = term.toLowerCase();
+
+  let searchIndex = 0;
+
+  while (searchIndex < normalizedText.length) {
+    const termIndex = normalizedText.indexOf(normalizedTerm, searchIndex);
+
+    if (termIndex === -1) {
+      return false;
+    }
+
+    const contextStart = Math.max(0, termIndex - 80);
+    const contextEnd = Math.min(
+      normalizedText.length,
+      termIndex + normalizedTerm.length + 80
+    );
+
+    const context = normalizedText.slice(contextStart, contextEnd);
+
+    const allowedPatterns = [
+      `keine ${normalizedTerm}`,
+      `keinen ${normalizedTerm}`,
+      `nicht ${normalizedTerm}`,
+      `${normalizedTerm} nicht`,
+      `${normalizedTerm} gibt es`,
+      `${normalizedTerm} gibt es nicht`,
+      `ohne ${normalizedTerm}`,
+      `statt ${normalizedTerm}`,
+      `keinesfalls ${normalizedTerm}`,
+      `niemals ${normalizedTerm}`,
+    ];
+
+    const isAllowed = allowedPatterns.some((pattern) =>
+      context.includes(pattern)
+    );
+
+    if (!isAllowed) {
+      return false;
+    }
+
+    searchIndex = termIndex + normalizedTerm.length;
+  }
+
+  return true;
+}
+
+function hasForbiddenTermWithoutCorrection(answer: string, terms: string[]) {
   const text = answer.toLowerCase();
 
+  return terms.some((term) => {
+    if (!text.includes(term)) {
+      return false;
+    }
+
+    return !termHasNegationContext(text, term);
+  });
+}
+
+function hasTechnicalConflict(engineType: EngineType, answer: string) {
   if (engineType === "Diesel") {
-    const forbiddenDieselTerms = [
+    return hasForbiddenTermWithoutCorrection(answer, [
       "zündkerze",
       "zündkerzen",
       "zündspule",
       "zündspulen",
       "zündfunke",
       "zündanlage",
-    ];
-
-    return forbiddenDieselTerms.some((term) => text.includes(term));
+    ]);
   }
 
   if (engineType === "Benziner") {
-    const forbiddenPetrolTerms = [
+    return hasForbiddenTermWithoutCorrection(answer, [
       "glühkerze",
       "glühkerzen",
       "glühsteuergerät",
-    ];
-
-    return forbiddenPetrolTerms.some((term) => text.includes(term));
+    ]);
   }
 
   return false;
 }
 
-function buildSystemPrompt(
-  engineContext: ReturnType<typeof detectEngineContext>,
-  retryWarning?: string
-) {
+function buildSystemPrompt(engineContext: EngineContext, retryWarning?: string) {
   return `
 Du bist DiagnoseHUB, ein spezialisierter KI-Diagnoseassistent für professionelle Kfz-Werkstätten.
 
@@ -201,16 +136,17 @@ Motorcode:
 ${engineContext.code ?? "nicht erkannt"}
 
 Zusatzhinweis:
-${engineContext.notes}
+${engineContext.notes ?? "Kein Zusatzhinweis vorhanden."}
 
 ${retryWarning ?? ""}
 
 Technische Regeln:
 
 1. Wenn Motortyp Diesel:
-- Niemals Zündkerzen nennen.
-- Niemals Zündspulen nennen.
-- Niemals Zündfunken oder Zündanlage nennen.
+- Niemals Zündkerzen als Ursache oder Prüfpunkt nennen.
+- Niemals Zündspulen als Ursache oder Prüfpunkt nennen.
+- Niemals Zündfunken oder Zündanlage als Ursache oder Prüfpunkt nennen.
+- Wenn der Nutzer nach Zündkerzen fragt, klarstellen: Diesel hat keine Zündkerzen; stattdessen passende Diesel-Prüfpunkte nennen.
 - Bei Startproblemen/Kaltstart maximal Glühkerzen oder Glühsteuergerät nennen.
 - Bei Ruckeln, schlechtem Lauf, Leistungsverlust oder Druckproblemen bevorzugt prüfen:
   - Injektoren / Rücklaufmenge
@@ -225,7 +161,7 @@ Technische Regeln:
 
 2. Wenn Motortyp Benziner:
 - Zündkerzen und Zündspulen dürfen genannt werden.
-- Glühkerzen und Glühsteuergerät nicht nennen.
+- Glühkerzen und Glühsteuergerät nicht als Ursache oder Prüfpunkt nennen.
 - Bei TFSI/TSI/FSI außerdem berücksichtigen:
   - Falschluft / Kurbelgehäuseentlüftung
   - Injektoren
@@ -236,7 +172,7 @@ Technische Regeln:
 
 3. Wenn Motortyp unbekannt:
 - Keine motortypspezifischen Bauteile blind nennen.
-- Keine Zündkerzen oder Glühkerzen ohne passenden Kontext nennen.
+- Keine Zündkerzen oder Glühkerzen ohne passenden Kontext als Ursache nennen.
 - Wenn nötige Daten fehlen, kurz sagen, welche Angaben fehlen.
 
 Antwortformat bei neuer Diagnose:
@@ -254,7 +190,7 @@ Antwortformat bei kurzer Folgefrage:
 }
 
 async function createDiagnosisAnswer(
-  engineContext: ReturnType<typeof detectEngineContext>,
+  engineContext: EngineContext,
   messages: ChatMessage[],
   input: string,
   retryWarning?: string
@@ -316,8 +252,8 @@ export async function POST(request: Request) {
         `
 ACHTUNG: Die vorherige Antwort enthielt ein Bauteil, das zum erkannten Motortyp nicht passt.
 Erzeuge die Antwort neu und beachte den Motortyp zwingend.
-Bei Diesel keine Zündkerzen, Zündspulen, Zündfunken oder Zündanlage nennen.
-Bei Benziner keine Glühkerzen oder Glühsteuergerät nennen.
+Bei Diesel keine Zündkerzen, Zündspulen, Zündfunken oder Zündanlage als Ursache oder Prüfpunkt nennen.
+Bei Benziner keine Glühkerzen oder Glühsteuergerät als Ursache oder Prüfpunkt nennen.
         `
       );
     }

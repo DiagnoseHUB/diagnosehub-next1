@@ -1,44 +1,24 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-
-type EngineContext = {
-  engineType: string;
-  source: string;
-  label: string;
-  code: string | null;
-  notes?: string;
-};
-
-type FaultCodeInfo = {
-  code: string;
-  title: string;
-  system: string;
-  description: string;
-  typicalCauses: string[];
-  suggestedChecks: string[];
-};
-
-type FaultCodeContext = {
-  foundCodes: FaultCodeInfo[];
-  summary: string;
-};
-
-type ChatMessage = {
-  role: "user" | "assistant";
-  content: string;
-};
-
-type SavedDiagnosisCase = {
-  id: string;
-  title: string;
-  createdAt: string;
-  updatedAt: string;
-  messages: ChatMessage[];
-  engineContext: EngineContext | null;
-  faultCodeContext: FaultCodeContext | null;
-  qualityCheck: string;
-};
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
+import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/client";
+import {
+  deleteDiagnosisCaseFromSupabase,
+  loadDiagnosisCasesFromSupabase,
+  migrateLocalDiagnosisCasesToSupabase,
+  saveDiagnosisCaseToSupabase,
+  type ChatMessage,
+  type EngineContext,
+  type FaultCodeContext,
+  type SavedDiagnosisCase,
+} from "@/services/diagnosisCasesSupabase";
 
 type UserPlan = "free" | "werkstatt" | "pro";
 
@@ -46,6 +26,16 @@ type DiagnosisUsage = {
   date: string;
   count: number;
 };
+
+type CurrentDiagnosisCase = {
+  messages: ChatMessage[];
+  engineContext: EngineContext | null;
+  faultCodeContext: FaultCodeContext | null;
+  qualityCheck: string;
+  openedCaseId?: string | null;
+};
+
+type CaseStorageSource = "local" | "supabase";
 
 const STORAGE_KEY = "diagnosehub-current-case";
 const SAVED_CASES_STORAGE_KEY = "diagnosehub-saved-cases";
@@ -238,7 +228,40 @@ function formatDateTime(value: string) {
   });
 }
 
+function loadLocalSavedCases() {
+  try {
+    const savedCaseList = localStorage.getItem(SAVED_CASES_STORAGE_KEY);
+
+    if (!savedCaseList) {
+      return [];
+    }
+
+    const parsedSavedCases = JSON.parse(savedCaseList);
+
+    if (!Array.isArray(parsedSavedCases)) {
+      return [];
+    }
+
+    return parsedSavedCases as SavedDiagnosisCase[];
+  } catch (error) {
+    console.error("Lokale Diagnosefälle konnten nicht gelesen werden:", error);
+    return [];
+  }
+}
+
+function saveCasesToLocalStorage(savedCases: SavedDiagnosisCase[]) {
+  localStorage.setItem(SAVED_CASES_STORAGE_KEY, JSON.stringify(savedCases));
+}
+
 export default function SearchBar() {
+  const supabase = useMemo(() => createClient(), []);
+
+  const [user, setUser] = useState<User | null>(null);
+  const [caseStorageSource, setCaseStorageSource] =
+    useState<CaseStorageSource>("local");
+  const [caseSyncLoading, setCaseSyncLoading] = useState(false);
+  const [caseSyncMessage, setCaseSyncMessage] = useState("");
+
   const [search, setSearch] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [engineContext, setEngineContext] = useState<EngineContext | null>(null);
@@ -263,6 +286,7 @@ export default function SearchBar() {
   const latestAssistantMessageRef = useRef<HTMLDivElement | null>(null);
   const loadingMessageRef = useRef<HTMLDivElement | null>(null);
   const hasLoadedCaseRef = useRef(false);
+  const shouldAutoScrollRef = useRef(false);
 
   const quickQuestions = useMemo(() => {
     return buildDynamicQuickQuestions(engineContext, faultCodeContext);
@@ -304,6 +328,10 @@ export default function SearchBar() {
     savedCases.length >= currentPlan.savedCaseLimit && !openedCaseStillExists;
 
   useEffect(() => {
+    if (!shouldAutoScrollRef.current) {
+      return;
+    }
+
     if (loading) {
       loadingMessageRef.current?.scrollIntoView({
         behavior: "smooth",
@@ -320,35 +348,123 @@ export default function SearchBar() {
         behavior: "smooth",
         block: "start",
       });
+
+      shouldAutoScrollRef.current = false;
     }
   }, [messages, loading]);
 
   useEffect(() => {
+    void initializeSearchBar();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(
+      (_event: AuthChangeEvent, nextSession: Session | null) => {
+        const nextUser = nextSession?.user ?? null;
+
+        setUser(nextUser);
+
+        if (nextUser) {
+          void loadCasesForAuthenticatedUser(nextUser, loadLocalSavedCases());
+        } else {
+          setCaseStorageSource("local");
+          setCaseSyncMessage("");
+          loadLocalSavedCasesIntoState();
+        }
+      }
+    );
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [supabase]);
+
+  useEffect(() => {
+    if (!hasLoadedCaseRef.current) {
+      return;
+    }
+
+    if (messages.length === 0) {
+      localStorage.removeItem(STORAGE_KEY);
+      return;
+    }
+
+    const currentCase: CurrentDiagnosisCase = {
+      messages,
+      engineContext,
+      faultCodeContext,
+      qualityCheck,
+      openedCaseId,
+    };
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(currentCase));
+  }, [messages, engineContext, faultCodeContext, qualityCheck, openedCaseId]);
+
+  async function initializeSearchBar() {
+    try {
+      loadCurrentCaseFromLocalStorage();
+      loadLocalPlanAndUsage();
+      const localCases = loadLocalSavedCases();
+
+      setSavedCases(localCases);
+
+      const { data, error } = await supabase.auth.getSession();
+
+      if (error) {
+        setError(error.message);
+        setCaseStorageSource("local");
+        return;
+      }
+
+      const activeUser = data.session?.user ?? null;
+
+      setUser(activeUser);
+
+      if (activeUser) {
+        await loadCasesForAuthenticatedUser(activeUser, localCases);
+      } else {
+        setCaseStorageSource("local");
+      }
+    } catch (error) {
+      console.error("SearchBar konnte nicht initialisiert werden:", error);
+      setError("DiagnoseHUB konnte gespeicherte Daten nicht vollständig laden.");
+    } finally {
+      hasLoadedCaseRef.current = true;
+    }
+  }
+
+  function loadCurrentCaseFromLocalStorage() {
     try {
       const savedCurrentCase = localStorage.getItem(STORAGE_KEY);
-      const savedCaseList = localStorage.getItem(SAVED_CASES_STORAGE_KEY);
+
+      if (!savedCurrentCase) {
+        return;
+      }
+
+      const parsedCase = JSON.parse(savedCurrentCase) as CurrentDiagnosisCase;
+
+      setMessages(parsedCase.messages || []);
+      setEngineContext(parsedCase.engineContext || null);
+      setFaultCodeContext(parsedCase.faultCodeContext || null);
+      setQualityCheck(parsedCase.qualityCheck || "");
+      setOpenedCaseId(parsedCase.openedCaseId || null);
+    } catch (error) {
+      console.error("Aktueller Diagnosefall konnte nicht geladen werden:", error);
+    }
+  }
+
+  function loadLocalSavedCasesIntoState() {
+    const localCases = loadLocalSavedCases();
+
+    setSavedCases(localCases);
+  }
+
+  function loadLocalPlanAndUsage() {
+    try {
       const savedUserPlan = localStorage.getItem(USER_PLAN_STORAGE_KEY);
       const savedDiagnosisUsage = localStorage.getItem(
         DIAGNOSIS_USAGE_STORAGE_KEY
       );
-
-      if (savedCurrentCase) {
-        const parsedCase = JSON.parse(savedCurrentCase);
-
-        setMessages(parsedCase.messages || []);
-        setEngineContext(parsedCase.engineContext || null);
-        setFaultCodeContext(parsedCase.faultCodeContext || null);
-        setQualityCheck(parsedCase.qualityCheck || "");
-        setOpenedCaseId(parsedCase.openedCaseId || null);
-      }
-
-      if (savedCaseList) {
-        const parsedSavedCases = JSON.parse(savedCaseList);
-
-        if (Array.isArray(parsedSavedCases)) {
-          setSavedCases(parsedSavedCases);
-        }
-      }
 
       if (isValidUserPlan(savedUserPlan)) {
         setUserPlan(savedUserPlan);
@@ -368,32 +484,75 @@ export default function SearchBar() {
         );
       }
     } catch (error) {
-      console.error("Gespeicherte Diagnosefälle konnten nicht geladen werden:", error);
+      console.error("Plan oder Nutzung konnte nicht geladen werden:", error);
+    }
+  }
+
+  async function loadCasesForAuthenticatedUser(
+    activeUser: User,
+    localCasesForMigration: SavedDiagnosisCase[]
+  ) {
+    setCaseSyncLoading(true);
+    setError("");
+
+    try {
+      if (localCasesForMigration.length > 0) {
+        await migrateLocalDiagnosisCasesToSupabase(
+          supabase,
+          activeUser,
+          localCasesForMigration
+        );
+      }
+
+      const remoteCases = await loadDiagnosisCasesFromSupabase(
+        supabase,
+        activeUser
+      );
+
+      setSavedCases(remoteCases);
+      saveCasesToLocalStorage(remoteCases);
+      setCaseStorageSource("supabase");
+
+      if (localCasesForMigration.length > 0) {
+        setCaseSyncMessage(
+          "Lokale Fälle wurden mit Supabase synchronisiert."
+        );
+      } else {
+        setCaseSyncMessage("Supabase-Fallhistorie wurde geladen.");
+      }
+
+      window.setTimeout(() => {
+        setCaseSyncMessage("");
+      }, 3000);
+    } catch (error) {
+      console.error("Supabase-Fallhistorie konnte nicht geladen werden:", error);
+      setCaseStorageSource("local");
+      setError(
+        "Supabase-Fallhistorie konnte nicht geladen werden. Lokale Fälle bleiben verfügbar."
+      );
+      loadLocalSavedCasesIntoState();
     } finally {
-      hasLoadedCaseRef.current = true;
+      setCaseSyncLoading(false);
     }
-  }, []);
+  }
 
-  useEffect(() => {
-    if (!hasLoadedCaseRef.current) {
+  async function reloadSupabaseCases() {
+    if (!user) {
+      setError("Für Supabase-Fallhistorie zuerst einloggen.");
       return;
     }
 
-    if (messages.length === 0) {
-      localStorage.removeItem(STORAGE_KEY);
+    await loadCasesForAuthenticatedUser(user, []);
+  }
+
+  async function migrateLocalCasesNow() {
+    if (!user) {
+      setError("Für Migration zuerst einloggen.");
       return;
     }
 
-    const currentCase = {
-      messages,
-      engineContext,
-      faultCodeContext,
-      qualityCheck,
-      openedCaseId,
-    };
-
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(currentCase));
-  }, [messages, engineContext, faultCodeContext, qualityCheck, openedCaseId]);
+    await loadCasesForAuthenticatedUser(user, loadLocalSavedCases());
+  }
 
   function changeUserPlan(nextPlan: UserPlan) {
     setUserPlan(nextPlan);
@@ -452,6 +611,8 @@ export default function SearchBar() {
 
     const nextMessages = [...messages, userMessage];
 
+    shouldAutoScrollRef.current = true;
+
     setMessages(nextMessages);
     setSearch("");
     setLoading(true);
@@ -495,6 +656,7 @@ export default function SearchBar() {
       setError(
         "Die KI-Diagnose konnte nicht erstellt werden. Prüfe API-Key, Guthaben oder Server-Log."
       );
+      shouldAutoScrollRef.current = false;
     } finally {
       setLoading(false);
     }
@@ -512,10 +674,11 @@ export default function SearchBar() {
     setCopiedMessageIndex(null);
     setOpenedCaseId(null);
     setError("");
+    shouldAutoScrollRef.current = false;
     localStorage.removeItem(STORAGE_KEY);
   }
 
-  function saveCurrentCase() {
+  async function saveCurrentCase() {
     if (messages.length === 0) {
       return;
     }
@@ -533,12 +696,14 @@ export default function SearchBar() {
 
     const now = new Date().toISOString();
 
+    const existingCase = savedCases.find(
+      (savedCase) => savedCase.id === openedCaseId
+    );
+
     const caseToSave: SavedDiagnosisCase = {
       id: openedCaseId ?? crypto.randomUUID(),
       title: getCaseTitle(messages),
-      createdAt:
-        savedCases.find((savedCase) => savedCase.id === openedCaseId)
-          ?.createdAt ?? now,
+      createdAt: existingCase?.createdAt ?? now,
       updatedAt: now,
       messages,
       engineContext,
@@ -546,17 +711,39 @@ export default function SearchBar() {
       qualityCheck,
     };
 
+    let persistedCase = caseToSave;
+
+    if (user) {
+      setCaseSyncLoading(true);
+
+      try {
+        persistedCase = await saveDiagnosisCaseToSupabase(
+          supabase,
+          user,
+          caseToSave
+        );
+        setCaseStorageSource("supabase");
+        setCaseSyncMessage("Fall wurde in Supabase gespeichert.");
+      } catch (error) {
+        console.error("Fall konnte nicht in Supabase gespeichert werden:", error);
+        setError(
+          "Fall konnte nicht in Supabase gespeichert werden. Speichern wurde abgebrochen."
+        );
+        setCaseSyncLoading(false);
+        return;
+      } finally {
+        setCaseSyncLoading(false);
+      }
+    }
+
     const updatedSavedCases = [
-      caseToSave,
-      ...savedCases.filter((savedCase) => savedCase.id !== caseToSave.id),
+      persistedCase,
+      ...savedCases.filter((savedCase) => savedCase.id !== persistedCase.id),
     ].slice(0, currentPlan.savedCaseLimit);
 
     setSavedCases(updatedSavedCases);
-    setOpenedCaseId(caseToSave.id);
-    localStorage.setItem(
-      SAVED_CASES_STORAGE_KEY,
-      JSON.stringify(updatedSavedCases)
-    );
+    setOpenedCaseId(persistedCase.id);
+    saveCasesToLocalStorage(updatedSavedCases);
 
     setSaveSuccess(true);
     setCopySuccess(false);
@@ -566,10 +753,13 @@ export default function SearchBar() {
 
     window.setTimeout(() => {
       setSaveSuccess(false);
+      setCaseSyncMessage("");
     }, 2500);
   }
 
   function openSavedCase(savedCase: SavedDiagnosisCase) {
+    shouldAutoScrollRef.current = false;
+
     setMessages(savedCase.messages);
     setEngineContext(savedCase.engineContext);
     setFaultCodeContext(savedCase.faultCodeContext);
@@ -581,24 +771,48 @@ export default function SearchBar() {
     setDownloadSuccess(false);
     setSaveSuccess(false);
     setCopiedMessageIndex(null);
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
   }
 
-  function deleteSavedCase(caseId: string) {
+  async function deleteSavedCase(caseId: string) {
+    if (user) {
+      setCaseSyncLoading(true);
+
+      try {
+        await deleteDiagnosisCaseFromSupabase(supabase, user, caseId);
+        setCaseSyncMessage("Fall wurde aus Supabase gelöscht.");
+      } catch (error) {
+        console.error("Fall konnte nicht aus Supabase gelöscht werden:", error);
+        setError(
+          "Fall konnte nicht aus Supabase gelöscht werden. Löschen wurde abgebrochen."
+        );
+        setCaseSyncLoading(false);
+        return;
+      } finally {
+        setCaseSyncLoading(false);
+      }
+    }
+
     const updatedSavedCases = savedCases.filter(
       (savedCase) => savedCase.id !== caseId
     );
 
     setSavedCases(updatedSavedCases);
-    localStorage.setItem(
-      SAVED_CASES_STORAGE_KEY,
-      JSON.stringify(updatedSavedCases)
-    );
+    saveCasesToLocalStorage(updatedSavedCases);
 
     if (openedCaseId === caseId) {
       setOpenedCaseId(null);
     }
 
     setError("");
+
+    window.setTimeout(() => {
+      setCaseSyncMessage("");
+    }, 2500);
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -753,6 +967,11 @@ ${chatText}
     }
   }
 
+  const caseStorageLabel =
+    caseStorageSource === "supabase"
+      ? "Supabase-Fallhistorie"
+      : "Lokale Fallhistorie";
+
   return (
     <div className="w-full">
       <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-4 shadow-2xl shadow-blue-950/30">
@@ -786,6 +1005,16 @@ ${chatText}
                 <p className="text-sm text-slate-500">
                   {savedCases.length} / {currentPlan.savedCaseLimit} Fälle gespeichert
                 </p>
+
+                <span
+                  className={
+                    caseStorageSource === "supabase"
+                      ? "rounded-full border border-green-500/30 bg-green-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-green-300"
+                      : "rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-yellow-300"
+                  }
+                >
+                  {caseStorageLabel}
+                </span>
               </div>
 
               <p className="mt-2 text-sm text-slate-500">
@@ -798,6 +1027,12 @@ ${chatText}
                   {remainingSavedCases}
                 </span>{" "}
                 neue Speicherplätze.
+              </p>
+
+              <p className="mt-2 text-sm text-slate-500">
+                {user
+                  ? `Supabase-Login aktiv: ${user.email}`
+                  : "Nicht eingeloggt: Fälle bleiben nur lokal auf diesem Gerät."}
               </p>
             </div>
 
@@ -817,6 +1052,39 @@ ${chatText}
               ))}
             </div>
           </div>
+
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button
+              onClick={reloadSupabaseCases}
+              disabled={!user || caseSyncLoading}
+              className="rounded-xl border border-green-500/40 px-4 py-2 text-sm font-semibold text-green-300 transition hover:bg-green-500 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {caseSyncLoading ? "Synchronisiert..." : "Supabase neu laden"}
+            </button>
+
+            <button
+              onClick={migrateLocalCasesNow}
+              disabled={!user || caseSyncLoading}
+              className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Lokale Fälle migrieren
+            </button>
+
+            {!user && (
+              <a
+                href="/login"
+                className="rounded-xl border border-blue-500/40 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-300 transition hover:bg-blue-500 hover:text-white"
+              >
+                Einloggen für Cloud-Speicher
+              </a>
+            )}
+          </div>
+
+          {caseSyncMessage && (
+            <div className="mt-4 rounded-xl border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-300">
+              {caseSyncMessage}
+            </div>
+          )}
 
           {diagnosisLimitReached && (
             <div className="mt-4 rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-300">
@@ -847,11 +1115,11 @@ ${chatText}
             {messages.length > 0 && (
               <>
                 <button
-                  onClick={saveCurrentCase}
-                  disabled={savedCaseLimitReached}
+                  onClick={() => void saveCurrentCase()}
+                  disabled={savedCaseLimitReached || caseSyncLoading}
                   className="rounded-xl border border-blue-500/40 bg-blue-500/10 px-5 py-3 font-semibold text-blue-300 transition hover:bg-blue-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Fall speichern
+                  {caseSyncLoading ? "Speichert..." : "Fall speichern"}
                 </button>
 
                 <a
@@ -887,7 +1155,7 @@ ${chatText}
             )}
 
             <button
-              onClick={() => sendDiagnosis()}
+              onClick={() => void sendDiagnosis()}
               disabled={loading || diagnosisLimitReached}
               className="rounded-xl bg-blue-600 px-6 py-3 font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -927,7 +1195,10 @@ ${chatText}
                 Gespeicherte Fälle
               </p>
               <p className="mt-1 text-sm text-slate-500">
-                Lokal im Browser gespeichert. Aktueller Plan:{" "}
+                {caseStorageSource === "supabase"
+                  ? "In Supabase gespeichert und lokal gespiegelt."
+                  : "Lokal im Browser gespeichert."}{" "}
+                Aktueller Plan:{" "}
                 <span className="font-semibold text-slate-300">
                   {savedCases.length} / {currentPlan.savedCaseLimit}
                 </span>{" "}
@@ -981,8 +1252,9 @@ ${chatText}
                     </button>
 
                     <button
-                      onClick={() => deleteSavedCase(savedCase.id)}
-                      className="rounded-xl border border-red-500/30 px-4 py-2 text-sm font-semibold text-red-300 transition hover:bg-red-500/10"
+                      onClick={() => void deleteSavedCase(savedCase.id)}
+                      disabled={caseSyncLoading}
+                      className="rounded-xl border border-red-500/30 px-4 py-2 text-sm font-semibold text-red-300 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Löschen
                     </button>
@@ -1004,7 +1276,7 @@ ${chatText}
             {quickQuestions.map((question) => (
               <button
                 key={question}
-                onClick={() => sendDiagnosis(question)}
+                onClick={() => void sendDiagnosis(question)}
                 disabled={loading || diagnosisLimitReached}
                 className="rounded-full border border-slate-700 bg-slate-900 px-4 py-2 text-sm text-slate-300 transition hover:border-blue-500 hover:text-blue-300 disabled:cursor-not-allowed disabled:opacity-50"
               >

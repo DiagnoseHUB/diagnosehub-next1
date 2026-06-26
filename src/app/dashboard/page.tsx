@@ -9,6 +9,15 @@ import type {
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { createClient } from "@/lib/supabase/client";
+import {
+  deleteDiagnosisCaseFromSupabase,
+  loadDiagnosisCasesFromSupabase,
+  migrateLocalDiagnosisCasesToSupabase,
+  type ChatMessage,
+  type EngineContext,
+  type FaultCodeContext,
+  type SavedDiagnosisCase,
+} from "@/services/diagnosisCasesSupabase";
 
 type UserPlan = "free" | "werkstatt" | "pro";
 
@@ -38,44 +47,6 @@ type DiagnosisUsage = {
   count: number;
 };
 
-type ChatMessage = {
-  role: "user" | "assistant";
-  content: string;
-};
-
-type EngineContext = {
-  engineType: string;
-  source: string;
-  label: string;
-  code: string | null;
-  notes?: string;
-};
-
-type FaultCodeInfo = {
-  code: string;
-  title: string;
-  system: string;
-  description: string;
-  typicalCauses: string[];
-  suggestedChecks: string[];
-};
-
-type FaultCodeContext = {
-  foundCodes: FaultCodeInfo[];
-  summary: string;
-};
-
-type SavedDiagnosisCase = {
-  id: string;
-  title: string;
-  createdAt: string;
-  updatedAt: string;
-  messages: ChatMessage[];
-  engineContext: EngineContext | null;
-  faultCodeContext: FaultCodeContext | null;
-  qualityCheck: string;
-};
-
 type CurrentDiagnosisCase = {
   messages: ChatMessage[];
   engineContext: EngineContext | null;
@@ -94,6 +65,8 @@ type PremiumLead = {
   phone: string;
   note: string;
 };
+
+type CaseStorageSource = "local" | "supabase";
 
 const DEMO_ACCOUNT_STORAGE_KEY = "diagnosehub-demo-account";
 const USER_PLAN_STORAGE_KEY = "diagnosehub-user-plan";
@@ -214,6 +187,31 @@ function convertProfileToLocalAccount(
   };
 }
 
+function loadLocalSavedCases() {
+  try {
+    const savedCaseList = localStorage.getItem(SAVED_CASES_STORAGE_KEY);
+
+    if (!savedCaseList) {
+      return [];
+    }
+
+    const parsedSavedCases = JSON.parse(savedCaseList);
+
+    if (!Array.isArray(parsedSavedCases)) {
+      return [];
+    }
+
+    return parsedSavedCases as SavedDiagnosisCase[];
+  } catch (error) {
+    console.error("Lokale Fälle konnten nicht gelesen werden:", error);
+    return [];
+  }
+}
+
+function saveCasesToLocalStorage(savedCases: SavedDiagnosisCase[]) {
+  localStorage.setItem(SAVED_CASES_STORAGE_KEY, JSON.stringify(savedCases));
+}
+
 function StatCard({
   label,
   value,
@@ -248,10 +246,13 @@ export default function DashboardPage() {
   const [userPlan, setUserPlan] = useState<UserPlan>("free");
   const [usage, setUsage] = useState<DiagnosisUsage>(getInitialUsage());
   const [savedCases, setSavedCases] = useState<SavedDiagnosisCase[]>([]);
+  const [caseStorageSource, setCaseStorageSource] =
+    useState<CaseStorageSource>("local");
   const [premiumLeads, setPremiumLeads] = useState<PremiumLead[]>([]);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
   const [profileLoading, setProfileLoading] = useState(false);
+  const [caseLoading, setCaseLoading] = useState(false);
 
   const currentPlan = planLimits[userPlan];
   const normalizedUsage = normalizeUsage(usage);
@@ -283,7 +284,7 @@ export default function DashboardPage() {
   }, [premiumLeads]);
 
   useEffect(() => {
-    loadDashboardData();
+    void loadDashboardData();
 
     const {
       data: { subscription },
@@ -294,9 +295,11 @@ export default function DashboardPage() {
 
         if (nextSession?.user) {
           await loadWorkshopProfile(nextSession.user);
+          await loadSupabaseCases(nextSession.user, false);
         } else {
           setDatabaseProfile(null);
           loadLocalAccountFallback();
+          loadLocalCasesIntoState();
         }
       }
     );
@@ -361,6 +364,48 @@ export default function DashboardPage() {
     }
   }
 
+  function loadLocalUsageAndLeads() {
+    try {
+      const savedUsage = localStorage.getItem(DIAGNOSIS_USAGE_STORAGE_KEY);
+      const savedLeadList = localStorage.getItem(PREMIUM_LEADS_STORAGE_KEY);
+
+      if (savedUsage) {
+        const parsedUsage = JSON.parse(savedUsage);
+        const normalizedSavedUsage = normalizeUsage({
+          date: parsedUsage.date || getTodayKey(),
+          count: Number(parsedUsage.count) || 0,
+        });
+
+        setUsage(normalizedSavedUsage);
+        localStorage.setItem(
+          DIAGNOSIS_USAGE_STORAGE_KEY,
+          JSON.stringify(normalizedSavedUsage)
+        );
+      } else {
+        setUsage(getInitialUsage());
+      }
+
+      if (savedLeadList) {
+        const parsedLeads = JSON.parse(savedLeadList);
+
+        if (Array.isArray(parsedLeads)) {
+          setPremiumLeads(parsedLeads);
+        }
+      } else {
+        setPremiumLeads([]);
+      }
+    } catch (error) {
+      console.error("Lokale Dashboard-Daten konnten nicht geladen werden:", error);
+    }
+  }
+
+  function loadLocalCasesIntoState() {
+    const localCases = loadLocalSavedCases();
+
+    setSavedCases(localCases);
+    setCaseStorageSource("local");
+  }
+
   async function loadWorkshopProfile(currentUser: User) {
     setProfileLoading(true);
     setError("");
@@ -392,8 +437,44 @@ export default function DashboardPage() {
     }
   }
 
+  async function loadSupabaseCases(currentUser: User, migrateLocal: boolean) {
+    setCaseLoading(true);
+    setError("");
+
+    try {
+      const localCases = loadLocalSavedCases();
+
+      if (migrateLocal && localCases.length > 0) {
+        await migrateLocalDiagnosisCasesToSupabase(
+          supabase,
+          currentUser,
+          localCases
+        );
+      }
+
+      const remoteCases = await loadDiagnosisCasesFromSupabase(
+        supabase,
+        currentUser
+      );
+
+      setSavedCases(remoteCases);
+      saveCasesToLocalStorage(remoteCases);
+      setCaseStorageSource("supabase");
+    } catch (error) {
+      console.error("Supabase-Fälle konnten nicht geladen werden:", error);
+      showError(
+        "Supabase-Fälle konnten nicht geladen werden. Lokale Fälle bleiben sichtbar."
+      );
+      loadLocalCasesIntoState();
+    } finally {
+      setCaseLoading(false);
+    }
+  }
+
   async function loadDashboardData() {
     try {
+      loadLocalUsageAndLeads();
+
       const { data: sessionData, error: sessionError } =
         await supabase.auth.getSession();
 
@@ -406,48 +487,10 @@ export default function DashboardPage() {
 
       if (sessionData.session?.user) {
         await loadWorkshopProfile(sessionData.session.user);
+        await loadSupabaseCases(sessionData.session.user, false);
       } else {
         loadLocalAccountFallback();
-      }
-
-      const savedUsage = localStorage.getItem(DIAGNOSIS_USAGE_STORAGE_KEY);
-      const savedCaseList = localStorage.getItem(SAVED_CASES_STORAGE_KEY);
-      const savedLeadList = localStorage.getItem(PREMIUM_LEADS_STORAGE_KEY);
-
-      if (savedUsage) {
-        const parsedUsage = JSON.parse(savedUsage);
-        const normalizedSavedUsage = normalizeUsage({
-          date: parsedUsage.date || getTodayKey(),
-          count: Number(parsedUsage.count) || 0,
-        });
-
-        setUsage(normalizedSavedUsage);
-        localStorage.setItem(
-          DIAGNOSIS_USAGE_STORAGE_KEY,
-          JSON.stringify(normalizedSavedUsage)
-        );
-      } else {
-        setUsage(getInitialUsage());
-      }
-
-      if (savedCaseList) {
-        const parsedCases = JSON.parse(savedCaseList);
-
-        if (Array.isArray(parsedCases)) {
-          setSavedCases(parsedCases);
-        }
-      } else {
-        setSavedCases([]);
-      }
-
-      if (savedLeadList) {
-        const parsedLeads = JSON.parse(savedLeadList);
-
-        if (Array.isArray(parsedLeads)) {
-          setPremiumLeads(parsedLeads);
-        }
-      } else {
-        setPremiumLeads([]);
+        loadLocalCasesIntoState();
       }
     } catch (error) {
       console.error("Dashboard-Daten konnten nicht geladen werden:", error);
@@ -468,13 +511,28 @@ export default function DashboardPage() {
     window.location.href = "/#diagnose";
   }
 
-  function deleteSavedCase(caseId: string) {
+  async function deleteSavedCase(caseId: string) {
+    if (user && caseStorageSource === "supabase") {
+      setCaseLoading(true);
+
+      try {
+        await deleteDiagnosisCaseFromSupabase(supabase, user, caseId);
+      } catch (error) {
+        console.error("Fall konnte nicht aus Supabase gelöscht werden:", error);
+        showError("Fall konnte nicht aus Supabase gelöscht werden.");
+        setCaseLoading(false);
+        return;
+      } finally {
+        setCaseLoading(false);
+      }
+    }
+
     const updatedCases = savedCases.filter((savedCase) => {
       return savedCase.id !== caseId;
     });
 
     setSavedCases(updatedCases);
-    localStorage.setItem(SAVED_CASES_STORAGE_KEY, JSON.stringify(updatedCases));
+    saveCasesToLocalStorage(updatedCases);
 
     const currentCaseRaw = localStorage.getItem(CURRENT_CASE_STORAGE_KEY);
 
@@ -490,7 +548,11 @@ export default function DashboardPage() {
       }
     }
 
-    showSuccess("Diagnosefall wurde gelöscht.");
+    showSuccess(
+      caseStorageSource === "supabase"
+        ? "Diagnosefall wurde aus Supabase gelöscht."
+        : "Diagnosefall wurde lokal gelöscht."
+    );
   }
 
   function deletePremiumLead(leadId: string) {
@@ -526,6 +588,26 @@ export default function DashboardPage() {
     showSuccess("Werkstattprofil wurde aus Supabase aktualisiert.");
   }
 
+  async function refreshSupabaseCases() {
+    if (!user) {
+      showError("Kein Supabase-User eingeloggt.");
+      return;
+    }
+
+    await loadSupabaseCases(user, false);
+    showSuccess("Diagnosefälle wurden aus Supabase aktualisiert.");
+  }
+
+  async function migrateLocalCasesNow() {
+    if (!user) {
+      showError("Kein Supabase-User eingeloggt.");
+      return;
+    }
+
+    await loadSupabaseCases(user, true);
+    showSuccess("Lokale Diagnosefälle wurden nach Supabase migriert.");
+  }
+
   function exportDashboardSummary() {
     const activeWorkshop =
       databaseProfile?.workshop_name || account?.workshop || "nicht eingerichtet";
@@ -534,7 +616,10 @@ export default function DashboardPage() {
       databaseProfile?.full_name || account?.name || "nicht eingerichtet";
 
     const activeEmail =
-      databaseProfile?.email || account?.email || user?.email || "nicht eingerichtet";
+      databaseProfile?.email ||
+      account?.email ||
+      user?.email ||
+      "nicht eingerichtet";
 
     const activeRole =
       databaseProfile?.role || account?.role || "nicht eingerichtet";
@@ -552,7 +637,9 @@ export default function DashboardPage() {
       "",
       "Werkstattprofil",
       "---------------",
-      `Quelle: ${databaseProfile ? "Supabase workshop_profiles" : "localStorage Fallback"}`,
+      `Quelle: ${
+        databaseProfile ? "Supabase workshop_profiles" : "localStorage Fallback"
+      }`,
       `Werkstatt: ${activeWorkshop}`,
       `Name: ${activeName}`,
       `E-Mail: ${activeEmail}`,
@@ -563,17 +650,22 @@ export default function DashboardPage() {
       `Aktiver Plan: ${currentPlan.label}`,
       `Diagnosen heute: ${normalizedUsage.count} / ${currentPlan.dailyLimit}`,
       `Gespeicherte Fälle: ${savedCases.length} / ${currentPlan.savedCaseLimit}`,
+      `Fallquelle: ${caseStorageSource}`,
       "",
       "Gespeicherte Fälle",
       "-------------------",
       ...sortedCases.map((savedCase) => {
-        return `${formatDateTime(savedCase.updatedAt)} | ${savedCase.title} | ${getFaultCodeText(savedCase)}`;
+        return `${formatDateTime(savedCase.updatedAt)} | ${
+          savedCase.title
+        } | ${getFaultCodeText(savedCase)}`;
       }),
       "",
       "Premium-Vormerkungen",
       "---------------------",
       ...sortedLeads.map((lead) => {
-        return `${formatDateTime(lead.createdAt)} | ${premiumLeadPlanLabels[lead.plan]} | ${lead.workshop} | ${lead.email}`;
+        return `${formatDateTime(lead.createdAt)} | ${
+          premiumLeadPlanLabels[lead.plan]
+        } | ${lead.workshop} | ${lead.email}`;
       }),
     ];
 
@@ -601,6 +693,11 @@ export default function DashboardPage() {
       ? "Lokaler Fallback"
       : "Kein Profil";
 
+  const caseSourceLabel =
+    caseStorageSource === "supabase"
+      ? "Supabase Fälle"
+      : "Lokale Fälle";
+
   const activeWorkshop =
     databaseProfile?.workshop_name || account?.workshop || null;
 
@@ -626,16 +723,16 @@ export default function DashboardPage() {
               </h1>
 
               <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-400">
-                Das Dashboard liest das Werkstattprofil jetzt direkt aus
-                Supabase. Fallhistorie, Nutzungszähler und Vormerkungen laufen
-                vorerst noch lokal.
+                Das Dashboard liest Werkstattprofil und Diagnosefälle jetzt aus
+                Supabase. Nutzung und Premium-Vormerkungen laufen vorerst noch
+                lokal.
               </p>
             </div>
 
             <div className="flex flex-wrap gap-3 lg:justify-end">
               <button
-                onClick={loadDashboardData}
-                disabled={profileLoading}
+                onClick={() => void loadDashboardData()}
+                disabled={profileLoading || caseLoading}
                 className="rounded-xl border border-slate-700 px-5 py-3 font-semibold text-slate-300 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Aktualisieren
@@ -683,12 +780,12 @@ export default function DashboardPage() {
           />
 
           <StatCard
-            label="Profilquelle"
-            value={profileSourceLabel}
+            label="Fallquelle"
+            value={caseSourceLabel}
             subtext={
               user
                 ? "Supabase-Login erkannt."
-                : "Kein Supabase-Login aktiv."
+                : "Kein Login. Fallback auf lokale Fälle."
             }
           />
         </section>
@@ -722,7 +819,7 @@ export default function DashboardPage() {
 
                   <p className="mt-2 leading-7 text-slate-300">
                     Melde dich an, damit das Dashboard dein echtes
-                    Werkstattprofil aus Supabase laden kann.
+                    Werkstattprofil und deine Fälle aus Supabase laden kann.
                   </p>
                 </div>
               )}
@@ -736,7 +833,7 @@ export default function DashboardPage() {
                 </a>
 
                 <button
-                  onClick={refreshSupabaseProfile}
+                  onClick={() => void refreshSupabaseProfile()}
                   disabled={!user || profileLoading}
                   className="rounded-xl border border-green-500/40 px-5 py-3 font-semibold text-green-300 transition hover:bg-green-500 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
                 >
@@ -833,9 +930,8 @@ export default function DashboardPage() {
               </h2>
 
               <p className="mt-4 leading-7 text-slate-400">
-                Die Nutzung wird noch lokal im Browser gezählt. Im nächsten
-                Ausbauschritt speichern wir Diagnosefälle und Nutzung ebenfalls
-                benutzerbezogen in Supabase.
+                Die Nutzung wird noch lokal im Browser gezählt. Diagnosefälle
+                liegen bei aktivem Login jetzt bereits in Supabase.
               </p>
 
               <div className="mt-6 flex flex-wrap gap-3">
@@ -892,17 +988,50 @@ export default function DashboardPage() {
                   </p>
 
                   <h2 className="mt-2 text-3xl font-bold">
-                    Lokale Fallhistorie
+                    {caseStorageSource === "supabase"
+                      ? "Supabase-Fallhistorie"
+                      : "Lokale Fallhistorie"}
                   </h2>
                 </div>
 
-                <a
-                  href="/#diagnose"
-                  className="rounded-xl border border-slate-700 px-5 py-3 font-semibold text-slate-300 transition hover:bg-slate-800"
-                >
-                  Neuen Fall starten
-                </a>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    onClick={() => void refreshSupabaseCases()}
+                    disabled={!user || caseLoading}
+                    className="rounded-xl border border-green-500/40 px-5 py-3 font-semibold text-green-300 transition hover:bg-green-500 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {caseLoading ? "Lädt..." : "Supabase neu laden"}
+                  </button>
+
+                  <a
+                    href="/#diagnose"
+                    className="rounded-xl border border-slate-700 px-5 py-3 font-semibold text-slate-300 transition hover:bg-slate-800"
+                  >
+                    Neuen Fall starten
+                  </a>
+                </div>
               </div>
+
+              {user && (
+                <div className="mb-5 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+                  <p className="text-sm leading-7 text-slate-400">
+                    Fallquelle:{" "}
+                    <span className="font-bold text-white">
+                      {caseSourceLabel}
+                    </span>
+                    . Lokale Alt-Fälle können bei Bedarf nach Supabase migriert
+                    werden.
+                  </p>
+
+                  <button
+                    onClick={() => void migrateLocalCasesNow()}
+                    disabled={caseLoading}
+                    className="mt-3 rounded-xl border border-blue-500/40 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-300 transition hover:bg-blue-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Lokale Fälle nach Supabase migrieren
+                  </button>
+                </div>
+              )}
 
               {sortedCases.length === 0 ? (
                 <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-6 text-slate-500">
@@ -947,8 +1076,9 @@ export default function DashboardPage() {
                           </button>
 
                           <button
-                            onClick={() => deleteSavedCase(savedCase.id)}
-                            className="rounded-xl border border-red-500/30 px-4 py-2 text-sm font-semibold text-red-300 transition hover:bg-red-500/10"
+                            onClick={() => void deleteSavedCase(savedCase.id)}
+                            disabled={caseLoading}
+                            className="rounded-xl border border-red-500/30 px-4 py-2 text-sm font-semibold text-red-300 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             Löschen
                           </button>

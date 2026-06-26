@@ -57,6 +57,7 @@ const planLimits: Record<
   {
     label: string;
     dailyLimit: number;
+    savedCaseLimit: number;
     badge: string;
     description: string;
   }
@@ -64,18 +65,21 @@ const planLimits: Record<
   free: {
     label: "Free",
     dailyLimit: 3,
+    savedCaseLimit: 3,
     badge: "Kostenlos",
     description: "Für Tests und einzelne Diagnosefälle.",
   },
   werkstatt: {
     label: "Werkstatt Demo",
     dailyLimit: 50,
+    savedCaseLimit: 25,
     badge: "Premium Demo",
     description: "Vorbereitung für den späteren Werkstatt-Zugang.",
   },
   pro: {
     label: "Werkstatt Pro Demo",
     dailyLimit: 150,
+    savedCaseLimit: 100,
     badge: "Pro Demo",
     description: "Vorbereitung für größere Betriebe und höhere Nutzung.",
   },
@@ -279,11 +283,25 @@ export default function SearchBar() {
   }, [diagnosisUsage]);
 
   const currentPlan = planLimits[userPlan];
+
   const remainingDiagnoses = Math.max(
     currentPlan.dailyLimit - normalizedUsage.count,
     0
   );
+
+  const remainingSavedCases = Math.max(
+    currentPlan.savedCaseLimit - savedCases.length,
+    0
+  );
+
   const diagnosisLimitReached = remainingDiagnoses <= 0;
+
+  const openedCaseStillExists =
+    openedCaseId !== null &&
+    savedCases.some((savedCase) => savedCase.id === openedCaseId);
+
+  const savedCaseLimitReached =
+    savedCases.length >= currentPlan.savedCaseLimit && !openedCaseStillExists;
 
   useEffect(() => {
     if (loading) {
@@ -502,6 +520,17 @@ export default function SearchBar() {
       return;
     }
 
+    if (savedCaseLimitReached) {
+      setError(
+        `Falllimit erreicht: Im ${currentPlan.label}-Plan können aktuell ${currentPlan.savedCaseLimit} Fälle gespeichert werden. Für mehr gespeicherte Fälle den Werkstatt-Demo-Plan aktivieren.`
+      );
+      setSaveSuccess(false);
+      setCopySuccess(false);
+      setDownloadSuccess(false);
+      setCopiedMessageIndex(null);
+      return;
+    }
+
     const now = new Date().toISOString();
 
     const caseToSave: SavedDiagnosisCase = {
@@ -520,7 +549,7 @@ export default function SearchBar() {
     const updatedSavedCases = [
       caseToSave,
       ...savedCases.filter((savedCase) => savedCase.id !== caseToSave.id),
-    ].slice(0, 25);
+    ].slice(0, currentPlan.savedCaseLimit);
 
     setSavedCases(updatedSavedCases);
     setOpenedCaseId(caseToSave.id);
@@ -533,6 +562,7 @@ export default function SearchBar() {
     setCopySuccess(false);
     setDownloadSuccess(false);
     setCopiedMessageIndex(null);
+    setError("");
 
     window.setTimeout(() => {
       setSaveSuccess(false);
@@ -567,6 +597,8 @@ export default function SearchBar() {
     if (openedCaseId === caseId) {
       setOpenedCaseId(null);
     }
+
+    setError("");
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -649,6 +681,7 @@ ${chatText}
       setDownloadSuccess(false);
       setSaveSuccess(false);
       setCopiedMessageIndex(null);
+      setError("");
 
       window.setTimeout(() => {
         setCopySuccess(false);
@@ -666,6 +699,7 @@ ${chatText}
       setCopySuccess(false);
       setDownloadSuccess(false);
       setSaveSuccess(false);
+      setError("");
 
       window.setTimeout(() => {
         setCopiedMessageIndex(null);
@@ -708,6 +742,7 @@ ${chatText}
       setCopySuccess(false);
       setSaveSuccess(false);
       setCopiedMessageIndex(null);
+      setError("");
 
       window.setTimeout(() => {
         setDownloadSuccess(false);
@@ -745,7 +780,11 @@ ${chatText}
                 <p className="font-bold text-white">{currentPlan.label}</p>
 
                 <p className="text-sm text-slate-500">
-                  {normalizedUsage.count} / {currentPlan.dailyLimit} Diagnosen heute genutzt
+                  {normalizedUsage.count} / {currentPlan.dailyLimit} Diagnosen heute
+                </p>
+
+                <p className="text-sm text-slate-500">
+                  {savedCases.length} / {currentPlan.savedCaseLimit} Fälle gespeichert
                 </p>
               </div>
 
@@ -753,7 +792,12 @@ ${chatText}
                 {currentPlan.description} Noch verfügbar:{" "}
                 <span className="font-bold text-slate-300">
                   {remainingDiagnoses}
-                </span>
+                </span>{" "}
+                Diagnosen und{" "}
+                <span className="font-bold text-slate-300">
+                  {remainingSavedCases}
+                </span>{" "}
+                neue Speicherplätze.
               </p>
             </div>
 
@@ -780,6 +824,14 @@ ${chatText}
               Werkstatt-Demo-Plan aktivieren.
             </div>
           )}
+
+          {savedCaseLimitReached && (
+            <div className="mt-4 rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-300">
+              Falllimit erreicht. Du kannst bestehende Fälle überschreiben oder
+              löschen. Für mehr gespeicherte Fälle den Werkstatt-Demo-Plan
+              aktivieren.
+            </div>
+          )}
         </div>
 
         <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -796,7 +848,8 @@ ${chatText}
               <>
                 <button
                   onClick={saveCurrentCase}
-                  className="rounded-xl border border-blue-500/40 bg-blue-500/10 px-5 py-3 font-semibold text-blue-300 transition hover:bg-blue-500 hover:text-white"
+                  disabled={savedCaseLimitReached}
+                  className="rounded-xl border border-blue-500/40 bg-blue-500/10 px-5 py-3 font-semibold text-blue-300 transition hover:bg-blue-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Fall speichern
                 </button>
@@ -874,12 +927,17 @@ ${chatText}
                 Gespeicherte Fälle
               </p>
               <p className="mt-1 text-sm text-slate-500">
-                Lokal im Browser gespeichert. Später wird das durch Benutzerkonto
-                und Datenbank ersetzt.
+                Lokal im Browser gespeichert. Aktueller Plan:{" "}
+                <span className="font-semibold text-slate-300">
+                  {savedCases.length} / {currentPlan.savedCaseLimit}
+                </span>{" "}
+                Fälle.
               </p>
             </div>
 
-            <p className="text-sm text-slate-500">{savedCases.length} Fälle</p>
+            <p className="text-sm text-slate-500">
+              {remainingSavedCases} Speicherplätze frei
+            </p>
           </div>
 
           <div className="space-y-3">

@@ -4,22 +4,10 @@ import Image from "next/image";
 import { useState } from "react";
 
 const navigationLinks = [
-  {
-    label: "Diagnose",
-    href: "#diagnose",
-  },
-  {
-    label: "Ablauf",
-    href: "#workflow",
-  },
-  {
-    label: "Funktionen",
-    href: "#features",
-  },
-  {
-    label: "Hinweis",
-    href: "#hinweis",
-  },
+  { label: "Diagnose", href: "/#diagnose" },
+  { label: "Ablauf", href: "/#workflow" },
+  { label: "Funktionen", href: "/#features" },
+  { label: "Hinweis", href: "/#hinweis" },
 ];
 
 function Header() {
@@ -57,16 +45,20 @@ function Header() {
 
           <nav className="hidden items-center gap-8 text-sm font-medium text-slate-300 lg:flex">
             {navigationLinks.map((link) => (
-              <a key={link.href} href={link.href} className="transition hover:text-white">
+              <a
+                key={link.href}
+                href={link.href}
+                className="transition hover:text-white"
+              >
                 {link.label}
               </a>
             ))}
 
             <a
-              href="#premium"
+              href="/premium"
               className="rounded-full border border-yellow-500/30 bg-yellow-500/10 px-4 py-2 text-yellow-300 transition hover:bg-yellow-500 hover:text-slate-950"
             >
-              Premium bald
+              Premium vormerken
             </a>
           </nav>
 
@@ -76,7 +68,7 @@ function Header() {
             </button>
 
             <a
-              href="#diagnose"
+              href="/#diagnose"
               className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/40 transition hover:bg-blue-500"
             >
               Diagnose starten
@@ -117,11 +109,11 @@ function Header() {
               ))}
 
               <a
-                href="#premium"
+                href="/premium"
                 onClick={closeMobileMenu}
                 className="rounded-2xl border border-yellow-500/30 bg-yellow-500/10 px-5 py-4 font-semibold text-yellow-300 transition hover:bg-yellow-500 hover:text-slate-950"
               >
-                Premium bald
+                Premium vormerken
               </a>
 
               <button className="rounded-2xl border border-slate-700 px-5 py-4 text-left font-semibold text-slate-300 transition hover:bg-slate-800 hover:text-white">
@@ -129,7 +121,7 @@ function Header() {
               </button>
 
               <a
-                href="#diagnose"
+                href="/#diagnose"
                 onClick={closeMobileMenu}
                 className="rounded-2xl bg-blue-600 px-5 py-4 text-center font-semibold text-white shadow-lg shadow-blue-950/40 transition hover:bg-blue-500"
               >

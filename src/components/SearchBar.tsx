@@ -40,8 +40,46 @@ type SavedDiagnosisCase = {
   qualityCheck: string;
 };
 
+type UserPlan = "free" | "werkstatt" | "pro";
+
+type DiagnosisUsage = {
+  date: string;
+  count: number;
+};
+
 const STORAGE_KEY = "diagnosehub-current-case";
 const SAVED_CASES_STORAGE_KEY = "diagnosehub-saved-cases";
+const USER_PLAN_STORAGE_KEY = "diagnosehub-user-plan";
+const DIAGNOSIS_USAGE_STORAGE_KEY = "diagnosehub-diagnosis-usage";
+
+const planLimits: Record<
+  UserPlan,
+  {
+    label: string;
+    dailyLimit: number;
+    badge: string;
+    description: string;
+  }
+> = {
+  free: {
+    label: "Free",
+    dailyLimit: 3,
+    badge: "Kostenlos",
+    description: "Für Tests und einzelne Diagnosefälle.",
+  },
+  werkstatt: {
+    label: "Werkstatt Demo",
+    dailyLimit: 50,
+    badge: "Premium Demo",
+    description: "Vorbereitung für den späteren Werkstatt-Zugang.",
+  },
+  pro: {
+    label: "Werkstatt Pro Demo",
+    dailyLimit: 150,
+    badge: "Pro Demo",
+    description: "Vorbereitung für größere Betriebe und höhere Nutzung.",
+  },
+};
 
 const baseQuickQuestions = [
   "Welche Messwerte prüfen?",
@@ -49,6 +87,34 @@ const baseQuickQuestions = [
   "Häufigste Ursache eingrenzen",
   "Welche Live-Daten sind wichtig?",
 ];
+
+function getTodayKey() {
+  return new Date().toLocaleDateString("sv-SE");
+}
+
+function getInitialDiagnosisUsage(): DiagnosisUsage {
+  return {
+    date: getTodayKey(),
+    count: 0,
+  };
+}
+
+function normalizeDiagnosisUsage(usage: DiagnosisUsage): DiagnosisUsage {
+  const today = getTodayKey();
+
+  if (usage.date !== today) {
+    return {
+      date: today,
+      count: 0,
+    };
+  }
+
+  return usage;
+}
+
+function isValidUserPlan(value: string | null): value is UserPlan {
+  return value === "free" || value === "werkstatt" || value === "pro";
+}
 
 function buildDynamicQuickQuestions(
   engineContext: EngineContext | null,
@@ -176,6 +242,10 @@ export default function SearchBar() {
     useState<FaultCodeContext | null>(null);
   const [qualityCheck, setQualityCheck] = useState("");
   const [savedCases, setSavedCases] = useState<SavedDiagnosisCase[]>([]);
+  const [userPlan, setUserPlan] = useState<UserPlan>("free");
+  const [diagnosisUsage, setDiagnosisUsage] = useState<DiagnosisUsage>(
+    getInitialDiagnosisUsage()
+  );
   const [copySuccess, setCopySuccess] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -204,6 +274,17 @@ export default function SearchBar() {
     return -1;
   }, [messages]);
 
+  const normalizedUsage = useMemo(() => {
+    return normalizeDiagnosisUsage(diagnosisUsage);
+  }, [diagnosisUsage]);
+
+  const currentPlan = planLimits[userPlan];
+  const remainingDiagnoses = Math.max(
+    currentPlan.dailyLimit - normalizedUsage.count,
+    0
+  );
+  const diagnosisLimitReached = remainingDiagnoses <= 0;
+
   useEffect(() => {
     if (loading) {
       loadingMessageRef.current?.scrollIntoView({
@@ -228,6 +309,10 @@ export default function SearchBar() {
     try {
       const savedCurrentCase = localStorage.getItem(STORAGE_KEY);
       const savedCaseList = localStorage.getItem(SAVED_CASES_STORAGE_KEY);
+      const savedUserPlan = localStorage.getItem(USER_PLAN_STORAGE_KEY);
+      const savedDiagnosisUsage = localStorage.getItem(
+        DIAGNOSIS_USAGE_STORAGE_KEY
+      );
 
       if (savedCurrentCase) {
         const parsedCase = JSON.parse(savedCurrentCase);
@@ -245,6 +330,24 @@ export default function SearchBar() {
         if (Array.isArray(parsedSavedCases)) {
           setSavedCases(parsedSavedCases);
         }
+      }
+
+      if (isValidUserPlan(savedUserPlan)) {
+        setUserPlan(savedUserPlan);
+      }
+
+      if (savedDiagnosisUsage) {
+        const parsedUsage = JSON.parse(savedDiagnosisUsage);
+        const normalizedSavedUsage = normalizeDiagnosisUsage({
+          date: parsedUsage.date || getTodayKey(),
+          count: Number(parsedUsage.count) || 0,
+        });
+
+        setDiagnosisUsage(normalizedSavedUsage);
+        localStorage.setItem(
+          DIAGNOSIS_USAGE_STORAGE_KEY,
+          JSON.stringify(normalizedSavedUsage)
+        );
       }
     } catch (error) {
       console.error("Gespeicherte Diagnosefälle konnten nicht geladen werden:", error);
@@ -274,6 +377,27 @@ export default function SearchBar() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(currentCase));
   }, [messages, engineContext, faultCodeContext, qualityCheck, openedCaseId]);
 
+  function changeUserPlan(nextPlan: UserPlan) {
+    setUserPlan(nextPlan);
+    localStorage.setItem(USER_PLAN_STORAGE_KEY, nextPlan);
+    setError("");
+    setCopySuccess(false);
+    setDownloadSuccess(false);
+    setSaveSuccess(false);
+  }
+
+  function registerSuccessfulDiagnosis() {
+    const usageBeforeRequest = normalizeDiagnosisUsage(diagnosisUsage);
+
+    const nextUsage: DiagnosisUsage = {
+      date: usageBeforeRequest.date,
+      count: usageBeforeRequest.count + 1,
+    };
+
+    setDiagnosisUsage(nextUsage);
+    localStorage.setItem(DIAGNOSIS_USAGE_STORAGE_KEY, JSON.stringify(nextUsage));
+  }
+
   async function sendDiagnosis(questionOverride?: string) {
     const currentInput = (questionOverride ?? search).trim();
 
@@ -283,6 +407,23 @@ export default function SearchBar() {
     }
 
     if (loading) {
+      return;
+    }
+
+    const usageBeforeRequest = normalizeDiagnosisUsage(diagnosisUsage);
+    const limitBeforeRequest = planLimits[userPlan].dailyLimit;
+
+    if (usageBeforeRequest.count >= limitBeforeRequest) {
+      setDiagnosisUsage(usageBeforeRequest);
+      localStorage.setItem(
+        DIAGNOSIS_USAGE_STORAGE_KEY,
+        JSON.stringify(usageBeforeRequest)
+      );
+
+      setError(
+        `Tageslimit erreicht: Im ${planLimits[userPlan].label}-Plan sind aktuell ${limitBeforeRequest} KI-Diagnosen pro Tag vorgesehen. Für mehr Diagnosen den Werkstatt-Demo-Plan aktivieren.`
+      );
+
       return;
     }
 
@@ -330,6 +471,7 @@ export default function SearchBar() {
       setEngineContext(data.engineContext);
       setFaultCodeContext(data.faultCodeContext || null);
       setQualityCheck(data.qualityCheck || "");
+      registerSuccessfulDiagnosis();
     } catch (error) {
       console.error(error);
       setError(
@@ -592,6 +734,54 @@ ${chatText}
           className="w-full resize-none rounded-2xl border border-slate-800 bg-slate-950 p-5 text-white outline-none placeholder:text-slate-500 focus:border-blue-500"
         />
 
+        <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-blue-300">
+                  {currentPlan.badge}
+                </span>
+
+                <p className="font-bold text-white">{currentPlan.label}</p>
+
+                <p className="text-sm text-slate-500">
+                  {normalizedUsage.count} / {currentPlan.dailyLimit} Diagnosen heute genutzt
+                </p>
+              </div>
+
+              <p className="mt-2 text-sm text-slate-500">
+                {currentPlan.description} Noch verfügbar:{" "}
+                <span className="font-bold text-slate-300">
+                  {remainingDiagnoses}
+                </span>
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {(["free", "werkstatt", "pro"] as UserPlan[]).map((plan) => (
+                <button
+                  key={plan}
+                  onClick={() => changeUserPlan(plan)}
+                  className={
+                    userPlan === plan
+                      ? "rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white"
+                      : "rounded-xl border border-slate-700 px-4 py-2 text-sm font-bold text-slate-300 transition hover:bg-slate-800"
+                  }
+                >
+                  {planLimits[plan].label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {diagnosisLimitReached && (
+            <div className="mt-4 rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-300">
+              Tageslimit erreicht. Für weitere Tests kannst du im Prototyp den
+              Werkstatt-Demo-Plan aktivieren.
+            </div>
+          )}
+        </div>
+
         <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <p className="text-sm text-slate-500">
             {messages.length === 0
@@ -645,7 +835,7 @@ ${chatText}
 
             <button
               onClick={() => sendDiagnosis()}
-              disabled={loading}
+              disabled={loading || diagnosisLimitReached}
               className="rounded-xl bg-blue-600 px-6 py-3 font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading
@@ -757,7 +947,7 @@ ${chatText}
               <button
                 key={question}
                 onClick={() => sendDiagnosis(question)}
-                disabled={loading}
+                disabled={loading || diagnosisLimitReached}
                 className="rounded-full border border-slate-700 bg-slate-900 px-4 py-2 text-sm text-slate-300 transition hover:border-blue-500 hover:text-blue-300 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {question}

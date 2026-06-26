@@ -19,9 +19,9 @@ const USER_PLAN_STORAGE_KEY = "diagnosehub-user-plan";
 
 const navigationLinks = [
   { label: "Diagnose", href: "/#diagnose" },
+  { label: "Dashboard", href: "/dashboard" },
   { label: "Ablauf", href: "/#workflow" },
   { label: "Funktionen", href: "/#features" },
-  { label: "Hinweis", href: "/#hinweis" },
 ];
 
 const planLabels: Record<UserPlan, string> = {
@@ -119,7 +119,7 @@ function Header() {
             </div>
           </a>
 
-          <nav className="hidden items-center gap-8 text-sm font-medium text-slate-300 lg:flex">
+          <nav className="hidden items-center gap-7 text-sm font-medium text-slate-300 lg:flex">
             {navigationLinks.map((link) => (
               <a
                 key={link.href}

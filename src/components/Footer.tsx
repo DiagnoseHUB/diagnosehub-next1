@@ -3,19 +3,19 @@ import Image from "next/image";
 const productLinks = [
   {
     label: "Diagnose starten",
-    href: "#diagnose",
+    href: "/#diagnose",
   },
   {
     label: "Ablauf",
-    href: "#workflow",
+    href: "/#workflow",
   },
   {
     label: "Funktionen",
-    href: "#features",
+    href: "/#features",
   },
   {
     label: "Werkstatt-Hinweis",
-    href: "#hinweis",
+    href: "/#hinweis",
   },
 ];
 
@@ -105,8 +105,14 @@ function Footer() {
           <p>© 2026 DiagnoseHUB. Alle Rechte vorbehalten.</p>
 
           <div className="flex flex-wrap gap-4">
-            <span>Impressum folgt</span>
-            <span>Datenschutz folgt</span>
+            <a href="/impressum" className="transition hover:text-blue-300">
+              Impressum
+            </a>
+
+            <a href="/datenschutz" className="transition hover:text-blue-300">
+              Datenschutz
+            </a>
+
             <span>Version 0.1</span>
           </div>
         </div>

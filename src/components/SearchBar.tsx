@@ -29,7 +29,19 @@ type ChatMessage = {
   content: string;
 };
 
+type SavedDiagnosisCase = {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  messages: ChatMessage[];
+  engineContext: EngineContext | null;
+  faultCodeContext: FaultCodeContext | null;
+  qualityCheck: string;
+};
+
 const STORAGE_KEY = "diagnosehub-current-case";
+const SAVED_CASES_STORAGE_KEY = "diagnosehub-saved-cases";
 
 const baseQuickQuestions = [
   "Welche Messwerte prüfen?",
@@ -133,6 +145,29 @@ function buildDynamicQuickQuestions(
   return Array.from(new Set(questions)).slice(0, 12);
 }
 
+function getCaseTitle(messages: ChatMessage[]) {
+  const firstUserMessage = messages.find((message) => message.role === "user");
+
+  if (!firstUserMessage) {
+    return "Unbenannter Diagnosefall";
+  }
+
+  const cleanTitle = firstUserMessage.content.replace(/\s+/g, " ").trim();
+
+  if (cleanTitle.length <= 70) {
+    return cleanTitle;
+  }
+
+  return `${cleanTitle.slice(0, 70)}...`;
+}
+
+function formatDateTime(value: string) {
+  return new Date(value).toLocaleString("de-DE", {
+    dateStyle: "short",
+    timeStyle: "short",
+  });
+}
+
 export default function SearchBar() {
   const [search, setSearch] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -140,8 +175,11 @@ export default function SearchBar() {
   const [faultCodeContext, setFaultCodeContext] =
     useState<FaultCodeContext | null>(null);
   const [qualityCheck, setQualityCheck] = useState("");
+  const [savedCases, setSavedCases] = useState<SavedDiagnosisCase[]>([]);
   const [copySuccess, setCopySuccess] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [openedCaseId, setOpenedCaseId] = useState<string | null>(null);
   const [copiedMessageIndex, setCopiedMessageIndex] = useState<number | null>(
     null
   );
@@ -164,18 +202,28 @@ export default function SearchBar() {
 
   useEffect(() => {
     try {
-      const savedCase = localStorage.getItem(STORAGE_KEY);
+      const savedCurrentCase = localStorage.getItem(STORAGE_KEY);
+      const savedCaseList = localStorage.getItem(SAVED_CASES_STORAGE_KEY);
 
-      if (savedCase) {
-        const parsedCase = JSON.parse(savedCase);
+      if (savedCurrentCase) {
+        const parsedCase = JSON.parse(savedCurrentCase);
 
         setMessages(parsedCase.messages || []);
         setEngineContext(parsedCase.engineContext || null);
         setFaultCodeContext(parsedCase.faultCodeContext || null);
         setQualityCheck(parsedCase.qualityCheck || "");
+        setOpenedCaseId(parsedCase.openedCaseId || null);
+      }
+
+      if (savedCaseList) {
+        const parsedSavedCases = JSON.parse(savedCaseList);
+
+        if (Array.isArray(parsedSavedCases)) {
+          setSavedCases(parsedSavedCases);
+        }
       }
     } catch (error) {
-      console.error("Gespeicherter Diagnosefall konnte nicht geladen werden:", error);
+      console.error("Gespeicherte Diagnosefälle konnten nicht geladen werden:", error);
     } finally {
       hasLoadedCaseRef.current = true;
     }
@@ -196,10 +244,11 @@ export default function SearchBar() {
       engineContext,
       faultCodeContext,
       qualityCheck,
+      openedCaseId,
     };
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(currentCase));
-  }, [messages, engineContext, faultCodeContext, qualityCheck]);
+  }, [messages, engineContext, faultCodeContext, qualityCheck, openedCaseId]);
 
   async function sendDiagnosis(questionOverride?: string) {
     const currentInput = (questionOverride ?? search).trim();
@@ -227,6 +276,7 @@ export default function SearchBar() {
     setQualityCheck("");
     setCopySuccess(false);
     setDownloadSuccess(false);
+    setSaveSuccess(false);
     setCopiedMessageIndex(null);
 
     try {
@@ -274,9 +324,83 @@ export default function SearchBar() {
     setQualityCheck("");
     setCopySuccess(false);
     setDownloadSuccess(false);
+    setSaveSuccess(false);
     setCopiedMessageIndex(null);
+    setOpenedCaseId(null);
     setError("");
     localStorage.removeItem(STORAGE_KEY);
+  }
+
+  function saveCurrentCase() {
+    if (messages.length === 0) {
+      return;
+    }
+
+    const now = new Date().toISOString();
+
+    const caseToSave: SavedDiagnosisCase = {
+      id: openedCaseId ?? crypto.randomUUID(),
+      title: getCaseTitle(messages),
+      createdAt:
+        savedCases.find((savedCase) => savedCase.id === openedCaseId)
+          ?.createdAt ?? now,
+      updatedAt: now,
+      messages,
+      engineContext,
+      faultCodeContext,
+      qualityCheck,
+    };
+
+    const updatedSavedCases = [
+      caseToSave,
+      ...savedCases.filter((savedCase) => savedCase.id !== caseToSave.id),
+    ].slice(0, 25);
+
+    setSavedCases(updatedSavedCases);
+    setOpenedCaseId(caseToSave.id);
+    localStorage.setItem(
+      SAVED_CASES_STORAGE_KEY,
+      JSON.stringify(updatedSavedCases)
+    );
+
+    setSaveSuccess(true);
+    setCopySuccess(false);
+    setDownloadSuccess(false);
+    setCopiedMessageIndex(null);
+
+    window.setTimeout(() => {
+      setSaveSuccess(false);
+    }, 2500);
+  }
+
+  function openSavedCase(savedCase: SavedDiagnosisCase) {
+    setMessages(savedCase.messages);
+    setEngineContext(savedCase.engineContext);
+    setFaultCodeContext(savedCase.faultCodeContext);
+    setQualityCheck(savedCase.qualityCheck);
+    setOpenedCaseId(savedCase.id);
+    setSearch("");
+    setError("");
+    setCopySuccess(false);
+    setDownloadSuccess(false);
+    setSaveSuccess(false);
+    setCopiedMessageIndex(null);
+  }
+
+  function deleteSavedCase(caseId: string) {
+    const updatedSavedCases = savedCases.filter(
+      (savedCase) => savedCase.id !== caseId
+    );
+
+    setSavedCases(updatedSavedCases);
+    localStorage.setItem(
+      SAVED_CASES_STORAGE_KEY,
+      JSON.stringify(updatedSavedCases)
+    );
+
+    if (openedCaseId === caseId) {
+      setOpenedCaseId(null);
+    }
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -357,6 +481,7 @@ ${chatText}
       await navigator.clipboard.writeText(buildCaseReport());
       setCopySuccess(true);
       setDownloadSuccess(false);
+      setSaveSuccess(false);
       setCopiedMessageIndex(null);
 
       window.setTimeout(() => {
@@ -374,6 +499,7 @@ ${chatText}
       setCopiedMessageIndex(index);
       setCopySuccess(false);
       setDownloadSuccess(false);
+      setSaveSuccess(false);
 
       window.setTimeout(() => {
         setCopiedMessageIndex(null);
@@ -414,6 +540,7 @@ ${chatText}
 
       setDownloadSuccess(true);
       setCopySuccess(false);
+      setSaveSuccess(false);
       setCopiedMessageIndex(null);
 
       window.setTimeout(() => {
@@ -445,12 +572,21 @@ ${chatText}
           <p className="text-sm text-slate-500">
             {messages.length === 0
               ? "Enter zum Senden · Shift + Enter für neue Zeile"
-              : "Folgefrage im gleichen Diagnosefall stellen"}
+              : openedCaseId
+                ? "Gespeicherter Fall geöffnet · Folgefrage im gleichen Fall stellen"
+                : "Folgefrage im gleichen Diagnosefall stellen"}
           </p>
 
           <div className="flex flex-wrap gap-3">
             {messages.length > 0 && (
               <>
+                <button
+                  onClick={saveCurrentCase}
+                  className="rounded-xl border border-blue-500/40 bg-blue-500/10 px-5 py-3 font-semibold text-blue-300 transition hover:bg-blue-500 hover:text-white"
+                >
+                  Fall speichern
+                </button>
+
                 <button
                   onClick={copyCaseReport}
                   className="rounded-xl border border-slate-700 px-5 py-3 font-semibold text-slate-300 transition hover:bg-slate-800"
@@ -499,6 +635,82 @@ ${chatText}
         <div className="mt-5 rounded-xl border border-green-500/30 bg-green-500/10 px-6 py-4 text-green-300">
           Fallbericht wurde als TXT-Datei gespeichert.
         </div>
+      )}
+
+      {saveSuccess && (
+        <div className="mt-5 rounded-xl border border-green-500/30 bg-green-500/10 px-6 py-4 text-green-300">
+          Diagnosefall wurde gespeichert.
+        </div>
+      )}
+
+      {savedCases.length > 0 && (
+        <section className="mt-6 rounded-3xl border border-slate-800 bg-slate-900/80 p-6">
+          <div className="mb-5 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-wide text-blue-400">
+                Gespeicherte Fälle
+              </p>
+              <p className="mt-1 text-sm text-slate-500">
+                Lokal im Browser gespeichert. Später wird das durch Benutzerkonto
+                und Datenbank ersetzt.
+              </p>
+            </div>
+
+            <p className="text-sm text-slate-500">{savedCases.length} Fälle</p>
+          </div>
+
+          <div className="space-y-3">
+            {savedCases.map((savedCase) => (
+              <div
+                key={savedCase.id}
+                className={
+                  openedCaseId === savedCase.id
+                    ? "rounded-2xl border border-blue-500/50 bg-blue-500/10 p-4"
+                    : "rounded-2xl border border-slate-800 bg-slate-950/70 p-4"
+                }
+              >
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <h3 className="font-bold text-white">{savedCase.title}</h3>
+
+                    <div className="mt-2 flex flex-wrap gap-3 text-sm text-slate-500">
+                      <span>Aktualisiert: {formatDateTime(savedCase.updatedAt)}</span>
+
+                      {savedCase.engineContext?.code && (
+                        <span>Motorcode: {savedCase.engineContext.code}</span>
+                      )}
+
+                      {savedCase.faultCodeContext?.foundCodes?.[0]?.code && (
+                        <span>
+                          Fehlercode:{" "}
+                          {savedCase.faultCodeContext.foundCodes[0].code}
+                        </span>
+                      )}
+
+                      <span>{savedCase.messages.length} Nachrichten</span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      onClick={() => openSavedCase(savedCase)}
+                      className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:border-blue-500 hover:text-blue-300"
+                    >
+                      Öffnen
+                    </button>
+
+                    <button
+                      onClick={() => deleteSavedCase(savedCase.id)}
+                      className="rounded-xl border border-red-500/30 px-4 py-2 text-sm font-semibold text-red-300 transition hover:bg-red-500/10"
+                    >
+                      Löschen
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
       )}
 
       {messages.length > 0 && (

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Header from "@/components/Header";
 import SearchBar from "@/components/SearchBar";
 
@@ -64,7 +65,7 @@ export default function Home() {
       <Header />
 
       <main>
-        <section className="mx-auto grid max-w-7xl items-center gap-16 px-6 py-20 lg:grid-cols-2">
+        <section className="mx-auto grid max-w-7xl items-start gap-16 px-6 py-20 lg:grid-cols-2">
           <div>
             <div className="mb-6 inline-flex rounded-full border border-blue-500/30 bg-blue-500/10 px-5 py-2 text-sm font-medium text-blue-300">
               KI-Diagnose für Kfz-Werkstätten
@@ -78,9 +79,9 @@ export default function Home() {
             </h1>
 
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-400">
-              DiagnoseHUB kombiniert Motorkennbuchstaben, Fehlercodes,
-              Symptome, Live-Daten und KI zu einem strukturierten Prüfplan für
-              den Werkstattalltag.
+              DiagnoseHUB kombiniert Motorkennbuchstaben, Fehlercodes, Symptome,
+              Live-Daten und KI zu einem strukturierten Prüfplan für den
+              Werkstattalltag.
             </p>
 
             <div className="mt-8 flex flex-wrap gap-3">
@@ -94,59 +95,92 @@ export default function Home() {
               ))}
             </div>
 
-            <div className="mt-10">
+            <div id="diagnose" className="mt-10 scroll-mt-28">
               <SearchBar />
             </div>
           </div>
 
-          <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-8 shadow-2xl shadow-blue-950/40">
-            <p className="mb-4 text-sm font-medium text-blue-400">
-              DiagnoseHUB Workflow
-            </p>
+          <div className="space-y-8">
+            <div className="relative overflow-hidden rounded-3xl border border-blue-500/20 bg-gradient-to-br from-slate-900 via-slate-950 to-blue-950/50 p-10 shadow-2xl shadow-blue-950/50">
+              <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-blue-500/20 blur-3xl" />
+              <div className="absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-cyan-500/10 blur-3xl" />
 
-            <h2 className="text-3xl font-bold">
-              Vom Fehlercode zum Prüfplan.
-            </h2>
-
-            <p className="mt-4 leading-7 text-slate-400">
-              Starte mit einem echten Werkstattfall. Danach kannst du
-              Folgefragen stellen, Messwerte abfragen und den kompletten
-              Diagnoseverlauf als Fallbericht sichern.
-            </p>
-
-            <div className="mt-8 space-y-4">
-              <div className="rounded-xl border border-slate-800 bg-slate-950 p-5">
-                <div className="flex items-center justify-between gap-4">
-                  <span>Motorkontext erkennen</span>
-                  <span className="font-bold text-green-400">aktiv</span>
+              <div className="relative flex flex-col items-center text-center">
+                <div className="mb-6 flex h-72 w-72 items-center justify-center rounded-full border border-blue-500/20 bg-slate-950/70 p-8 shadow-2xl shadow-blue-950/60 md:h-96 md:w-96">
+                  <Image
+                    src="/diagnosehub-logo.png"
+                    alt="DiagnoseHUB Logo"
+                    width={420}
+                    height={420}
+                    priority
+                    className="h-full w-full object-contain"
+                  />
                 </div>
-              </div>
 
-              <div className="rounded-xl border border-slate-800 bg-slate-950 p-5">
-                <div className="flex items-center justify-between gap-4">
-                  <span>Fehlercodes zuordnen</span>
-                  <span className="font-bold text-green-400">aktiv</span>
+                <p className="text-sm font-semibold uppercase tracking-[0.35em] text-blue-300">
+                  DiagnoseHUB
+                </p>
+
+                <h2 className="mt-4 text-3xl font-bold md:text-4xl">
+                  Werkstattdiagnose mit System.
+                </h2>
+
+                <p className="mt-4 max-w-xl leading-7 text-slate-400">
+                  Motorcode, Fehlercode, Symptom und Verlauf werden in einem
+                  Fall zusammengeführt.
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-8 shadow-2xl shadow-blue-950/40">
+              <p className="mb-4 text-sm font-medium text-blue-400">
+                DiagnoseHUB Workflow
+              </p>
+
+              <h2 className="text-3xl font-bold">
+                Vom Fehlercode zum Prüfplan.
+              </h2>
+
+              <p className="mt-4 leading-7 text-slate-400">
+                Starte mit einem echten Werkstattfall. Danach kannst du
+                Folgefragen stellen, Messwerte abfragen und den kompletten
+                Diagnoseverlauf als Fallbericht sichern.
+              </p>
+
+              <div className="mt-8 space-y-4">
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-5">
+                  <div className="flex items-center justify-between gap-4">
+                    <span>Motorkontext erkennen</span>
+                    <span className="font-bold text-green-400">aktiv</span>
+                  </div>
                 </div>
-              </div>
 
-              <div className="rounded-xl border border-slate-800 bg-slate-950 p-5">
-                <div className="flex items-center justify-between gap-4">
-                  <span>KI-Diagnose erstellen</span>
-                  <span className="font-bold text-blue-400">aktiv</span>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-5">
+                  <div className="flex items-center justify-between gap-4">
+                    <span>Fehlercodes zuordnen</span>
+                    <span className="font-bold text-green-400">aktiv</span>
+                  </div>
                 </div>
-              </div>
 
-              <div className="rounded-xl border border-slate-800 bg-slate-950 p-5">
-                <div className="flex items-center justify-between gap-4">
-                  <span>Folgefragen im Fallkontext</span>
-                  <span className="font-bold text-cyan-400">aktiv</span>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-5">
+                  <div className="flex items-center justify-between gap-4">
+                    <span>KI-Diagnose erstellen</span>
+                    <span className="font-bold text-blue-400">aktiv</span>
+                  </div>
                 </div>
-              </div>
 
-              <div className="rounded-xl border border-slate-800 bg-slate-950 p-5">
-                <div className="flex items-center justify-between gap-4">
-                  <span>Fallbericht exportieren</span>
-                  <span className="font-bold text-yellow-400">aktiv</span>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-5">
+                  <div className="flex items-center justify-between gap-4">
+                    <span>Folgefragen im Fallkontext</span>
+                    <span className="font-bold text-cyan-400">aktiv</span>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-5">
+                  <div className="flex items-center justify-between gap-4">
+                    <span>Fallbericht exportieren</span>
+                    <span className="font-bold text-yellow-400">aktiv</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -166,11 +200,10 @@ export default function Home() {
                 </h2>
 
                 <p className="mt-4 leading-8 text-slate-400">
-                  Normale KI kann technische Zusammenhänge frei formulieren,
-                  aber sie kennt deinen Diagnosefall nicht sauber genug.
-                  DiagnoseHUB legt zuerst Werkstatt-Kontext über den Fall:
-                  Motorcode, Kraftstoffart, Fehlercode, Verlauf und
-                  Qualitätsprüfung.
+                  Normale KI kann technische Zusammenhänge frei formulieren, aber
+                  sie kennt deinen Diagnosefall nicht sauber genug. DiagnoseHUB
+                  legt zuerst Werkstatt-Kontext über den Fall: Motorcode,
+                  Kraftstoffart, Fehlercode, Verlauf und Qualitätsprüfung.
                 </p>
               </div>
 
@@ -230,7 +263,10 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="mx-auto max-w-7xl px-6 pb-20">
+        <section
+          id="workflow"
+          className="mx-auto max-w-7xl scroll-mt-28 px-6 pb-20"
+        >
           <div className="mb-10">
             <p className="mb-4 text-sm font-semibold uppercase tracking-wide text-blue-400">
               Ablauf
@@ -257,7 +293,10 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="mx-auto max-w-7xl px-6 pb-20">
+        <section
+          id="features"
+          className="mx-auto max-w-7xl scroll-mt-28 px-6 pb-20"
+        >
           <div className="mb-10">
             <p className="mb-4 text-sm font-semibold uppercase tracking-wide text-blue-400">
               Funktionen
@@ -284,7 +323,10 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="mx-auto max-w-7xl px-6 pb-24">
+        <section
+          id="hinweis"
+          className="mx-auto max-w-7xl scroll-mt-28 px-6 pb-24"
+        >
           <div className="rounded-3xl border border-blue-500/20 bg-blue-500/10 p-8">
             <div className="grid gap-8 lg:grid-cols-[1.4fr_0.6fr] lg:items-center">
               <div>
@@ -303,15 +345,18 @@ export default function Home() {
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-6">
+              <div
+                id="premium"
+                className="scroll-mt-28 rounded-2xl border border-slate-800 bg-slate-950/70 p-6"
+              >
                 <p className="text-sm text-slate-500">Status</p>
                 <p className="mt-2 text-2xl font-bold text-green-400">
                   Prototyp aktiv
                 </p>
 
                 <p className="mt-4 text-sm leading-6 text-slate-400">
-                  Nächste Ausbaustufen: Login, Benutzerkonten,
-                  Fallhistorie, PDF-Berichte und größere technische Datenbank.
+                  Nächste Ausbaustufen: Login, Benutzerkonten, Fallhistorie,
+                  PDF-Berichte und größere technische Datenbank.
                 </p>
               </div>
             </div>

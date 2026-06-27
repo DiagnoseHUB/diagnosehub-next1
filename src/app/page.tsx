@@ -1,544 +1,1181 @@
-import Image from "next/image";
+"use client";
+
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import SearchBar from "@/components/SearchBar";
+import { createClient } from "@/lib/supabase/client";
+import {
+  deleteDiagnosisCaseFromSupabase,
+  loadDiagnosisCasesFromSupabase,
+  migrateLocalDiagnosisCasesToSupabase,
+  type SavedDiagnosisCase,
+} from "@/services/diagnosisCasesSupabase";
+import {
+  getInitialDiagnosisUsage,
+  loadDiagnosisUsageFromSupabase,
+  normalizeDiagnosisUsage,
+  resetDiagnosisUsageInSupabase,
+  type DiagnosisUsage,
+} from "@/services/diagnosisUsageSupabase";
+import {
+  deletePremiumLeadFromSupabase,
+  loadPremiumLeadsFromSupabase,
+  migrateLocalPremiumLeadsToSupabase,
+  type PremiumLead,
+  type PremiumPlan,
+} from "@/services/premiumLeadsSupabase";
 
-const exampleCases = [
-  "VW Passat CBAB P0299 Leistungsverlust",
-  "Audi A4 B8 CDHB P0171 ruckelt im Leerlauf",
-  "BMW N47D20 P0087 startet schlecht",
-  "Opel D14NEL Turbolader erneut defekt",
+type UserPlan = "free" | "werkstatt" | "pro";
+
+type DataSource = "local" | "supabase";
+type ProfileSource = "localStorage" | "supabase" | "fallback";
+
+type DemoAccount = {
+  name: string;
+  workshop: string;
+  email: string;
+  role: string;
+  plan: UserPlan;
+  updatedAt: string;
+  supabaseUserId?: string;
+};
+
+type WorkshopProfileDatabaseRow = {
+  id: string;
+  full_name: string;
+  workshop_name: string;
+  email: string;
+  role: string;
+  plan: UserPlan;
+  created_at: string;
+  updated_at: string;
+};
+
+type WorkshopData = {
+  name: string;
+  workshop: string;
+  email: string;
+  role: string;
+  plan: UserPlan;
+  updatedAt: string;
+  source: ProfileSource;
+};
+
+const DEMO_ACCOUNT_STORAGE_KEY = "diagnosehub-demo-account";
+const USER_PLAN_STORAGE_KEY = "diagnosehub-user-plan";
+const SAVED_CASES_STORAGE_KEY = "diagnosehub-saved-cases";
+const CURRENT_CASE_STORAGE_KEY = "diagnosehub-current-case";
+const DIAGNOSIS_USAGE_STORAGE_KEY = "diagnosehub-diagnosis-usage";
+const PREMIUM_LEADS_STORAGE_KEY = "diagnosehub-premium-leads";
+
+const legacyUsageStorageKeys = [
+  "diagnosehub-diagnosis-usage",
+  "diagnosehub-usage",
 ];
 
-const workflowSteps = [
-  {
-    number: "01",
-    title: "Fall eingeben",
-    text: "Fahrzeug, Motorcode, Fehlercode, Symptom oder Messwert eingeben.",
-  },
-  {
-    number: "02",
-    title: "Kontext erkennen",
-    text: "DiagnoseHUB erkennt Motortyp, Motorkennbuchstaben und bekannte Fehlercodes.",
-  },
-  {
-    number: "03",
-    title: "Prüfplan erhalten",
-    text: "Die KI erstellt eine strukturierte Diagnose mit Ursachen, Messwerten und Prüfreihenfolge.",
-  },
-  {
-    number: "04",
-    title: "Folgefragen stellen",
-    text: "Rückfragen wie „Ladedruck Sollwert?“ oder „Was zuerst prüfen?“ bleiben im gleichen Fallkontext.",
-  },
-];
+const planLabels: Record<UserPlan, string> = {
+  free: "Free",
+  werkstatt: "Werkstatt Demo",
+  pro: "Werkstatt Pro Demo",
+};
 
-const features = [
-  {
-    title: "Motorkennbuchstaben-Erkennung",
-    text: "Bekannte Motorcodes werden vor der KI ausgewertet, damit Diesel und Benziner nicht verwechselt werden.",
-  },
-  {
-    title: "Fehlercode-Datenbank",
-    text: "OBD-Codes wie P0299, P0087, P0171 oder P2002 liefern festen technischen Kontext für die Diagnose.",
-  },
-  {
-    title: "Qualitätsprüfung",
-    text: "Grobe technische Konflikte wie Zündkerzen beim Diesel werden erkannt und automatisch neu geprüft.",
-  },
-  {
-    title: "Folgefragen mit Kontext",
-    text: "Der Diagnoseverlauf bleibt erhalten, sodass kurze Rückfragen praxisnah beantwortet werden.",
-  },
-  {
-    title: "Fallbericht exportieren",
-    text: "Diagnoseverlauf, Motorkontext und Fehlercode-Kontext können kopiert oder als TXT gespeichert werden.",
-  },
-  {
-    title: "Werkstattgerechte Prüfreihenfolge",
-    text: "Erst einfache Prüfungen, dann Live-Daten, dann mechanische Messungen statt blindem Teiletausch.",
-  },
-];
+const premiumLeadPlanLabels: Record<PremiumPlan, string> = {
+  werkstatt: "Werkstatt",
+  pro: "Pro",
+};
 
-const pricingPlans = [
-  {
-    name: "Free",
-    price: "0 €",
-    interval: "zum Testen",
-    description:
-      "Für erste Tests und einzelne Diagnosefälle. Ideal, um DiagnoseHUB auszuprobieren.",
-    highlighted: false,
-    badge: "Start",
-    buttonText: "Kostenlos testen",
-    buttonHref: "/#diagnose",
-    features: [
-      "Begrenzte KI-Diagnosen",
-      "Motorkontext-Erkennung",
-      "Fehlercode-Kontext",
-      "Basis-Fallbericht als TXT",
-      "Lokale Fallhistorie im Browser",
-      "Standard-Prüfprotokoll",
-    ],
-    limitations: [
-      "Kein echter Benutzeraccount",
-      "Keine Cloud-Fallhistorie",
-      "Keine PDF-Berichte",
-    ],
-  },
-  {
-    name: "Werkstatt",
-    price: "29 €",
-    interval: "pro Monat",
-    description:
-      "Für kleine Werkstätten, die DiagnoseHUB regelmäßig im Alltag nutzen wollen.",
-    highlighted: true,
-    badge: "Empfohlen",
-    buttonText: "Werkstatt-Zugang vormerken",
-    buttonHref: "/premium?plan=werkstatt",
-    features: [
-      "Mehr KI-Diagnosen pro Monat",
-      "Individuelle Prüfprotokolle nach Fehlercode",
-      "Erweiterte Fallhistorie",
-      "Fallberichte für Kundenakte",
-      "Dynamische Schnellfragen",
-      "Erweiterte Fehlercode-Datenbank",
-      "Priorisierte Weiterentwicklung",
-    ],
-    limitations: ["Mehrere Benutzer später", "Schnittstellen später"],
-  },
-  {
-    name: "Werkstatt Pro",
-    price: "79 €",
-    interval: "pro Monat",
-    description:
-      "Für Betriebe mit mehreren Nutzern, höherem Diagnosevolumen und mehr Dokumentation.",
-    highlighted: false,
-    badge: "Später",
-    buttonText: "Pro vormerken",
-    buttonHref: "/premium?plan=pro",
-    features: [
-      "Höheres Diagnosekontingent",
-      "Mehrere Mitarbeiter geplant",
-      "PDF-Berichte geplant",
-      "Cloud-Fallhistorie geplant",
-      "Größere technische Datenbank",
-      "Premium-Prüfprotokolle",
-      "Werkstatt-Dashboard geplant",
-    ],
-    limitations: ["Noch nicht im Prototyp aktiv"],
-  },
-];
+const dataSourceLabels: Record<DataSource, string> = {
+  local: "Lokal",
+  supabase: "Supabase",
+};
 
-export default function Home() {
+const profileSourceLabels: Record<ProfileSource, string> = {
+  localStorage: "Lokaler Fallback",
+  supabase: "Supabase Datenbank",
+  fallback: "Fallback",
+};
+
+const defaultWorkshopData: WorkshopData = {
+  name: "Nicht hinterlegt",
+  workshop: "Nicht hinterlegt",
+  email: "Nicht hinterlegt",
+  role: "Werkstatt",
+  plan: "free",
+  updatedAt: "",
+  source: "fallback",
+};
+
+function isValidUserPlan(value: string | null): value is UserPlan {
+  return value === "free" || value === "werkstatt" || value === "pro";
+}
+
+function formatDateTime(value?: string) {
+  if (!value) {
+    return "nicht vorhanden";
+  }
+
+  try {
+    return new Date(value).toLocaleString("de-DE", {
+      dateStyle: "short",
+      timeStyle: "short",
+    });
+  } catch {
+    return value;
+  }
+}
+
+function formatDate(value?: string) {
+  if (!value) {
+    return "nicht vorhanden";
+  }
+
+  try {
+    return new Date(value).toLocaleDateString("de-DE", {
+      dateStyle: "medium",
+    });
+  } catch {
+    return value;
+  }
+}
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Unbekannter Fehler";
+}
+
+function loadLocalAccount(): DemoAccount | null {
+  try {
+    const savedAccount = localStorage.getItem(DEMO_ACCOUNT_STORAGE_KEY);
+
+    if (!savedAccount) {
+      return null;
+    }
+
+    return JSON.parse(savedAccount) as DemoAccount;
+  } catch (error) {
+    console.error("Lokaler Account konnte nicht geladen werden:", error);
+    return null;
+  }
+}
+
+function getLocalPlan(): UserPlan {
+  try {
+    const savedPlan = localStorage.getItem(USER_PLAN_STORAGE_KEY);
+
+    if (isValidUserPlan(savedPlan)) {
+      return savedPlan;
+    }
+
+    const localAccount = loadLocalAccount();
+
+    if (localAccount && isValidUserPlan(localAccount.plan)) {
+      return localAccount.plan;
+    }
+  } catch (error) {
+    console.error("Lokaler Plan konnte nicht geladen werden:", error);
+  }
+
+  return "free";
+}
+
+function getLocalWorkshopData(): WorkshopData {
+  const localAccount = loadLocalAccount();
+  const localPlan = getLocalPlan();
+
+  if (!localAccount) {
+    return {
+      ...defaultWorkshopData,
+      plan: localPlan,
+      source: localPlan === "free" ? "fallback" : "localStorage",
+    };
+  }
+
+  return {
+    name: localAccount.name || defaultWorkshopData.name,
+    workshop: localAccount.workshop || defaultWorkshopData.workshop,
+    email: localAccount.email || defaultWorkshopData.email,
+    role: localAccount.role || defaultWorkshopData.role,
+    plan: isValidUserPlan(localAccount.plan) ? localAccount.plan : localPlan,
+    updatedAt: localAccount.updatedAt || "",
+    source: "localStorage",
+  };
+}
+
+function syncWorkshopProfileToLocalStorage(profile: WorkshopProfileDatabaseRow) {
+  const localAccount: DemoAccount = {
+    name: profile.full_name,
+    workshop: profile.workshop_name,
+    email: profile.email,
+    role: profile.role,
+    plan: profile.plan,
+    updatedAt: profile.updated_at,
+    supabaseUserId: profile.id,
+  };
+
+  localStorage.setItem(DEMO_ACCOUNT_STORAGE_KEY, JSON.stringify(localAccount));
+  localStorage.setItem(USER_PLAN_STORAGE_KEY, profile.plan);
+}
+
+function loadLocalDiagnosisCases(): SavedDiagnosisCase[] {
+  try {
+    const savedCases = localStorage.getItem(SAVED_CASES_STORAGE_KEY);
+
+    if (!savedCases) {
+      return [];
+    }
+
+    const parsedCases = JSON.parse(savedCases);
+
+    if (!Array.isArray(parsedCases)) {
+      return [];
+    }
+
+    return parsedCases as SavedDiagnosisCase[];
+  } catch (error) {
+    console.error("Lokale Diagnosefälle konnten nicht geladen werden:", error);
+    return [];
+  }
+}
+
+function saveDiagnosisCasesToLocalStorage(cases: SavedDiagnosisCase[]) {
+  localStorage.setItem(SAVED_CASES_STORAGE_KEY, JSON.stringify(cases));
+}
+
+function loadLocalDiagnosisUsage(): DiagnosisUsage {
+  try {
+    for (const storageKey of legacyUsageStorageKeys) {
+      const savedUsage = localStorage.getItem(storageKey);
+
+      if (!savedUsage) {
+        continue;
+      }
+
+      const parsedUsage = JSON.parse(savedUsage) as Partial<DiagnosisUsage>;
+
+      if (
+        typeof parsedUsage.date === "string" &&
+        typeof parsedUsage.count === "number"
+      ) {
+        return normalizeDiagnosisUsage({
+          date: parsedUsage.date,
+          count: parsedUsage.count,
+        });
+      }
+    }
+  } catch (error) {
+    console.error("Lokale Nutzung konnte nicht geladen werden:", error);
+  }
+
+  return getInitialDiagnosisUsage();
+}
+
+function saveDiagnosisUsageToLocalStorage(usage: DiagnosisUsage) {
+  localStorage.setItem(DIAGNOSIS_USAGE_STORAGE_KEY, JSON.stringify(usage));
+}
+
+function loadLocalPremiumLeads(): PremiumLead[] {
+  try {
+    const savedLeads = localStorage.getItem(PREMIUM_LEADS_STORAGE_KEY);
+
+    if (!savedLeads) {
+      return [];
+    }
+
+    const parsedLeads = JSON.parse(savedLeads);
+
+    if (!Array.isArray(parsedLeads)) {
+      return [];
+    }
+
+    return parsedLeads as PremiumLead[];
+  } catch (error) {
+    console.error("Lokale Premium-Vormerkungen konnten nicht geladen werden:", error);
+    return [];
+  }
+}
+
+function savePremiumLeadsToLocalStorage(leads: PremiumLead[]) {
+  localStorage.setItem(PREMIUM_LEADS_STORAGE_KEY, JSON.stringify(leads));
+}
+
+function DashboardCard({
+  title,
+  value,
+  description,
+  children,
+}: {
+  title: string;
+  value: ReactNode;
+  description?: string;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-lg shadow-blue-950/20">
+      <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+        {title}
+      </p>
+
+      <div className="mt-3 text-3xl font-black text-white">{value}</div>
+
+      {description && (
+        <p className="mt-3 leading-7 text-slate-400">{description}</p>
+      )}
+
+      {children && <div className="mt-5">{children}</div>}
+    </div>
+  );
+}
+
+function Section({
+  title,
+  description,
+  right,
+  children,
+}: {
+  title: string;
+  description?: string;
+  right?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-[2rem] border border-slate-800 bg-slate-900/70 p-6 shadow-xl shadow-blue-950/20">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div>
+          <h2 className="text-2xl font-black text-white">{title}</h2>
+          {description && (
+            <p className="mt-2 max-w-3xl leading-7 text-slate-400">
+              {description}
+            </p>
+          )}
+        </div>
+
+        {right && <div className="flex flex-wrap gap-3">{right}</div>}
+      </div>
+
+      <div className="mt-6">{children}</div>
+    </section>
+  );
+}
+
+function SourceBadge({ source }: { source: DataSource }) {
+  return (
+    <span
+      className={
+        source === "supabase"
+          ? "rounded-full border border-green-500/30 bg-green-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-green-300"
+          : "rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-yellow-300"
+      }
+    >
+      {dataSourceLabels[source]}
+    </span>
+  );
+}
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="rounded-3xl border border-dashed border-slate-700 bg-slate-950/60 p-8 text-center text-slate-400">
+      {text}
+    </div>
+  );
+}
+
+export default function DashboardPage() {
+  const supabase = useMemo(() => createClient(), []);
+
+  const [user, setUser] = useState<User | null>(null);
+  const [workshopData, setWorkshopData] =
+    useState<WorkshopData>(defaultWorkshopData);
+
+  const [diagnosisCases, setDiagnosisCases] = useState<SavedDiagnosisCase[]>(
+    []
+  );
+  const [diagnosisUsage, setDiagnosisUsage] = useState<DiagnosisUsage>(
+    getInitialDiagnosisUsage()
+  );
+  const [premiumLeads, setPremiumLeads] = useState<PremiumLead[]>([]);
+
+  const [caseSource, setCaseSource] = useState<DataSource>("local");
+  const [usageSource, setUsageSource] = useState<DataSource>("local");
+  const [leadSource, setLeadSource] = useState<DataSource>("local");
+
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [caseLoading, setCaseLoading] = useState(true);
+  const [usageLoading, setUsageLoading] = useState(true);
+  const [leadLoading, setLeadLoading] = useState(true);
+
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const isLoading =
+    profileLoading || caseLoading || usageLoading || leadLoading;
+
+  useEffect(() => {
+    void loadDashboard();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(
+      async (_event: AuthChangeEvent, nextSession: Session | null) => {
+        await loadDashboard(nextSession);
+      }
+    );
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [supabase]);
+
+  function setLocalFallbackData() {
+    const localWorkshopData = getLocalWorkshopData();
+    const localCases = loadLocalDiagnosisCases();
+    const localUsage = loadLocalDiagnosisUsage();
+    const localLeads = loadLocalPremiumLeads();
+
+    setWorkshopData(localWorkshopData);
+    setDiagnosisCases(localCases);
+    setDiagnosisUsage(localUsage);
+    setPremiumLeads(localLeads);
+
+    setCaseSource("local");
+    setUsageSource("local");
+    setLeadSource("local");
+  }
+
+  async function loadDashboard(existingSession?: Session | null) {
+    setError("");
+    setSuccess("");
+    setProfileLoading(true);
+    setCaseLoading(true);
+    setUsageLoading(true);
+    setLeadLoading(true);
+
+    try {
+      setLocalFallbackData();
+
+      const session =
+        existingSession ??
+        (await supabase.auth.getSession()).data.session ??
+        null;
+
+      if (!session?.user) {
+        setUser(null);
+        return;
+      }
+
+      setUser(session.user);
+
+      await Promise.all([
+        loadWorkshopProfile(session.user),
+        loadSupabaseCases(session.user, false),
+        loadSupabaseUsage(session.user),
+        loadSupabasePremiumLeads(session.user, false),
+      ]);
+    } catch (error) {
+      console.error("Dashboard konnte nicht geladen werden:", error);
+      setError(`Dashboard konnte nicht geladen werden: ${getErrorMessage(error)}`);
+      setLocalFallbackData();
+    } finally {
+      setProfileLoading(false);
+      setCaseLoading(false);
+      setUsageLoading(false);
+      setLeadLoading(false);
+    }
+  }
+
+  async function loadWorkshopProfile(currentUser: User) {
+    try {
+      const { data, error } = await supabase
+        .from("workshop_profiles")
+        .select("*")
+        .eq("id", currentUser.id)
+        .maybeSingle();
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      if (!data) {
+        const fallbackWorkshopData = getLocalWorkshopData();
+
+        setWorkshopData({
+          ...fallbackWorkshopData,
+          email: currentUser.email || fallbackWorkshopData.email,
+        });
+
+        return;
+      }
+
+      const profile = data as WorkshopProfileDatabaseRow;
+
+      setWorkshopData({
+        name: profile.full_name,
+        workshop: profile.workshop_name,
+        email: profile.email,
+        role: profile.role,
+        plan: profile.plan,
+        updatedAt: profile.updated_at,
+        source: "supabase",
+      });
+
+      syncWorkshopProfileToLocalStorage(profile);
+    } catch (error) {
+      console.error("Werkstattprofil konnte nicht geladen werden:", error);
+      setError(
+        `Werkstattprofil konnte nicht aus Supabase geladen werden: ${getErrorMessage(
+          error
+        )}`
+      );
+      setWorkshopData(getLocalWorkshopData());
+    }
+  }
+
+  async function loadSupabaseCases(currentUser: User, migrateLocal: boolean) {
+    setCaseLoading(true);
+
+    try {
+      const localCases = loadLocalDiagnosisCases();
+
+      if (migrateLocal && localCases.length > 0) {
+        await migrateLocalDiagnosisCasesToSupabase(
+          supabase,
+          currentUser,
+          localCases
+        );
+      }
+
+      const remoteCases = await loadDiagnosisCasesFromSupabase(
+        supabase,
+        currentUser
+      );
+
+      setDiagnosisCases(remoteCases);
+      saveDiagnosisCasesToLocalStorage(remoteCases);
+      setCaseSource("supabase");
+    } catch (error) {
+      console.error("Diagnosefälle konnten nicht geladen werden:", error);
+      setError(
+        `Diagnosefälle konnten nicht aus Supabase geladen werden: ${getErrorMessage(
+          error
+        )}`
+      );
+      setDiagnosisCases(loadLocalDiagnosisCases());
+      setCaseSource("local");
+    } finally {
+      setCaseLoading(false);
+    }
+  }
+
+  async function loadSupabaseUsage(currentUser: User) {
+    setUsageLoading(true);
+
+    try {
+      const remoteUsage = await loadDiagnosisUsageFromSupabase(
+        supabase,
+        currentUser
+      );
+
+      setDiagnosisUsage(remoteUsage);
+      saveDiagnosisUsageToLocalStorage(remoteUsage);
+      setUsageSource("supabase");
+    } catch (error) {
+      console.error("Nutzungszähler konnte nicht geladen werden:", error);
+      setError(
+        `Nutzungszähler konnte nicht aus Supabase geladen werden: ${getErrorMessage(
+          error
+        )}`
+      );
+      setDiagnosisUsage(loadLocalDiagnosisUsage());
+      setUsageSource("local");
+    } finally {
+      setUsageLoading(false);
+    }
+  }
+
+  async function loadSupabasePremiumLeads(
+    currentUser: User,
+    migrateLocal: boolean
+  ) {
+    setLeadLoading(true);
+
+    try {
+      const localLeads = loadLocalPremiumLeads();
+
+      if (migrateLocal && localLeads.length > 0) {
+        await migrateLocalPremiumLeadsToSupabase(
+          supabase,
+          currentUser,
+          localLeads
+        );
+      }
+
+      const remoteLeads = await loadPremiumLeadsFromSupabase(
+        supabase,
+        currentUser
+      );
+
+      setPremiumLeads(remoteLeads);
+      savePremiumLeadsToLocalStorage(remoteLeads);
+      setLeadSource("supabase");
+    } catch (error) {
+      console.error("Premium-Vormerkungen konnten nicht geladen werden:", error);
+      setError(
+        `Premium-Vormerkungen konnten nicht aus Supabase geladen werden: ${getErrorMessage(
+          error
+        )}`
+      );
+      setPremiumLeads(loadLocalPremiumLeads());
+      setLeadSource("local");
+    } finally {
+      setLeadLoading(false);
+    }
+  }
+
+  async function refreshAllSupabaseData() {
+    if (!user) {
+      setError("Du bist nicht eingeloggt. Dashboard nutzt lokale Daten.");
+      return;
+    }
+
+    setSuccess("");
+    setError("");
+
+    await Promise.all([
+      loadWorkshopProfile(user),
+      loadSupabaseCases(user, false),
+      loadSupabaseUsage(user),
+      loadSupabasePremiumLeads(user, false),
+    ]);
+
+    setSuccess("Dashboard wurde aus Supabase neu geladen.");
+  }
+
+  async function migrateLocalCasesNow() {
+    if (!user) {
+      setError("Zum Migrieren musst du eingeloggt sein.");
+      return;
+    }
+
+    setSuccess("");
+    setError("");
+
+    await loadSupabaseCases(user, true);
+    setSuccess("Lokale Diagnosefälle wurden nach Supabase migriert.");
+  }
+
+  async function migrateLocalPremiumLeadsNow() {
+    if (!user) {
+      setError("Zum Migrieren musst du eingeloggt sein.");
+      return;
+    }
+
+    setSuccess("");
+    setError("");
+
+    await loadSupabasePremiumLeads(user, true);
+    setSuccess("Lokale Premium-Vormerkungen wurden nach Supabase migriert.");
+  }
+
+  async function resetUsageCounter() {
+    setSuccess("");
+    setError("");
+
+    try {
+      if (user && usageSource === "supabase") {
+        const nextUsage = await resetDiagnosisUsageInSupabase(supabase, user);
+
+        setDiagnosisUsage(nextUsage);
+        saveDiagnosisUsageToLocalStorage(nextUsage);
+        setSuccess("Nutzungszähler wurde in Supabase zurückgesetzt.");
+        return;
+      }
+
+      const nextUsage = getInitialDiagnosisUsage();
+
+      setDiagnosisUsage(nextUsage);
+      saveDiagnosisUsageToLocalStorage(nextUsage);
+      setUsageSource("local");
+      setSuccess("Lokaler Nutzungszähler wurde zurückgesetzt.");
+    } catch (error) {
+      setError(`Nutzungszähler konnte nicht zurückgesetzt werden: ${getErrorMessage(error)}`);
+    }
+  }
+
+  async function deleteDiagnosisCase(caseId: string) {
+    setSuccess("");
+    setError("");
+
+    try {
+      if (user && caseSource === "supabase") {
+        await deleteDiagnosisCaseFromSupabase(supabase, user, caseId);
+      }
+
+      const updatedCases = diagnosisCases.filter((diagnosisCase) => {
+        return diagnosisCase.id !== caseId;
+      });
+
+      setDiagnosisCases(updatedCases);
+      saveDiagnosisCasesToLocalStorage(updatedCases);
+      setSuccess("Diagnosefall wurde gelöscht.");
+    } catch (error) {
+      setError(`Diagnosefall konnte nicht gelöscht werden: ${getErrorMessage(error)}`);
+    }
+  }
+
+  async function deletePremiumLead(leadId: string) {
+    setSuccess("");
+    setError("");
+
+    try {
+      if (user && leadSource === "supabase") {
+        await deletePremiumLeadFromSupabase(supabase, user, leadId);
+      }
+
+      const updatedLeads = premiumLeads.filter((lead) => {
+        return lead.id !== leadId;
+      });
+
+      setPremiumLeads(updatedLeads);
+      savePremiumLeadsToLocalStorage(updatedLeads);
+      setSuccess("Premium-Vormerkung wurde gelöscht.");
+    } catch (error) {
+      setError(
+        `Premium-Vormerkung konnte nicht gelöscht werden: ${getErrorMessage(error)}`
+      );
+    }
+  }
+
+  function openDiagnosisCase(savedCase: SavedDiagnosisCase, target: "diagnose" | "protocol") {
+    localStorage.setItem(
+      CURRENT_CASE_STORAGE_KEY,
+      JSON.stringify({
+        messages: savedCase.messages,
+        engineContext: savedCase.engineContext,
+        faultCodeContext: savedCase.faultCodeContext,
+        qualityCheck: savedCase.qualityCheck,
+        openedCaseId: savedCase.id,
+      })
+    );
+
+    if (target === "protocol") {
+      window.location.href = "/pruefprotokoll";
+      return;
+    }
+
+    window.location.href = "/#diagnose";
+  }
+
+  function exportDashboardData() {
+    const exportData = {
+      exportedAt: new Date().toISOString(),
+      user: user
+        ? {
+            id: user.id,
+            email: user.email,
+          }
+        : null,
+      workshopData,
+      sources: {
+        cases: caseSource,
+        usage: usageSource,
+        premiumLeads: leadSource,
+      },
+      diagnosisUsage,
+      diagnosisCases,
+      premiumLeads,
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+      type: "application/json",
+    });
+
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = `diagnosehub-dashboard-${new Date()
+      .toISOString()
+      .slice(0, 10)}.json`;
+
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    window.URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-white">
       <Header />
 
-      <main>
-        <section className="mx-auto grid max-w-7xl items-start gap-16 px-6 py-20 lg:grid-cols-2">
+      <main className="mx-auto max-w-7xl px-6 py-10">
+        <div className="mb-8 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div>
-            <div className="mb-6 inline-flex rounded-full border border-blue-500/30 bg-blue-500/10 px-5 py-2 text-sm font-medium text-blue-300">
-              KI-Diagnose für Kfz-Werkstätten
-            </div>
+            <p className="text-sm font-bold uppercase tracking-[0.3em] text-blue-400">
+              DiagnoseHUB
+            </p>
 
-            <h1 className="text-5xl font-bold leading-tight tracking-tight md:text-7xl">
-              Diagnose statt{" "}
-              <span className="bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">
-                Teile-Raten.
-              </span>
+            <h1 className="mt-3 text-4xl font-black tracking-tight md:text-5xl">
+              Dashboard
             </h1>
 
-            <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-400">
-              DiagnoseHUB kombiniert Motorkennbuchstaben, Fehlercodes, Symptome,
-              Live-Daten und KI zu einem strukturierten Prüfplan für den
-              Werkstattalltag.
+            <p className="mt-4 max-w-3xl leading-8 text-slate-400">
+              Übersicht über Werkstattprofil, Diagnosefälle, Nutzungszähler und
+              Premium-Vormerkungen. Supabase ist die Hauptquelle, lokale Daten
+              bleiben als Fallback erhalten.
             </p>
+          </div>
 
-            <div className="mt-8 flex flex-wrap gap-3">
-              {exampleCases.map((example) => (
-                <div
-                  key={example}
-                  className="rounded-full border border-slate-800 bg-slate-900 px-4 py-2 text-sm text-slate-300"
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={refreshAllSupabaseData}
+              disabled={!user || isLoading}
+              className="rounded-xl border border-slate-700 px-5 py-3 font-semibold text-slate-300 transition hover:bg-slate-800 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Supabase neu laden
+            </button>
+
+            <button
+              type="button"
+              onClick={exportDashboardData}
+              className="rounded-xl border border-blue-500/40 bg-blue-500/10 px-5 py-3 font-semibold text-blue-300 transition hover:bg-blue-500 hover:text-white"
+            >
+              Export JSON
+            </button>
+          </div>
+        </div>
+
+        {error && (
+          <div className="mb-6 rounded-2xl border border-red-500/30 bg-red-500/10 px-5 py-4 leading-7 text-red-300">
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="mb-6 rounded-2xl border border-green-500/30 bg-green-500/10 px-5 py-4 leading-7 text-green-300">
+            {success}
+          </div>
+        )}
+
+        <div className="mb-8 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+          <DashboardCard
+            title="Account"
+            value={user ? "Eingeloggt" : "Lokal"}
+            description={
+              user
+                ? user.email || "Supabase-Session aktiv"
+                : "Keine Supabase-Session aktiv"
+            }
+          />
+
+          <DashboardCard
+            title="Plan"
+            value={planLabels[workshopData.plan]}
+            description={`Quelle: ${profileSourceLabels[workshopData.source]}`}
+          />
+
+          <DashboardCard
+            title="Diagnosen heute"
+            value={diagnosisUsage.count}
+            description={`Datum: ${formatDate(diagnosisUsage.date)}`}
+          >
+            <SourceBadge source={usageSource} />
+          </DashboardCard>
+
+          <DashboardCard
+            title="Premium-Vormerkungen"
+            value={premiumLeads.length}
+            description="Gespeicherte Interessenten"
+          >
+            <SourceBadge source={leadSource} />
+          </DashboardCard>
+        </div>
+
+        <div className="space-y-8">
+          <Section
+            title="Werkstattprofil"
+            description="Diese Daten werden für Dashboard, Header und Prüfprotokoll genutzt."
+            right={
+              <a
+                href="/login"
+                className="rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white transition hover:bg-blue-500"
+              >
+                Profil bearbeiten
+              </a>
+            }
+          >
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+                <p className="text-sm text-slate-500">Werkstatt</p>
+                <p className="mt-2 font-bold text-white">
+                  {workshopData.workshop}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+                <p className="text-sm text-slate-500">Name</p>
+                <p className="mt-2 font-bold text-white">{workshopData.name}</p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+                <p className="text-sm text-slate-500">E-Mail</p>
+                <p className="mt-2 break-words font-bold text-white">
+                  {workshopData.email}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+                <p className="text-sm text-slate-500">Rolle</p>
+                <p className="mt-2 font-bold text-white">{workshopData.role}</p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+                <p className="text-sm text-slate-500">Zuletzt geändert</p>
+                <p className="mt-2 font-bold text-white">
+                  {formatDateTime(workshopData.updatedAt)}
+                </p>
+              </div>
+            </div>
+          </Section>
+
+          <Section
+            title="Nutzungszähler"
+            description="Zählt Diagnoseanfragen pro Tag. Bei Login wird der Wert aus Supabase geladen."
+            right={
+              <button
+                type="button"
+                onClick={resetUsageCounter}
+                disabled={usageLoading}
+                className="rounded-xl border border-red-500/40 bg-red-500/10 px-5 py-3 font-semibold text-red-300 transition hover:bg-red-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Zähler zurücksetzen
+              </button>
+            }
+          >
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+                <p className="text-sm text-slate-500">Quelle</p>
+                <div className="mt-2">
+                  <SourceBadge source={usageSource} />
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+                <p className="text-sm text-slate-500">Datum</p>
+                <p className="mt-2 font-bold text-white">
+                  {formatDate(diagnosisUsage.date)}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+                <p className="text-sm text-slate-500">Anfragen heute</p>
+                <p className="mt-2 text-3xl font-black text-white">
+                  {diagnosisUsage.count}
+                </p>
+              </div>
+            </div>
+          </Section>
+
+          <Section
+            title="Diagnosefälle"
+            description="Gespeicherte Fälle. Du kannst lokale Fälle nach Supabase migrieren und Fälle für Diagnose oder Prüfprotokoll öffnen."
+            right={
+              <>
+                <button
+                  type="button"
+                  onClick={() => user && loadSupabaseCases(user, false)}
+                  disabled={!user || caseLoading}
+                  className="rounded-xl border border-slate-700 px-5 py-3 font-semibold text-slate-300 transition hover:bg-slate-800 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {example}
-                </div>
-              ))}
+                  Fälle neu laden
+                </button>
+
+                <button
+                  type="button"
+                  onClick={migrateLocalCasesNow}
+                  disabled={!user || caseLoading}
+                  className="rounded-xl border border-green-500/40 bg-green-500/10 px-5 py-3 font-semibold text-green-300 transition hover:bg-green-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Lokale Fälle migrieren
+                </button>
+              </>
+            }
+          >
+            <div className="mb-5">
+              <SourceBadge source={caseSource} />
             </div>
 
-            <div id="diagnose" className="mt-10 scroll-mt-28">
-              <SearchBar />
-            </div>
-          </div>
-
-          <div className="space-y-8">
-            <div className="relative overflow-hidden rounded-3xl border border-blue-500/20 bg-gradient-to-br from-slate-900 via-slate-950 to-blue-950/50 p-10 shadow-2xl shadow-blue-950/50">
-              <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-blue-500/20 blur-3xl" />
-              <div className="absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-cyan-500/10 blur-3xl" />
-
-              <div className="relative flex flex-col items-center text-center">
-                <div className="mb-6 flex h-72 w-72 items-center justify-center rounded-full border border-blue-500/20 bg-slate-950/70 p-8 shadow-2xl shadow-blue-950/60 md:h-96 md:w-96">
-                  <Image
-                    src="/diagnosehub-logo.png"
-                    alt="DiagnoseHUB Logo"
-                    width={420}
-                    height={420}
-                    priority
-                    className="h-full w-full object-contain"
-                  />
-                </div>
-
-                <p className="text-sm font-semibold uppercase tracking-[0.35em] text-blue-300">
-                  DiagnoseHUB
-                </p>
-
-                <h2 className="mt-4 text-3xl font-bold md:text-4xl">
-                  Werkstattdiagnose mit System.
-                </h2>
-
-                <p className="mt-4 max-w-xl leading-7 text-slate-400">
-                  Motorcode, Fehlercode, Symptom und Verlauf werden in einem
-                  Fall zusammengeführt.
-                </p>
-              </div>
-            </div>
-
-            <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-8 shadow-2xl shadow-blue-950/40">
-              <p className="mb-4 text-sm font-medium text-blue-400">
-                DiagnoseHUB Workflow
-              </p>
-
-              <h2 className="text-3xl font-bold">
-                Vom Fehlercode zum Prüfplan.
-              </h2>
-
-              <p className="mt-4 leading-7 text-slate-400">
-                Starte mit einem echten Werkstattfall. Danach kannst du
-                Folgefragen stellen, Messwerte abfragen und den kompletten
-                Diagnoseverlauf als Fallbericht sichern.
-              </p>
-
-              <div className="mt-8 space-y-4">
-                <div className="rounded-xl border border-slate-800 bg-slate-950 p-5">
-                  <div className="flex items-center justify-between gap-4">
-                    <span>Motorkontext erkennen</span>
-                    <span className="font-bold text-green-400">aktiv</span>
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-slate-800 bg-slate-950 p-5">
-                  <div className="flex items-center justify-between gap-4">
-                    <span>Fehlercodes zuordnen</span>
-                    <span className="font-bold text-green-400">aktiv</span>
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-slate-800 bg-slate-950 p-5">
-                  <div className="flex items-center justify-between gap-4">
-                    <span>KI-Diagnose erstellen</span>
-                    <span className="font-bold text-blue-400">aktiv</span>
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-slate-800 bg-slate-950 p-5">
-                  <div className="flex items-center justify-between gap-4">
-                    <span>Folgefragen im Fallkontext</span>
-                    <span className="font-bold text-cyan-400">aktiv</span>
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-slate-800 bg-slate-950 p-5">
-                  <div className="flex items-center justify-between gap-4">
-                    <span>Fallbericht exportieren</span>
-                    <span className="font-bold text-yellow-400">aktiv</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="mx-auto max-w-7xl px-6 pb-20">
-          <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-8">
-            <p className="mb-4 text-sm font-semibold uppercase tracking-wide text-blue-400">
-              Warum DiagnoseHUB?
-            </p>
-
-            <div className="grid gap-8 lg:grid-cols-2">
-              <div>
-                <h2 className="text-3xl font-bold">
-                  Mehr Struktur als normale KI.
-                </h2>
-
-                <p className="mt-4 leading-8 text-slate-400">
-                  Normale KI kann technische Zusammenhänge frei formulieren, aber
-                  sie kennt deinen Diagnosefall nicht sauber genug. DiagnoseHUB
-                  legt zuerst Werkstatt-Kontext über den Fall: Motorcode,
-                  Kraftstoffart, Fehlercode, Verlauf und Qualitätsprüfung.
-                </p>
-              </div>
-
+            {diagnosisCases.length === 0 ? (
+              <EmptyState text="Noch keine gespeicherten Diagnosefälle vorhanden." />
+            ) : (
               <div className="grid gap-4">
-                <div className="grid grid-cols-2 gap-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-5">
-                  <div>
-                    <p className="font-bold text-slate-400">Normale KI</p>
-                    <p className="mt-2 text-sm leading-6 text-slate-500">
-                      Antwortet frei und kann Diesel/Benziner oder Bauteile
-                      verwechseln.
-                    </p>
-                  </div>
+                {diagnosisCases.map((diagnosisCase) => (
+                  <div
+                    key={diagnosisCase.id}
+                    className="rounded-3xl border border-slate-800 bg-slate-950/70 p-5"
+                  >
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                      <div>
+                        <h3 className="text-xl font-bold text-white">
+                          {diagnosisCase.title || "Unbenannter Diagnosefall"}
+                        </h3>
 
-                  <div>
-                    <p className="font-bold text-blue-300">DiagnoseHUB</p>
-                    <p className="mt-2 text-sm leading-6 text-slate-400">
-                      Nutzt Motorcode, Fehlercode-Kontext und technische
-                      Prüfregeln.
-                    </p>
-                  </div>
-                </div>
+                        <p className="mt-2 text-sm text-slate-500">
+                          Aktualisiert: {formatDateTime(diagnosisCase.updatedAt)}
+                        </p>
 
-                <div className="grid grid-cols-2 gap-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-5">
-                  <div>
-                    <p className="font-bold text-slate-400">Normale KI</p>
-                    <p className="mt-2 text-sm leading-6 text-slate-500">
-                      Gibt oft allgemeine Tipps ohne klare Reihenfolge.
-                    </p>
-                  </div>
+                        <p className="mt-3 line-clamp-2 leading-7 text-slate-400">
+                          {diagnosisCase.messages?.[0]?.content ||
+                            "Keine Beschreibung vorhanden."}
+                        </p>
+                      </div>
 
-                  <div>
-                    <p className="font-bold text-blue-300">DiagnoseHUB</p>
-                    <p className="mt-2 text-sm leading-6 text-slate-400">
-                      Erstellt eine prüfbare Reihenfolge mit Messwerten und
-                      Folgefragen.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-5">
-                  <div>
-                    <p className="font-bold text-slate-400">Normale KI</p>
-                    <p className="mt-2 text-sm leading-6 text-slate-500">
-                      Der Verlauf ist schwer für Werkstattdokumentation nutzbar.
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="font-bold text-blue-300">DiagnoseHUB</p>
-                    <p className="mt-2 text-sm leading-6 text-slate-400">
-                      Fallbericht kopieren oder als TXT-Datei speichern.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section
-          id="workflow"
-          className="mx-auto max-w-7xl scroll-mt-28 px-6 pb-20"
-        >
-          <div className="mb-10">
-            <p className="mb-4 text-sm font-semibold uppercase tracking-wide text-blue-400">
-              Ablauf
-            </p>
-
-            <h2 className="text-4xl font-bold">So arbeitet DiagnoseHUB.</h2>
-          </div>
-
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            {workflowSteps.map((step) => (
-              <div
-                key={step.number}
-                className="rounded-3xl border border-slate-800 bg-slate-900/60 p-7"
-              >
-                <p className="text-sm font-bold text-blue-400">
-                  {step.number}
-                </p>
-
-                <h3 className="mt-5 text-xl font-bold">{step.title}</h3>
-
-                <p className="mt-3 leading-7 text-slate-400">{step.text}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section
-          id="features"
-          className="mx-auto max-w-7xl scroll-mt-28 px-6 pb-20"
-        >
-          <div className="mb-10">
-            <p className="mb-4 text-sm font-semibold uppercase tracking-wide text-blue-400">
-              Funktionen
-            </p>
-
-            <h2 className="text-4xl font-bold">
-              Gebaut für reale Werkstattfälle.
-            </h2>
-          </div>
-
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {features.map((feature) => (
-              <div
-                key={feature.title}
-                className="rounded-2xl border border-slate-800 bg-slate-900/60 p-7"
-              >
-                <h3 className="text-xl font-bold">{feature.title}</h3>
-
-                <p className="mt-3 leading-7 text-slate-400">
-                  {feature.text}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section
-          id="premium"
-          className="mx-auto max-w-7xl scroll-mt-28 px-6 pb-20"
-        >
-          <div className="mb-10 max-w-3xl">
-            <p className="mb-4 text-sm font-semibold uppercase tracking-wide text-blue-400">
-              Free / Premium
-            </p>
-
-            <h2 className="text-4xl font-bold">
-              Einfache Pakete für den Werkstattalltag.
-            </h2>
-
-            <p className="mt-4 leading-8 text-slate-400">
-              Die Bezahlung ist noch nicht aktiv. Diese Pakete bereiten die
-              spätere Premium-Logik vor und zeigen, welche Funktionen kostenlos
-              bleiben und welche später in einen Werkstatt-Zugang wandern.
-            </p>
-          </div>
-
-          <div className="grid gap-6 lg:grid-cols-3">
-            {pricingPlans.map((plan) => (
-              <div
-                key={plan.name}
-                className={
-                  plan.highlighted
-                    ? "relative rounded-3xl border border-blue-500/50 bg-blue-500/10 p-8 shadow-2xl shadow-blue-950/50"
-                    : "relative rounded-3xl border border-slate-800 bg-slate-900/60 p-8"
-                }
-              >
-                <div
-                  className={
-                    plan.highlighted
-                      ? "mb-5 inline-flex rounded-full border border-blue-400/40 bg-blue-500/20 px-4 py-2 text-sm font-bold text-blue-200"
-                      : "mb-5 inline-flex rounded-full border border-slate-700 bg-slate-950 px-4 py-2 text-sm font-bold text-slate-300"
-                  }
-                >
-                  {plan.badge}
-                </div>
-
-                <h3 className="text-3xl font-bold">{plan.name}</h3>
-
-                <div className="mt-5 flex items-end gap-2">
-                  <p className="text-5xl font-black">{plan.price}</p>
-                  <p className="pb-2 text-slate-400">{plan.interval}</p>
-                </div>
-
-                <p className="mt-5 leading-7 text-slate-400">
-                  {plan.description}
-                </p>
-
-                <div className="mt-8">
-                  <p className="mb-4 font-bold text-white">Enthalten</p>
-
-                  <ul className="space-y-3">
-                    {plan.features.map((feature) => (
-                      <li key={feature} className="flex gap-3 text-slate-300">
-                        <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-blue-400" />
-                        <span>{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                {plan.limitations.length > 0 && (
-                  <div className="mt-8">
-                    <p className="mb-4 font-bold text-white">Hinweise</p>
-
-                    <ul className="space-y-3">
-                      {plan.limitations.map((limitation) => (
-                        <li
-                          key={limitation}
-                          className="flex gap-3 text-slate-500"
+                      <div className="flex flex-wrap gap-3">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            openDiagnosisCase(diagnosisCase, "diagnose")
+                          }
+                          className="rounded-xl border border-blue-500/40 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-300 transition hover:bg-blue-500 hover:text-white"
                         >
-                          <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-slate-600" />
-                          <span>{limitation}</span>
-                        </li>
-                      ))}
-                    </ul>
+                          Öffnen
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            openDiagnosisCase(diagnosisCase, "protocol")
+                          }
+                          className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:bg-slate-800 hover:text-white"
+                        >
+                          Prüfprotokoll
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => deleteDiagnosisCase(diagnosisCase.id)}
+                          disabled={caseLoading}
+                          className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-300 transition hover:bg-red-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Löschen
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                )}
+                ))}
+              </div>
+            )}
+          </Section>
+
+          <Section
+            title={
+              leadSource === "supabase"
+                ? "Supabase-Vormerkungen"
+                : "Lokale Vormerkungen"
+            }
+            description="Premium-Interessenten aus der Premium-Seite. Eingeloggte Nutzer speichern und löschen diese Daten direkt in Supabase."
+            right={
+              <>
+                <button
+                  type="button"
+                  onClick={() => user && loadSupabasePremiumLeads(user, false)}
+                  disabled={!user || leadLoading}
+                  className="rounded-xl border border-slate-700 px-5 py-3 font-semibold text-slate-300 transition hover:bg-slate-800 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Supabase neu laden
+                </button>
+
+                <button
+                  type="button"
+                  onClick={migrateLocalPremiumLeadsNow}
+                  disabled={!user || leadLoading}
+                  className="rounded-xl border border-green-500/40 bg-green-500/10 px-5 py-3 font-semibold text-green-300 transition hover:bg-green-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Lokale Vormerkungen migrieren
+                </button>
 
                 <a
-                  href={plan.buttonHref}
-                  className={
-                    plan.highlighted
-                      ? "mt-8 block rounded-xl bg-blue-600 px-6 py-4 text-center font-bold text-white transition hover:bg-blue-500"
-                      : "mt-8 block rounded-xl border border-slate-700 px-6 py-4 text-center font-bold text-slate-300 transition hover:bg-slate-800 hover:text-white"
-                  }
+                  href="/premium"
+                  className="rounded-xl bg-yellow-500 px-5 py-3 font-semibold text-slate-950 transition hover:bg-yellow-400"
                 >
-                  {plan.buttonText}
+                  Premium-Seite
                 </a>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-8 rounded-3xl border border-yellow-500/20 bg-yellow-500/10 p-6">
-            <p className="font-bold text-yellow-300">
-              Hinweis zum aktuellen Stand
-            </p>
-
-            <p className="mt-3 leading-7 text-slate-300">
-              Im aktuellen Prototyp ist noch kein echtes Bezahlsystem aktiv.
-              Als Nächstes bauen wir eine interne Free/Premium-Erkennung ein.
-              Danach folgen Login, Benutzerkonto und erst dann Stripe.
-            </p>
-          </div>
-        </section>
-
-        <section
-          id="hinweis"
-          className="mx-auto max-w-7xl scroll-mt-28 px-6 pb-24"
-        >
-          <div className="rounded-3xl border border-blue-500/20 bg-blue-500/10 p-8">
-            <div className="grid gap-8 lg:grid-cols-[1.4fr_0.6fr] lg:items-center">
-              <div>
-                <p className="mb-4 text-sm font-semibold uppercase tracking-wide text-blue-300">
-                  Werkstatt-Hinweis
-                </p>
-
-                <h2 className="text-3xl font-bold">
-                  DiagnoseHUB ersetzt keine Messung am Fahrzeug.
-                </h2>
-
-                <p className="mt-4 leading-8 text-slate-300">
-                  Die Plattform unterstützt bei Eingrenzung, Prüfstrategie und
-                  Dokumentation. Entscheidend bleiben Live-Daten, Messwerte,
-                  Sichtprüfung und fachgerechte Diagnose am Fahrzeug.
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-6">
-                <p className="text-sm text-slate-500">Status</p>
-                <p className="mt-2 text-2xl font-bold text-green-400">
-                  Prototyp aktiv
-                </p>
-
-                <p className="mt-4 text-sm leading-6 text-slate-400">
-                  Nächste Ausbaustufen: Login, Benutzerkonten, echte
-                  Premium-Erkennung, Stripe, PDF-Berichte und größere technische
-                  Datenbank.
-                </p>
-              </div>
+              </>
+            }
+          >
+            <div className="mb-5">
+              <SourceBadge source={leadSource} />
             </div>
-          </div>
-        </section>
+
+            {premiumLeads.length === 0 ? (
+              <EmptyState text="Noch keine Premium-Vormerkungen vorhanden." />
+            ) : (
+              <div className="grid gap-4">
+                {premiumLeads.map((lead) => (
+                  <div
+                    key={lead.id}
+                    className="rounded-3xl border border-slate-800 bg-slate-950/70 p-5"
+                  >
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <h3 className="text-xl font-bold text-white">
+                            {lead.workshop}
+                          </h3>
+
+                          <span className="rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-yellow-300">
+                            {premiumLeadPlanLabels[lead.plan]}
+                          </span>
+                        </div>
+
+                        <div className="mt-4 grid gap-3 text-sm text-slate-400 md:grid-cols-2 xl:grid-cols-4">
+                          <p>
+                            <span className="text-slate-500">Name:</span>{" "}
+                            {lead.name}
+                          </p>
+
+                          <p>
+                            <span className="text-slate-500">E-Mail:</span>{" "}
+                            {lead.email}
+                          </p>
+
+                          <p>
+                            <span className="text-slate-500">Telefon:</span>{" "}
+                            {lead.phone || "nicht angegeben"}
+                          </p>
+
+                          <p>
+                            <span className="text-slate-500">Erstellt:</span>{" "}
+                            {formatDateTime(lead.createdAt)}
+                          </p>
+                        </div>
+
+                        {lead.note && (
+                          <p className="mt-4 rounded-2xl border border-slate-800 bg-slate-900/70 p-4 leading-7 text-slate-300">
+                            {lead.note}
+                          </p>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => deletePremiumLead(lead.id)}
+                        disabled={leadLoading}
+                        className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-300 transition hover:bg-red-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Löschen
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Section>
+        </div>
       </main>
 
       <Footer />

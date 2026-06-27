@@ -6,8 +6,12 @@ import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { createClient } from "@/lib/supabase/client";
+import {
+  PLAN_CONFIG,
+  isValidUserPlan,
+  type UserPlan,
+} from "@/config/plans";
 
-type UserPlan = "free" | "werkstatt" | "pro";
 
 type PlanSource = "supabase" | "localStorage" | "fallback";
 
@@ -88,12 +92,6 @@ type InspectionProfile = {
 const CURRENT_CASE_STORAGE_KEY = "diagnosehub-current-case";
 const USER_PLAN_STORAGE_KEY = "diagnosehub-user-plan";
 const DEMO_ACCOUNT_STORAGE_KEY = "diagnosehub-demo-account";
-
-const planLabels: Record<UserPlan, string> = {
-  free: "Free",
-  werkstatt: "Werkstatt Demo",
-  pro: "Werkstatt Pro Demo",
-};
 
 const planSourceLabels: Record<PlanSource, string> = {
   supabase: "Supabase Datenbank",
@@ -446,10 +444,6 @@ const inspectionProfiles = [
   misfireProfile,
   airMassProfile,
 ];
-
-function isValidUserPlan(value: string | null): value is UserPlan {
-  return value === "free" || value === "werkstatt" || value === "pro";
-}
 
 function hasPremiumAccess(userPlan: UserPlan) {
   return userPlan === "werkstatt" || userPlan === "pro";
@@ -947,7 +941,7 @@ export default function PruefprotokollPage() {
                   <p>
                     Plan:{" "}
                     <span className="font-semibold text-white print:text-black">
-                      {planLabels[userPlan]}
+                      {PLAN_CONFIG[userPlan].label}
                     </span>
                   </p>
                   <p>
@@ -985,7 +979,7 @@ export default function PruefprotokollPage() {
               </p>
 
               <div className="mt-4 grid gap-4 md:grid-cols-3">
-                <InfoRow label="Aktiver Plan" value={planLabels[userPlan]} />
+                <InfoRow label="Aktiver Plan" value={PLAN_CONFIG[userPlan].label} />
                 <InfoRow
                   label="Premium-Prüfprofil"
                   value={premiumProfileStatus}

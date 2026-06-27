@@ -9,8 +9,12 @@ import type {
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { createClient } from "@/lib/supabase/client";
+import {
+  PLAN_CONFIG,
+  isValidUserPlan,
+  type UserPlan,
+} from "@/config/plans";
 
-type UserPlan = "free" | "werkstatt" | "pro";
 
 type DemoAccount = {
   name: string;
@@ -35,54 +39,6 @@ type WorkshopProfile = {
 
 const DEMO_ACCOUNT_STORAGE_KEY = "diagnosehub-demo-account";
 const USER_PLAN_STORAGE_KEY = "diagnosehub-user-plan";
-
-const planOptions: Record<
-  UserPlan,
-  {
-    label: string;
-    badge: string;
-    description: string;
-    features: string[];
-  }
-> = {
-  free: {
-    label: "Free",
-    badge: "Kostenlos",
-    description: "Für Tests und einzelne Diagnosefälle.",
-    features: [
-      "3 KI-Diagnosen pro Tag",
-      "3 gespeicherte Fälle",
-      "Standard-Prüfprotokoll",
-      "Basis-Fallbericht als TXT",
-    ],
-  },
-  werkstatt: {
-    label: "Werkstatt Demo",
-    badge: "Premium Demo",
-    description: "Vorbereitung für den späteren Werkstatt-Zugang.",
-    features: [
-      "30 KI-Diagnosen pro Tag",
-      "25 gespeicherte Fälle",
-      "Individuelle Prüfprotokolle",
-      "Erweiterte Fehlercode-Logik",
-    ],
-  },
-  pro: {
-    label: "Werkstatt Pro Demo",
-    badge: "Pro Demo",
-    description: "Vorbereitung für größere Betriebe.",
-    features: [
-      "100 KI-Diagnosen pro Tag",
-      "100 gespeicherte Fälle",
-      "Pro-Funktionen vorbereitet",
-      "Mehrnutzer-Logik später möglich",
-    ],
-  },
-};
-
-function isValidUserPlan(value: string | null): value is UserPlan {
-  return value === "free" || value === "werkstatt" || value === "pro";
-}
 
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString("de-DE", {
@@ -165,7 +121,7 @@ export default function LoginPage() {
       return "Werkstattprofil vorhanden";
     }
 
-    return `${account.workshop} · ${planOptions[account.plan].label}`;
+    return `${account.workshop} · ${PLAN_CONFIG[account.plan].label}`;
   }, [databaseProfile, savedAccount, user]);
 
   useEffect(() => {
@@ -623,7 +579,7 @@ export default function LoginPage() {
                       <p>
                         Plan:{" "}
                         <span className="font-semibold text-white">
-                          {planOptions[databaseProfile.plan].label}
+                          {PLAN_CONFIG[databaseProfile.plan].label}
                         </span>
                       </p>
 
@@ -906,15 +862,15 @@ export default function LoginPage() {
                                   : "inline-flex rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-bold uppercase tracking-wide text-slate-400"
                               }
                             >
-                              {planOptions[planKey].badge}
+                              {PLAN_CONFIG[planKey].badge}
                             </span>
 
                             <h3 className="mt-3 text-xl font-bold text-white">
-                              {planOptions[planKey].label}
+                              {PLAN_CONFIG[planKey].label}
                             </h3>
 
                             <p className="mt-2 leading-7 text-slate-400">
-                              {planOptions[planKey].description}
+                              {PLAN_CONFIG[planKey].description}
                             </p>
                           </div>
 
@@ -926,7 +882,7 @@ export default function LoginPage() {
                         </div>
 
                         <ul className="mt-4 grid gap-2 md:grid-cols-2">
-                          {planOptions[planKey].features.map((feature) => (
+                          {PLAN_CONFIG[planKey].features.map((feature) => (
                             <li
                               key={feature}
                               className="flex gap-3 text-sm text-slate-300"

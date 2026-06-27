@@ -101,6 +101,8 @@ const planLimits: Record<
   },
 };
 
+const showLocalPlanSwitcher = process.env.NODE_ENV === "development";
+
 const baseQuickQuestions = [
   "Welche Messwerte prüfen?",
   "Was prüfe ich als erstes?",
@@ -1210,27 +1212,24 @@ ${chatText}
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              {(["free", "werkstatt", "pro"] as UserPlan[]).map((plan) => (
-                <button
-                  key={plan}
-                  onClick={() => changeUserPlan(plan)}
-                  disabled={Boolean(user)}
-                  title={
-                    user
-                      ? "Bei Supabase-Login Plan über Login/Profil ändern"
-                      : "Lokalen Testplan ändern"
-                  }
-                  className={
-                    userPlan === plan
-                      ? "rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-70"
-                      : "rounded-xl border border-slate-700 px-4 py-2 text-sm font-bold text-slate-300 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-                  }
-                >
-                  {planLimits[plan].label}
-                </button>
-              ))}
-            </div>
+         {showLocalPlanSwitcher && !user && (
+  <div className="flex flex-wrap gap-2">
+    {(["free", "werkstatt", "pro"] as UserPlan[]).map((plan) => (
+      <button
+        key={plan}
+        onClick={() => changeUserPlan(plan)}
+        title="Lokalen Testplan ändern"
+        className={
+          userPlan === plan
+            ? "rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white"
+            : "rounded-xl border border-slate-700 px-4 py-2 text-sm font-bold text-slate-300 transition hover:bg-slate-800"
+        }
+      >
+        {planLimits[plan].label}
+      </button>
+    ))}
+  </div>
+)}
           </div>
 
           <div className="mt-4 flex flex-wrap gap-3">

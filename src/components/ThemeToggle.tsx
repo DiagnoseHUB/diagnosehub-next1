@@ -52,14 +52,11 @@ export default function ThemeToggle() {
     <button
       type="button"
       onClick={toggleTheme}
-      className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-slate-800 hover:text-white"
+      className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-700 bg-slate-900 text-lg text-slate-300 transition hover:bg-slate-800 hover:text-white"
       aria-label={isLight ? "Dunkelmodus aktivieren" : "Hellmodus aktivieren"}
       title={isLight ? "Dunkelmodus aktivieren" : "Hellmodus aktivieren"}
     >
-      <span className="hidden md:inline">
-        {isLight ? "Dunkel" : "Hell"}
-      </span>
-      <span className="md:hidden">{isLight ? "🌙" : "☀️"}</span>
+      {isLight ? "🌙" : "☀️"}
     </button>
   );
 }

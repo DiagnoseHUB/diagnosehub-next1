@@ -5,8 +5,12 @@ import { useEffect, useMemo, useState } from "react";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import ThemeToggle from "@/components/ThemeToggle";
 import { createClient } from "@/lib/supabase/client";
+import {
+  PLAN_CONFIG,
+  isValidUserPlan,
+  type UserPlan,
+} from "@/config/plans";
 
-type UserPlan = "free" | "werkstatt" | "pro";
 
 type AccountSource = "none" | "localStorage" | "supabase";
 
@@ -41,21 +45,11 @@ const navigationLinks = [
   { label: "Funktionen", href: "/#features" },
 ];
 
-const planLabels: Record<UserPlan, string> = {
-  free: "Free",
-  werkstatt: "Werkstatt Demo",
-  pro: "Werkstatt Pro Demo",
-};
-
 const accountSourceLabels: Record<AccountSource, string> = {
   none: "Kein Account",
   localStorage: "Lokal",
   supabase: "Supabase",
 };
-
-function isValidUserPlan(value: string | null): value is UserPlan {
-  return value === "free" || value === "werkstatt" || value === "pro";
-}
 
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) {
@@ -321,7 +315,7 @@ function Header() {
   }, [supabase]);
 
   const accountLabel = demoAccount?.workshop || "Kein Account";
-  const planLabel = planLabels[userPlan];
+  const planLabel = PLAN_CONFIG[userPlan].label;
   const sourceLabel = accountSourceLabels[accountSource];
 
   return (

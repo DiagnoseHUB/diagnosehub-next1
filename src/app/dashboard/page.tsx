@@ -25,8 +25,12 @@ import {
   type PremiumLead,
   type PremiumPlan,
 } from "@/services/premiumLeadsSupabase";
+import {
+  PLAN_CONFIG,
+  isValidUserPlan,
+  type UserPlan,
+} from "@/config/plans";
 
-type UserPlan = "free" | "werkstatt" | "pro";
 
 type DataSource = "local" | "supabase";
 type ProfileSource = "localStorage" | "supabase" | "fallback";
@@ -74,24 +78,6 @@ const legacyUsageStorageKeys = [
   "diagnosehub-usage",
 ];
 
-const planLabels: Record<UserPlan, string> = {
-  free: "Free",
-  werkstatt: "Werkstatt Demo",
-  pro: "Werkstatt Pro Demo",
-};
-
-const planDailyLimits: Record<UserPlan, number> = {
-  free: 3,
-  werkstatt: 30,
-  pro: 100,
-};
-
-const planSavedCaseLimits: Record<UserPlan, number> = {
-  free: 3,
-  werkstatt: 25,
-  pro: 100,
-};
-
 const premiumLeadPlanLabels: Record<PremiumPlan, string> = {
   werkstatt: "Werkstatt",
   pro: "Pro",
@@ -117,10 +103,6 @@ const defaultWorkshopData: WorkshopData = {
   updatedAt: "",
   source: "fallback",
 };
-
-function isValidUserPlan(value: string | null): value is UserPlan {
-  return value === "free" || value === "werkstatt" || value === "pro";
-}
 
 function formatDateTime(value?: string) {
   if (!value) {
@@ -479,8 +461,9 @@ export default function DashboardPage() {
   const [success, setSuccess] = useState("");
 
   const normalizedUsage = normalizeDiagnosisUsage(diagnosisUsage);
-  const currentDailyLimit = planDailyLimits[workshopData.plan];
-  const currentSavedCaseLimit = planSavedCaseLimits[workshopData.plan];
+  const currentPlanConfig = PLAN_CONFIG[workshopData.plan];
+  const currentDailyLimit = currentPlanConfig.dailyDiagnosisLimit;
+  const currentSavedCaseLimit = currentPlanConfig.savedCaseLimit;
 
   const remainingDiagnoses = Math.max(
     currentDailyLimit - normalizedUsage.count,
@@ -1042,7 +1025,7 @@ export default function DashboardPage() {
 
           <DashboardCard
             title="Plan"
-            value={planLabels[workshopData.plan]}
+            value={currentPlanConfig.label}
             description={`Quelle: ${profileSourceLabels[workshopData.source]}`}
           />
 

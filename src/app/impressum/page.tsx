@@ -6,68 +6,123 @@ export default function ImpressumPage() {
     <div className="min-h-screen bg-slate-950 text-white">
       <Header />
 
-      <main className="mx-auto max-w-4xl px-6 py-20">
-        <div className="mb-10">
-          <p className="mb-4 text-sm font-semibold uppercase tracking-wide text-blue-400">
-            Rechtliches
+      <main className="mx-auto max-w-4xl px-6 py-14">
+        <section className="rounded-[2rem] border border-slate-800 bg-slate-900/80 p-8 shadow-2xl shadow-blue-950/30">
+          <p className="text-sm font-bold uppercase tracking-[0.3em] text-blue-400">
+            DiagnoseHUB
           </p>
 
-          <h1 className="text-5xl font-bold">Impressum</h1>
+          <h1 className="mt-4 text-4xl font-black tracking-tight md:text-5xl">
+            Impressum
+          </h1>
 
-          <p className="mt-5 leading-8 text-slate-400">
-            Diese Seite ist ein Platzhalter. Vor der Veröffentlichung müssen die
-            Angaben vollständig und korrekt ergänzt werden.
-          </p>
-        </div>
+          <div className="mt-8 space-y-8 leading-8 text-slate-300">
+            <section>
+              <h2 className="text-2xl font-bold text-white">
+                Angaben zum Anbieter
+              </h2>
 
-        <section className="space-y-8 rounded-3xl border border-slate-800 bg-slate-900/70 p-8">
-          <div>
-            <h2 className="text-2xl font-bold">Angaben gemäß Impressumspflicht</h2>
+              <div className="mt-4 rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-5 text-yellow-100">
+                <p className="font-bold">Vor Livegang ausfüllen</p>
+                <p className="mt-2">
+                  Diese Seite ist ein technischer Beta-Platzhalter. Ersetze die
+                  Platzhalter vor Veröffentlichung durch deine echten
+                  Anbieterangaben.
+                </p>
+              </div>
 
-            <div className="mt-4 leading-8 text-slate-400">
-              <p>DiagnoseHUB</p>
-              <p>Inhaber / Verantwortlicher: [Name ergänzen]</p>
-              <p>Straße und Hausnummer: [ergänzen]</p>
-              <p>PLZ und Ort: [ergänzen]</p>
-              <p>Deutschland</p>
-            </div>
-          </div>
+              <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-950/70 p-5">
+                <p className="font-semibold text-white">
+                  &lt;Vollständiger Name / Firmenname&gt;
+                </p>
+                <p>&lt;Straße und Hausnummer&gt;</p>
+                <p>&lt;PLZ und Ort&gt;</p>
+                <p>Deutschland</p>
+              </div>
+            </section>
 
-          <div>
-            <h2 className="text-2xl font-bold">Kontakt</h2>
+            <section>
+              <h2 className="text-2xl font-bold text-white">Kontakt</h2>
 
-            <div className="mt-4 leading-8 text-slate-400">
-              <p>Telefon: [ergänzen]</p>
-              <p>E-Mail: [ergänzen]</p>
-            </div>
-          </div>
+              <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-950/70 p-5">
+                <p>
+                  E-Mail:{" "}
+                  <span className="font-semibold text-white">
+                    &lt;deine-email@domain.de&gt;
+                  </span>
+                </p>
+                <p>
+                  Telefon:{" "}
+                  <span className="font-semibold text-white">
+                    &lt;optional / falls gewünscht&gt;
+                  </span>
+                </p>
+              </div>
+            </section>
 
-          <div>
-            <h2 className="text-2xl font-bold">Umsatzsteuer-ID</h2>
+            <section>
+              <h2 className="text-2xl font-bold text-white">
+                Verantwortlich für den Inhalt
+              </h2>
 
-            <p className="mt-4 leading-8 text-slate-400">
-              Umsatzsteuer-Identifikationsnummer gemäß § 27 a
-              Umsatzsteuergesetz: [falls vorhanden ergänzen]
-            </p>
-          </div>
+              <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-950/70 p-5">
+                <p>&lt;Vollständiger Name&gt;</p>
+                <p>&lt;Anschrift wie oben&gt;</p>
+              </div>
+            </section>
 
-          <div>
-            <h2 className="text-2xl font-bold">Verantwortlich für den Inhalt</h2>
+            <section>
+              <h2 className="text-2xl font-bold text-white">
+                Hinweis zur Beta-Version
+              </h2>
 
-            <div className="mt-4 leading-8 text-slate-400">
-              <p>[Name ergänzen]</p>
-              <p>[Adresse ergänzen]</p>
-            </div>
-          </div>
+              <p className="mt-4">
+                DiagnoseHUB befindet sich aktuell in einer technischen
+                Beta-Phase. Die Plattform dient der digitalen Unterstützung bei
+                Kfz-Diagnose, Dokumentation und späteren Lernfunktionen.
+              </p>
 
-          <div>
-            <h2 className="text-2xl font-bold">Hinweis zur Fahrzeugdiagnose</h2>
+              <p className="mt-4">
+                Die bereitgestellten Inhalte ersetzen keine eigene fachliche
+                Prüfung am Fahrzeug und keine Herstellerinformationen,
+                Reparaturanleitungen oder gesetzlichen Prüfvorgaben.
+              </p>
+            </section>
 
-            <p className="mt-4 leading-8 text-slate-400">
-              DiagnoseHUB ist eine digitale Diagnosehilfe. Die bereitgestellten
-              Informationen ersetzen keine fachgerechte Prüfung, Messung oder
-              Reparaturentscheidung durch qualifiziertes Fachpersonal.
-            </p>
+            <section>
+              <h2 className="text-2xl font-bold text-white">
+                Haftung für Inhalte
+              </h2>
+
+              <p className="mt-4">
+                Die Inhalte dieser Seite wurden mit größter Sorgfalt erstellt.
+                Für Richtigkeit, Vollständigkeit und Aktualität der Inhalte kann
+                jedoch keine Gewähr übernommen werden.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-2xl font-bold text-white">
+                Haftung für Links
+              </h2>
+
+              <p className="mt-4">
+                Diese Website kann Links zu externen Webseiten enthalten. Auf
+                deren Inhalte besteht kein Einfluss. Für fremde Inhalte ist
+                stets der jeweilige Anbieter oder Betreiber der verlinkten
+                Seiten verantwortlich.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-2xl font-bold text-white">Urheberrecht</h2>
+
+              <p className="mt-4">
+                Die durch den Seitenbetreiber erstellten Inhalte und Werke auf
+                dieser Website unterliegen dem deutschen Urheberrecht. Beiträge
+                Dritter werden als solche gekennzeichnet.
+              </p>
+            </section>
           </div>
         </section>
       </main>

@@ -15,12 +15,16 @@ import {
   formatFaultCodeContext,
   type FaultCodeContext,
 } from "../../../services/faultCodeDatabase";
+import {
+  PLAN_DAILY_LIMITS,
+  PLAN_LABELS,
+  isValidUserPlan,
+  type UserPlan,
+} from "@/config/plans";
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
-
-type UserPlan = "free" | "werkstatt" | "pro";
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -74,22 +78,6 @@ type UsageLimitPayload = {
   warning?: string;
 };
 
-const planLabels: Record<UserPlan, string> = {
-  free: "Free",
-  werkstatt: "Werkstatt Demo",
-  pro: "Werkstatt Pro Demo",
-};
-
-const planDailyLimits: Record<UserPlan, number> = {
-  free: 3,
-  werkstatt: 30,
-  pro: 100,
-};
-
-function isValidUserPlan(value: unknown): value is UserPlan {
-  return value === "free" || value === "werkstatt" || value === "pro";
-}
-
 function getTodayKeyGermany() {
   return new Intl.DateTimeFormat("sv-SE", {
     timeZone: "Europe/Berlin",
@@ -113,21 +101,30 @@ function normalizeMessages(value: unknown): ChatMessage[] {
     return [];
   }
 
-  return value
-    .filter((message) => {
-      return (
-        message &&
-        typeof message === "object" &&
-        (message.role === "user" || message.role === "assistant") &&
-        typeof message.content === "string"
-      );
-    })
-    .map((message) => {
-      return {
-        role: message.role,
-        content: message.content,
-      };
-    });
+  return value.flatMap((entry): ChatMessage[] => {
+    if (!entry || typeof entry !== "object") {
+      return [];
+    }
+
+    const candidate = entry as {
+      role?: unknown;
+      content?: unknown;
+    };
+
+    if (
+      (candidate.role === "user" || candidate.role === "assistant") &&
+      typeof candidate.content === "string"
+    ) {
+      return [
+        {
+          role: candidate.role,
+          content: candidate.content,
+        },
+      ];
+    }
+
+    return [];
+  });
 }
 
 function createAuthenticatedSupabaseClient(accessToken: string) {
@@ -276,10 +273,10 @@ async function resolveUsageControl(
       supabase: null,
       user: null,
       plan: "free",
-      planLabel: planLabels.free,
+      planLabel: PLAN_LABELS.free,
       todayKey,
       countBefore: 0,
-      maxDailyDiagnoses: planDailyLimits.free,
+      maxDailyDiagnoses: PLAN_DAILY_LIMITS.free,
     };
   }
 
@@ -300,10 +297,10 @@ async function resolveUsageControl(
     supabase,
     user,
     plan,
-    planLabel: planLabels[plan],
+    planLabel: PLAN_LABELS[plan],
     todayKey,
     countBefore,
-    maxDailyDiagnoses: planDailyLimits[plan],
+    maxDailyDiagnoses: PLAN_DAILY_LIMITS[plan],
   };
 }
 

@@ -115,6 +115,11 @@ function syncProfileToLocalStorage(profile: WorkshopProfileDatabaseRow) {
   localStorage.setItem(USER_PLAN_STORAGE_KEY, profile.plan);
 }
 
+function clearLocalAccountState() {
+  localStorage.removeItem(DEMO_ACCOUNT_STORAGE_KEY);
+  localStorage.setItem(USER_PLAN_STORAGE_KEY, "free");
+}
+
 function convertProfileToDemoAccount(
   profile: WorkshopProfileDatabaseRow
 ): DemoAccount {
@@ -137,9 +142,16 @@ function Header() {
   const [userPlan, setUserPlan] = useState<UserPlan>("free");
   const [accountSource, setAccountSource] = useState<AccountSource>("none");
   const [accountLoading, setAccountLoading] = useState(true);
+  const [logoutLoading, setLogoutLoading] = useState(false);
 
   function closeMobileMenu() {
     setMobileMenuOpen(false);
+  }
+
+  function applyLoggedOutState() {
+    setDemoAccount(null);
+    setUserPlan("free");
+    setAccountSource("none");
   }
 
   function applyLocalFallback() {
@@ -254,6 +266,28 @@ function Header() {
       applyLocalFallback();
     } finally {
       setAccountLoading(false);
+    }
+  }
+
+  async function handleLogout() {
+    setLogoutLoading(true);
+
+    try {
+      await supabase.auth.signOut();
+      clearLocalAccountState();
+      applyLoggedOutState();
+      closeMobileMenu();
+
+      window.location.href = "/login";
+    } catch (error) {
+      console.error("Logout fehlgeschlagen:", error);
+      clearLocalAccountState();
+      applyLoggedOutState();
+      closeMobileMenu();
+
+      window.location.href = "/login";
+    } finally {
+      setLogoutLoading(false);
     }
   }
 
@@ -373,6 +407,17 @@ function Header() {
               )}
             </a>
 
+            {demoAccount && (
+              <button
+                type="button"
+                onClick={handleLogout}
+                disabled={logoutLoading}
+                className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-300 transition hover:bg-red-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {logoutLoading ? "Logout..." : "Logout"}
+              </button>
+            )}
+
             <a
               href="/#diagnose"
               className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/40 transition hover:bg-blue-500"
@@ -471,6 +516,17 @@ function Header() {
               >
                 {demoAccount ? "Account verwalten" : "Login"}
               </a>
+
+              {demoAccount && (
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  disabled={logoutLoading}
+                  className="rounded-2xl border border-red-500/40 bg-red-500/10 px-5 py-4 text-left font-semibold text-red-300 transition hover:bg-red-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {logoutLoading ? "Logout..." : "Logout"}
+                </button>
+              )}
 
               <a
                 href="/#diagnose"

@@ -2,61 +2,72 @@
 
 import { useEffect, useState } from "react";
 
-type ThemeMode = "dark" | "light";
+type ThemeMode = "light" | "dark";
 
-const THEME_STORAGE_KEY = "diagnosehub-theme";
+const storageKey = "diagnosehub-theme";
 
 function applyTheme(theme: ThemeMode) {
-  if (theme === "light") {
-    document.documentElement.classList.add("diagnosehub-light");
+  const root = document.documentElement;
+
+  if (theme === "dark") {
+    root.classList.add("dark");
+    root.style.colorScheme = "dark";
   } else {
-    document.documentElement.classList.remove("diagnosehub-light");
+    root.classList.remove("dark");
+    root.style.colorScheme = "light";
   }
+
+  localStorage.setItem(storageKey, theme);
 }
 
 function getInitialTheme(): ThemeMode {
   if (typeof window === "undefined") {
-    return "dark";
+    return "light";
   }
 
-  const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+  const savedTheme = localStorage.getItem(storageKey);
 
-  if (savedTheme === "light" || savedTheme === "dark") {
+  if (savedTheme === "dark" || savedTheme === "light") {
     return savedTheme;
   }
 
-  return "dark";
+  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+
+  return prefersDark ? "dark" : "light";
 }
 
 export default function ThemeToggle() {
-  const [theme, setTheme] = useState<ThemeMode>("dark");
+  const [theme, setTheme] = useState<ThemeMode>("light");
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     const initialTheme = getInitialTheme();
 
     setTheme(initialTheme);
     applyTheme(initialTheme);
+    setMounted(true);
   }, []);
 
   function toggleTheme() {
     const nextTheme: ThemeMode = theme === "dark" ? "light" : "dark";
 
     setTheme(nextTheme);
-    localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
     applyTheme(nextTheme);
   }
-
-  const isLight = theme === "light";
 
   return (
     <button
       type="button"
       onClick={toggleTheme}
-      className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-700 bg-slate-900 text-lg text-slate-300 transition hover:bg-slate-800 hover:text-white"
-      aria-label={isLight ? "Dunkelmodus aktivieren" : "Hellmodus aktivieren"}
-      title={isLight ? "Dunkelmodus aktivieren" : "Hellmodus aktivieren"}
+      aria-label={
+        theme === "dark" ? "Hellen Modus aktivieren" : "Dunklen Modus aktivieren"
+      }
+      className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800 shadow-sm transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
     >
-      {isLight ? "🌙" : "☀️"}
+      <span aria-hidden="true">{mounted && theme === "dark" ? "🌙" : "☀️"}</span>
+      <span className="hidden sm:inline">
+        {mounted && theme === "dark" ? "Dunkel" : "Hell"}
+      </span>
     </button>
   );
 }

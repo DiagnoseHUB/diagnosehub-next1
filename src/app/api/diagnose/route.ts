@@ -1,3 +1,7 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
 import {

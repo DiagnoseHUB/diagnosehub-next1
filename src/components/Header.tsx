@@ -22,6 +22,7 @@ const navigationLinks = [
   { label: "Diagnose", href: "/#diagnose" },
   { label: "Dashboard", href: "/dashboard" },
   { label: "Anleitungen", href: "/anleitungen" },
+  { label: "Lernen", href: "/lernen" },
   { label: "Ablauf", href: "/#workflow" },
   { label: "Funktionen", href: "/#features" },
 ];
@@ -237,10 +238,10 @@ function Header() {
             ))}
 
             <a
-              href="/premium"
+              href="/billing"
               className="rounded-full border border-yellow-400 bg-yellow-50 px-4 py-2 text-yellow-700 transition hover:bg-yellow-500 hover:text-slate-950 dark:border-yellow-500/30 dark:bg-yellow-500/10 dark:text-yellow-300 dark:hover:bg-yellow-500 dark:hover:text-slate-950"
             >
-              Premium vormerken
+              Pro aktivieren
             </a>
           </nav>
 
@@ -377,11 +378,11 @@ function Header() {
               ))}
 
               <a
-                href="/premium"
+                href="/billing"
                 onClick={closeMobileMenu}
                 className="rounded-2xl border border-yellow-400 bg-yellow-50 px-5 py-4 font-semibold text-yellow-700 transition hover:bg-yellow-500 hover:text-slate-950 dark:border-yellow-500/30 dark:bg-yellow-500/10 dark:text-yellow-300 dark:hover:bg-yellow-500 dark:hover:text-slate-950"
               >
-                Premium vormerken
+                Pro aktivieren
               </a>
 
               <a

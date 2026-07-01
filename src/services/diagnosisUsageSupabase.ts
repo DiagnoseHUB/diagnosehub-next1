@@ -1,6 +1,10 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 
 export type DiagnosisUsage = {
+  /**
+   * Ab jetzt kein Tagesdatum mehr, sondern Monatsschlüssel.
+   * Beispiel: 2026-07-01
+   */
   date: string;
   count: number;
 };
@@ -14,8 +18,31 @@ type DiagnosisUsageDatabaseRow = {
   updated_at: string;
 };
 
+function getCurrentDateGermany() {
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Europe/Berlin",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+/**
+ * Kompatibilitätsname bleibt erhalten.
+ * Bedeutet ab jetzt: aktueller Monats-Key.
+ *
+ * Beispiel:
+ * 2026-07-01
+ */
 export function getTodayKey() {
-  return new Date().toLocaleDateString("sv-SE");
+  const currentDateGermany = getCurrentDateGermany();
+  const currentMonth = currentDateGermany.slice(0, 7);
+
+  return `${currentMonth}-01`;
+}
+
+export function getCurrentMonthKey() {
+  return getTodayKey();
 }
 
 export function getInitialDiagnosisUsage(): DiagnosisUsage {
@@ -26,38 +53,41 @@ export function getInitialDiagnosisUsage(): DiagnosisUsage {
 }
 
 export function normalizeDiagnosisUsage(usage: DiagnosisUsage): DiagnosisUsage {
-  const today = getTodayKey();
+  const currentMonthKey = getTodayKey();
 
-  if (usage.date !== today) {
+  if (!usage || usage.date !== currentMonthKey) {
     return {
-      date: today,
+      date: currentMonthKey,
       count: 0,
     };
   }
 
-  return usage;
+  return {
+    date: usage.date,
+    count: Number.isFinite(Number(usage.count)) ? Number(usage.count) : 0,
+  };
 }
 
 function convertDatabaseRowToDiagnosisUsage(
   row: DiagnosisUsageDatabaseRow
 ): DiagnosisUsage {
-  return {
+  return normalizeDiagnosisUsage({
     date: row.usage_date,
     count: row.diagnosis_count,
-  };
+  });
 }
 
 export async function loadDiagnosisUsageFromSupabase(
   supabase: SupabaseClient,
   user: User
 ): Promise<DiagnosisUsage> {
-  const today = getTodayKey();
+  const currentMonthKey = getTodayKey();
 
   const { data, error } = await supabase
     .from("diagnosis_usage")
     .select("*")
     .eq("user_id", user.id)
-    .eq("usage_date", today)
+    .eq("usage_date", currentMonthKey)
     .maybeSingle();
 
   if (error) {
@@ -66,7 +96,7 @@ export async function loadDiagnosisUsageFromSupabase(
 
   if (!data) {
     return {
-      date: today,
+      date: currentMonthKey,
       count: 0,
     };
   }
@@ -88,6 +118,7 @@ export async function saveDiagnosisUsageToSupabase(
         user_id: user.id,
         usage_date: normalizedUsage.date,
         diagnosis_count: normalizedUsage.count,
+        updated_at: new Date().toISOString(),
       },
       {
         onConflict: "user_id,usage_date",

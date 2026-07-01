@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -15,28 +16,51 @@ const geistMono = Geist_Mono({
 const themeScript = `
 (function () {
   try {
-    var savedTheme = localStorage.getItem("diagnosehub-theme");
+    var storageKey = "diagnosehub-theme";
+    var legacyKeys = ["theme", "diagnosehub-color-theme", "diagnosehub-theme-mode"];
+    var theme = localStorage.getItem(storageKey);
 
-    if (savedTheme === "light") {
-      document.documentElement.classList.add("diagnosehub-light");
-    } else {
-      document.documentElement.classList.remove("diagnosehub-light");
+    if (theme !== "light" && theme !== "dark") {
+      for (var i = 0; i < legacyKeys.length; i++) {
+        var legacyTheme = localStorage.getItem(legacyKeys[i]);
+
+        if (legacyTheme === "light" || legacyTheme === "dark") {
+          theme = legacyTheme;
+          localStorage.setItem(storageKey, theme);
+          break;
+        }
+      }
     }
-  } catch (error) {
+
+    if (theme !== "light" && theme !== "dark") {
+      theme = window.matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light";
+    }
+
+    document.documentElement.classList.toggle("dark", theme === "dark");
     document.documentElement.classList.remove("diagnosehub-light");
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme;
+  } catch (error) {
+    document.documentElement.classList.add("dark");
+    document.documentElement.classList.remove("diagnosehub-light");
+    document.documentElement.dataset.theme = "dark";
+    document.documentElement.style.colorScheme = "dark";
   }
 })();
 `;
 
 export const metadata: Metadata = {
   title: "DiagnoseHUB",
-  description: "KI-Diagnose, Prüfprotokolle und Lernplattform für Kfz-Werkstätten.",
+  description:
+    "KI-Diagnose, Prüfprotokolle und Lernplattform für Kfz-Werkstätten.",
 };
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode;
+  children: ReactNode;
 }>) {
   return (
     <html
@@ -48,7 +72,9 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
 
-      <body className="flex min-h-full flex-col">{children}</body>
+      <body className="flex min-h-full flex-col bg-slate-50 text-slate-950 transition-colors dark:bg-slate-950 dark:text-slate-100">
+        {children}
+      </body>
     </html>
   );
 }

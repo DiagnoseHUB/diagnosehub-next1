@@ -2,6 +2,24 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+html {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+body {
+  background: #f8fafc;
+  color: #020617;
+}
+
+html.dark body {
+  background: #020617;
+  color: #f1f5f9;
+}
+
 :root {
   --background: #020617;
   --foreground: #f8fafc;

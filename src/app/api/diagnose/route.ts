@@ -83,13 +83,18 @@ type UsageLimitPayload = {
 };
 
 function getTodayKeyGermany() {
-  return new Intl.DateTimeFormat("sv-SE", {
+  const currentDateGermany = new Intl.DateTimeFormat("sv-SE", {
     timeZone: "Europe/Berlin",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
+
+  const currentMonth = currentDateGermany.slice(0, 7);
+
+  return `${currentMonth}-01`;
 }
+
 
 function sanitizeText(value: unknown, maxLength: number) {
   if (typeof value !== "string") {
@@ -665,8 +670,7 @@ export async function POST(request: Request) {
     ) {
       return NextResponse.json(
         {
-          error: `Tageslimit erreicht. Dein aktueller Plan ${usageControl.planLabel} erlaubt ${usageControl.maxDailyDiagnoses} Diagnosen pro Tag.`,
-          usageLimit: buildUsageLimitPayload(usageControl, null),
+error: `Monatslimit erreicht. Dein aktueller Plan ${usageControl.planLabel} erlaubt ${usageControl.maxDailyDiagnoses} KI-Anfragen pro Monat. Folgefragen zählen mit.`,          usageLimit: buildUsageLimitPayload(usageControl, null),
         },
         { status: 429 }
       );

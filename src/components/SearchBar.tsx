@@ -37,6 +37,7 @@ type CurrentDiagnosisCase = {
   faultCodeContext: FaultCodeContext | null;
   qualityCheck: string;
   openedCaseId?: string | null;
+  causingPart?: string;
 };
 
 type CaseStorageSource = "local" | "supabase";
@@ -86,6 +87,15 @@ function getErrorMessage(error: unknown) {
   }
 
   return "Unbekannter Fehler";
+}
+
+function getMonthlyDiagnosisLimit(plan: UserPlan) {
+  const planConfig = PLAN_CONFIG[plan] as {
+    monthlyDiagnosisLimit?: number;
+    dailyDiagnosisLimit: number;
+  };
+
+  return planConfig.monthlyDiagnosisLimit ?? planConfig.dailyDiagnosisLimit;
 }
 
 function buildDynamicQuickQuestions(
@@ -190,7 +200,10 @@ function getCaseTitle(messages: ChatMessage[]) {
     return "Unbenannter Diagnosefall";
   }
 
-  const cleanTitle = firstUserMessage.content.replace(/\s+/g, " ").trim();
+  const cleanTitle = firstUserMessage.content
+    .replace(/\n+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 
   if (cleanTitle.length <= 70) {
     return cleanTitle;
@@ -251,6 +264,7 @@ export default function SearchBar() {
   const [usageSyncMessage, setUsageSyncMessage] = useState("");
 
   const [search, setSearch] = useState("");
+  const [causingPart, setCausingPart] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [engineContext, setEngineContext] = useState<EngineContext | null>(null);
   const [faultCodeContext, setFaultCodeContext] =
@@ -282,7 +296,9 @@ export default function SearchBar() {
 
   const latestAssistantMessageIndex = useMemo(() => {
     for (let index = messages.length - 1; index >= 0; index -= 1) {
-      if (messages[index].role === "assistant") {
+      const message = messages[index];
+
+      if (message?.role === "assistant") {
         return index;
       }
     }
@@ -295,9 +311,10 @@ export default function SearchBar() {
   }, [diagnosisUsage]);
 
   const currentPlan = PLAN_CONFIG[userPlan];
+  const monthlyDiagnosisLimit = getMonthlyDiagnosisLimit(userPlan);
 
   const remainingDiagnoses = Math.max(
-    currentPlan.dailyDiagnosisLimit - normalizedUsage.count,
+    monthlyDiagnosisLimit - normalizedUsage.count,
     0
   );
 
@@ -388,10 +405,18 @@ export default function SearchBar() {
       faultCodeContext,
       qualityCheck,
       openedCaseId,
+      causingPart,
     };
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(currentCase));
-  }, [messages, engineContext, faultCodeContext, qualityCheck, openedCaseId]);
+  }, [
+    messages,
+    engineContext,
+    faultCodeContext,
+    qualityCheck,
+    openedCaseId,
+    causingPart,
+  ]);
 
   async function initializeSearchBar() {
     try {
@@ -446,6 +471,7 @@ export default function SearchBar() {
       setFaultCodeContext(parsedCase.faultCodeContext || null);
       setQualityCheck(parsedCase.qualityCheck || "");
       setOpenedCaseId(parsedCase.openedCaseId || null);
+      setCausingPart(parsedCase.causingPart || "");
     } catch (error) {
       console.error("Aktueller Diagnosefall konnte nicht geladen werden:", error);
     }
@@ -652,7 +678,7 @@ export default function SearchBar() {
       setUsageSyncMessage(usageLimit.warning);
     } else {
       setUsageSyncMessage(
-        `Serverlimit aktiv: ${nextCount} / ${usageLimit.maxDailyDiagnoses} Diagnosen heute.`
+        `Serverlimit aktiv: ${nextCount} / ${usageLimit.maxDailyDiagnoses} KI-Anfragen diesen Monat.`
       );
     }
 
@@ -689,6 +715,44 @@ export default function SearchBar() {
     return data.session?.access_token || "";
   }
 
+  function getFirstDiagnosisText() {
+    const firstUserMessage = messages.find((message) => message.role === "user");
+
+    if (firstUserMessage?.content) {
+      return firstUserMessage.content;
+    }
+
+    return search.trim();
+  }
+
+  function buildRepairInstructionQuery() {
+    const cleanPart = causingPart.trim();
+    const diagnosisText = getFirstDiagnosisText().replace(/\s+/g, " ").trim();
+
+    if (!cleanPart) {
+      return "";
+    }
+
+    return [`${cleanPart} Austausch`, diagnosisText]
+      .filter(Boolean)
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function openRepairInstructionForCausingPart() {
+    const query = buildRepairInstructionQuery();
+
+    if (!query) {
+      setError(
+        "Bitte zuerst das schadensverursachende Teil eintragen, z. B. Turbolader, AGR-Ventil oder Injektor."
+      );
+      return;
+    }
+
+    window.location.href = `/anleitungen?ki=${encodeURIComponent(query)}&auto=1`;
+  }
+
   async function sendDiagnosis(questionOverride?: string) {
     const currentInput = (questionOverride ?? search).trim();
 
@@ -702,22 +766,31 @@ export default function SearchBar() {
     }
 
     const usageBeforeRequest = normalizeDiagnosisUsage(diagnosisUsage);
-    const limitBeforeRequest = PLAN_CONFIG[userPlan].dailyDiagnosisLimit;
+    const limitBeforeRequest = monthlyDiagnosisLimit;
 
     if (usageBeforeRequest.count >= limitBeforeRequest) {
       setDiagnosisUsage(usageBeforeRequest);
       saveUsageToLocalStorage(usageBeforeRequest);
 
       setError(
-        `Tageslimit erreicht: Im ${PLAN_CONFIG[userPlan].label}-Plan sind aktuell ${limitBeforeRequest} KI-Diagnosen pro Tag vorgesehen.`
+        `Monatslimit erreicht: Im ${PLAN_CONFIG[userPlan].label}-Plan sind aktuell ${limitBeforeRequest} KI-Anfragen pro Monat inklusive Folgefragen vorgesehen.`
       );
 
       return;
     }
 
+    const cleanCausingPart = causingPart.trim();
+
+    const diagnosisInputWithCausingPart = cleanCausingPart
+      ? `${currentInput}
+
+Schadensverursachendes Teil laut Werkstatt/Nutzer:
+${cleanCausingPart}`
+      : currentInput;
+
     const userMessage: ChatMessage = {
       role: "user",
-      content: currentInput,
+      content: diagnosisInputWithCausingPart,
     };
 
     const nextMessages = [...messages, userMessage];
@@ -744,7 +817,7 @@ export default function SearchBar() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          input: currentInput,
+          input: diagnosisInputWithCausingPart,
           messages,
           accessToken,
           useServerUsageTracking,
@@ -791,6 +864,7 @@ export default function SearchBar() {
 
   function resetDiagnosis() {
     setSearch("");
+    setCausingPart("");
     setMessages([]);
     setEngineContext(null);
     setFaultCodeContext(null);
@@ -812,7 +886,7 @@ export default function SearchBar() {
 
     if (savedCaseLimitReached) {
       setError(
-        `Falllimit erreicht: Im ${currentPlan.label}-Plan können aktuell ${currentPlan.savedCaseLimit} Fälle gespeichert werden. Für mehr gespeicherte Fälle den Werkstatt-Demo-Plan aktivieren.`
+        `Falllimit erreicht: Im ${currentPlan.label}-Plan können aktuell ${currentPlan.savedCaseLimit} Fälle gespeichert werden.`
       );
       setSaveSuccess(false);
       setCopySuccess(false);
@@ -984,6 +1058,10 @@ ${faultCode.suggestedChecks.map((check) => `- ${check}`).join("\n")}`;
           .join("\n")
       : "Motorkontext: nicht erkannt";
 
+    const damagingPartInfo = causingPart.trim()
+      ? `Schadensverursachendes Teil:\n${causingPart.trim()}\n\n`
+      : "";
+
     const chatText = messages
       .map((message) => {
         const sender = message.role === "user" ? "Werkstatt" : "DiagnoseHUB";
@@ -997,7 +1075,7 @@ ${faultCode.suggestedChecks.map((check) => `- ${check}`).join("\n")}`;
 Erstellt am:
 ${createdAt}
 
-Motorkontext:
+${damagingPartInfo}Motorkontext:
 ${motorInfo}
 
 Fehlercode-Kontext:
@@ -1106,7 +1184,7 @@ ${chatText}
 
   return (
     <div className="w-full">
-      <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-4 shadow-2xl shadow-blue-950/30">
+      <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-2xl shadow-slate-200/60 transition-colors dark:border-slate-800 dark:bg-slate-900/80 dark:shadow-blue-950/30">
         <textarea
           value={search}
           onChange={(event) => setSearch(event.target.value)}
@@ -1117,32 +1195,70 @@ ${chatText}
               : "Folgefrage stellen, z. B. Ladedruck Sollwert?"
           }
           rows={4}
-          className="w-full resize-none rounded-2xl border border-slate-800 bg-slate-950 p-5 text-white outline-none placeholder:text-slate-500 focus:border-blue-500"
+          className="w-full resize-none rounded-2xl border border-slate-300 bg-white p-5 text-slate-950 outline-none placeholder:text-slate-400 focus:border-blue-500 dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-500"
         />
 
-        <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+        <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_auto]">
+          <div>
+            <label
+              htmlFor="causing-part"
+              className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-300"
+            >
+              Schadensverursachendes Teil / Bauteil
+            </label>
+
+            <input
+              id="causing-part"
+              type="text"
+              value={causingPart}
+              onChange={(event) => setCausingPart(event.target.value)}
+              placeholder="z. B. Turbolader, AGR-Ventil, Injektor, Radlager, Klimakompressor..."
+              className="w-full rounded-2xl border border-slate-300 bg-white p-4 text-slate-950 outline-none placeholder:text-slate-400 focus:border-blue-500 dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-500"
+            />
+
+            <p className="mt-2 text-xs text-slate-500">
+              Optional. Wenn das defekte Teil feststeht, kannst du direkt eine
+              Austausch-Anleitung öffnen.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={openRepairInstructionForCausingPart}
+            disabled={!causingPart.trim()}
+            className="self-end rounded-xl border border-blue-500/40 bg-blue-500/10 px-5 py-4 text-sm font-bold text-blue-700 transition hover:bg-blue-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 dark:text-blue-300"
+          >
+            Anleitung zum Austausch öffnen
+          </button>
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 transition-colors dark:border-slate-800 dark:bg-slate-950/70">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-3">
-                <span className="rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-blue-300">
+                <span className="rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-blue-700 dark:text-blue-300">
                   {currentPlan.badge}
                 </span>
 
-                <p className="font-bold text-white">{currentPlan.label}</p>
-
-                <p className="text-sm text-slate-500">
-                  {normalizedUsage.count} / {currentPlan.dailyDiagnosisLimit} Diagnosen heute
+                <p className="font-bold text-slate-950 dark:text-white">
+                  {currentPlan.label}
                 </p>
 
                 <p className="text-sm text-slate-500">
-                  {savedCases.length} / {currentPlan.savedCaseLimit} Fälle gespeichert
+                  {normalizedUsage.count} / {monthlyDiagnosisLimit} KI-Anfragen
+                  diesen Monat
+                </p>
+
+                <p className="text-sm text-slate-500">
+                  {savedCases.length} / {currentPlan.savedCaseLimit} Fälle
+                  gespeichert
                 </p>
 
                 <span
                   className={
                     caseStorageSource === "supabase"
-                      ? "rounded-full border border-green-500/30 bg-green-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-green-300"
-                      : "rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-yellow-300"
+                      ? "rounded-full border border-green-500/30 bg-green-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-green-700 dark:text-green-300"
+                      : "rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-yellow-700 dark:text-yellow-300"
                   }
                 >
                   {caseStorageLabel}
@@ -1151,8 +1267,8 @@ ${chatText}
                 <span
                   className={
                     usageStorageSource === "supabase"
-                      ? "rounded-full border border-green-500/30 bg-green-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-green-300"
-                      : "rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-yellow-300"
+                      ? "rounded-full border border-green-500/30 bg-green-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-green-700 dark:text-green-300"
+                      : "rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-yellow-700 dark:text-yellow-300"
                   }
                 >
                   {usageStorageLabel}
@@ -1161,11 +1277,11 @@ ${chatText}
 
               <p className="mt-2 text-sm text-slate-500">
                 {currentPlan.description} Noch verfügbar:{" "}
-                <span className="font-bold text-slate-300">
+                <span className="font-bold text-slate-700 dark:text-slate-300">
                   {remainingDiagnoses}
                 </span>{" "}
-                Diagnosen und{" "}
-                <span className="font-bold text-slate-300">
+                KI-Anfragen und{" "}
+                <span className="font-bold text-slate-700 dark:text-slate-300">
                   {remainingSavedCases}
                 </span>{" "}
                 neue Speicherplätze.
@@ -1178,47 +1294,51 @@ ${chatText}
               </p>
             </div>
 
-         {showLocalPlanSwitcher && !user && (
-  <div className="flex flex-wrap gap-2">
-    {(["free", "werkstatt", "pro"] as UserPlan[]).map((plan) => (
-      <button
-        key={plan}
-        onClick={() => changeUserPlan(plan)}
-        title="Lokalen Testplan ändern"
-        className={
-          userPlan === plan
-            ? "rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white"
-            : "rounded-xl border border-slate-700 px-4 py-2 text-sm font-bold text-slate-300 transition hover:bg-slate-800"
-        }
-      >
-        {PLAN_CONFIG[plan].label}
-      </button>
-    ))}
-  </div>
-)}
+            {showLocalPlanSwitcher && !user && (
+              <div className="flex flex-wrap gap-2">
+                {(["free", "werkstatt", "pro"] as UserPlan[]).map((plan) => (
+                  <button
+                    key={plan}
+                    type="button"
+                    onClick={() => changeUserPlan(plan)}
+                    title="Lokalen Testplan ändern"
+                    className={
+                      userPlan === plan
+                        ? "rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white"
+                        : "rounded-xl border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                    }
+                  >
+                    {PLAN_CONFIG[plan].label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="mt-4 flex flex-wrap gap-3">
             <button
+              type="button"
               onClick={reloadSupabaseCases}
               disabled={!user || caseSyncLoading}
-              className="rounded-xl border border-green-500/40 px-4 py-2 text-sm font-semibold text-green-300 transition hover:bg-green-500 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-xl border border-green-500/40 px-4 py-2 text-sm font-semibold text-green-700 transition hover:bg-green-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 dark:text-green-300 dark:hover:text-slate-950"
             >
               {caseSyncLoading ? "Synchronisiert..." : "Fälle neu laden"}
             </button>
 
             <button
+              type="button"
               onClick={reloadSupabaseUsage}
               disabled={!user || usageSyncLoading}
-              className="rounded-xl border border-green-500/40 px-4 py-2 text-sm font-semibold text-green-300 transition hover:bg-green-500 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-xl border border-green-500/40 px-4 py-2 text-sm font-semibold text-green-700 transition hover:bg-green-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 dark:text-green-300 dark:hover:text-slate-950"
             >
               {usageSyncLoading ? "Lädt..." : "Plan/Nutzung neu laden"}
             </button>
 
             <button
+              type="button"
               onClick={migrateLocalCasesNow}
               disabled={!user || caseSyncLoading}
-              className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
             >
               Lokale Fälle migrieren
             </button>
@@ -1226,7 +1346,7 @@ ${chatText}
             {!user && (
               <a
                 href="/login"
-                className="rounded-xl border border-blue-500/40 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-300 transition hover:bg-blue-500 hover:text-white"
+                className="rounded-xl border border-blue-500/40 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-500 hover:text-white dark:text-blue-300"
               >
                 Einloggen für Cloud-Speicher
               </a>
@@ -1234,29 +1354,28 @@ ${chatText}
           </div>
 
           {caseSyncMessage && (
-            <div className="mt-4 rounded-xl border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-300">
+            <div className="mt-4 rounded-xl border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-700 dark:text-green-300">
               {caseSyncMessage}
             </div>
           )}
 
           {usageSyncMessage && (
-            <div className="mt-4 rounded-xl border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-300">
+            <div className="mt-4 rounded-xl border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-700 dark:text-green-300">
               {usageSyncMessage}
             </div>
           )}
 
           {diagnosisLimitReached && (
-            <div className="mt-4 rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-300">
-              Tageslimit erreicht. Ändere den Plan im Login-Profil oder warte
-              bis zum nächsten Tag.
+            <div className="mt-4 rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-700 dark:text-yellow-300">
+              Monatslimit erreicht. Warte bis zum nächsten Monat oder aktiviere
+              Pro.
             </div>
           )}
 
           {savedCaseLimitReached && (
-            <div className="mt-4 rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-300">
+            <div className="mt-4 rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-700 dark:text-yellow-300">
               Falllimit erreicht. Du kannst bestehende Fälle überschreiben oder
-              löschen. Für mehr gespeicherte Fälle den Werkstatt-Demo-Plan
-              aktivieren.
+              löschen.
             </div>
           )}
         </div>
@@ -1274,9 +1393,10 @@ ${chatText}
             {messages.length > 0 && (
               <>
                 <button
+                  type="button"
                   onClick={() => void saveCurrentCase()}
                   disabled={savedCaseLimitReached || caseSyncLoading}
-                  className="rounded-xl border border-blue-500/40 bg-blue-500/10 px-5 py-3 font-semibold text-blue-300 transition hover:bg-blue-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-xl border border-blue-500/40 bg-blue-500/10 px-5 py-3 font-semibold text-blue-700 transition hover:bg-blue-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 dark:text-blue-300"
                 >
                   {caseSyncLoading ? "Speichert..." : "Fall speichern"}
                 </button>
@@ -1285,28 +1405,31 @@ ${chatText}
                   href="/pruefprotokoll"
                   target="_blank"
                   rel="noreferrer"
-                  className="rounded-xl border border-blue-500/40 bg-blue-500/10 px-5 py-3 font-semibold text-blue-300 transition hover:bg-blue-500 hover:text-white"
+                  className="rounded-xl border border-blue-500/40 bg-blue-500/10 px-5 py-3 font-semibold text-blue-700 transition hover:bg-blue-500 hover:text-white dark:text-blue-300"
                 >
                   Prüfprotokoll drucken
                 </a>
 
                 <button
+                  type="button"
                   onClick={copyCaseReport}
-                  className="rounded-xl border border-slate-700 px-5 py-3 font-semibold text-slate-300 transition hover:bg-slate-800"
+                  className="rounded-xl border border-slate-300 px-5 py-3 font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
                 >
                   Fallbericht kopieren
                 </button>
 
                 <button
+                  type="button"
                   onClick={downloadCaseReport}
-                  className="rounded-xl border border-slate-700 px-5 py-3 font-semibold text-slate-300 transition hover:bg-slate-800"
+                  className="rounded-xl border border-slate-300 px-5 py-3 font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
                 >
                   TXT speichern
                 </button>
 
                 <button
+                  type="button"
                   onClick={resetDiagnosis}
-                  className="rounded-xl border border-slate-700 px-5 py-3 font-semibold text-slate-300 transition hover:bg-slate-800"
+                  className="rounded-xl border border-slate-300 px-5 py-3 font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
                 >
                   Neuer Fall
                 </button>
@@ -1314,6 +1437,7 @@ ${chatText}
             )}
 
             <button
+              type="button"
               onClick={() => void sendDiagnosis()}
               disabled={loading || diagnosisLimitReached}
               className="rounded-xl bg-blue-600 px-6 py-3 font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
@@ -1328,29 +1452,35 @@ ${chatText}
         </div>
       </div>
 
+      {error && (
+        <div className="mt-5 rounded-xl border border-red-500/30 bg-red-500/10 px-6 py-4 text-red-700 dark:text-red-300">
+          {error}
+        </div>
+      )}
+
       {copySuccess && (
-        <div className="mt-5 rounded-xl border border-green-500/30 bg-green-500/10 px-6 py-4 text-green-300">
+        <div className="mt-5 rounded-xl border border-green-500/30 bg-green-500/10 px-6 py-4 text-green-700 dark:text-green-300">
           Fallbericht wurde kopiert.
         </div>
       )}
 
       {downloadSuccess && (
-        <div className="mt-5 rounded-xl border border-green-500/30 bg-green-500/10 px-6 py-4 text-green-300">
+        <div className="mt-5 rounded-xl border border-green-500/30 bg-green-500/10 px-6 py-4 text-green-700 dark:text-green-300">
           Fallbericht wurde als TXT-Datei gespeichert.
         </div>
       )}
 
       {saveSuccess && (
-        <div className="mt-5 rounded-xl border border-green-500/30 bg-green-500/10 px-6 py-4 text-green-300">
+        <div className="mt-5 rounded-xl border border-green-500/30 bg-green-500/10 px-6 py-4 text-green-700 dark:text-green-300">
           Diagnosefall wurde gespeichert.
         </div>
       )}
 
       {savedCases.length > 0 && (
-        <section className="mt-6 rounded-3xl border border-slate-800 bg-slate-900/80 p-6">
+        <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 transition-colors dark:border-slate-800 dark:bg-slate-900/80">
           <div className="mb-5 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-wide text-blue-400">
+              <p className="text-sm font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-400">
                 Gespeicherte Fälle
               </p>
               <p className="mt-1 text-sm text-slate-500">
@@ -1358,7 +1488,7 @@ ${chatText}
                   ? "In Supabase gespeichert und lokal gespiegelt."
                   : "Lokal im Browser gespeichert."}{" "}
                 Aktueller Plan:{" "}
-                <span className="font-semibold text-slate-300">
+                <span className="font-semibold text-slate-700 dark:text-slate-300">
                   {savedCases.length} / {currentPlan.savedCaseLimit}
                 </span>{" "}
                 Fälle.
@@ -1377,12 +1507,14 @@ ${chatText}
                 className={
                   openedCaseId === savedCase.id
                     ? "rounded-2xl border border-blue-500/50 bg-blue-500/10 p-4"
-                    : "rounded-2xl border border-slate-800 bg-slate-950/70 p-4"
+                    : "rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/70"
                 }
               >
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div>
-                    <h3 className="font-bold text-white">{savedCase.title}</h3>
+                    <h3 className="font-bold text-slate-950 dark:text-white">
+                      {savedCase.title}
+                    </h3>
 
                     <div className="mt-2 flex flex-wrap gap-3 text-sm text-slate-500">
                       <span>Aktualisiert: {formatDateTime(savedCase.updatedAt)}</span>
@@ -1404,16 +1536,18 @@ ${chatText}
 
                   <div className="flex flex-wrap gap-3">
                     <button
+                      type="button"
                       onClick={() => openSavedCase(savedCase)}
-                      className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:border-blue-500 hover:text-blue-300"
+                      className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-blue-500 hover:text-blue-700 dark:border-slate-700 dark:text-slate-300 dark:hover:text-blue-300"
                     >
                       Öffnen
                     </button>
 
                     <button
+                      type="button"
                       onClick={() => void deleteSavedCase(savedCase.id)}
                       disabled={caseSyncLoading}
-                      className="rounded-xl border border-red-500/30 px-4 py-2 text-sm font-semibold text-red-300 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="rounded-xl border border-red-500/30 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-300"
                     >
                       Löschen
                     </button>
@@ -1435,9 +1569,10 @@ ${chatText}
             {quickQuestions.map((question) => (
               <button
                 key={question}
+                type="button"
                 onClick={() => void sendDiagnosis(question)}
                 disabled={loading || diagnosisLimitReached}
-                className="rounded-full border border-slate-700 bg-slate-900 px-4 py-2 text-sm text-slate-300 transition hover:border-blue-500 hover:text-blue-300 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700 transition hover:border-blue-500 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:text-blue-300"
               >
                 {question}
               </button>
@@ -1447,41 +1582,43 @@ ${chatText}
       )}
 
       {engineContext && (
-        <section className="mt-8 rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl shadow-blue-950/20">
-          <p className="mb-4 text-sm font-semibold uppercase tracking-wide text-blue-400">
+        <section className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/60 transition-colors dark:border-slate-800 dark:bg-slate-900/80 dark:shadow-blue-950/20">
+          <p className="mb-4 text-sm font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-400">
             Erkannter Motorkontext
           </p>
 
           <div className="grid gap-4 md:grid-cols-4">
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/70">
               <p className="text-sm text-slate-500">Motortyp</p>
-              <p className="mt-2 font-bold text-white">
+              <p className="mt-2 font-bold text-slate-950 dark:text-white">
                 {engineContext.engineType}
               </p>
             </div>
 
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/70">
               <p className="text-sm text-slate-500">Erkennung</p>
-              <p className="mt-2 font-bold text-white">
+              <p className="mt-2 font-bold text-slate-950 dark:text-white">
                 {engineContext.source}
               </p>
             </div>
 
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/70">
               <p className="text-sm text-slate-500">Motorcode</p>
-              <p className="mt-2 font-bold text-white">
+              <p className="mt-2 font-bold text-slate-950 dark:text-white">
                 {engineContext.code ?? "nicht erkannt"}
               </p>
             </div>
 
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/70">
               <p className="text-sm text-slate-500">Motor</p>
-              <p className="mt-2 font-bold text-white">{engineContext.label}</p>
+              <p className="mt-2 font-bold text-slate-950 dark:text-white">
+                {engineContext.label}
+              </p>
             </div>
           </div>
 
           {engineContext.notes && (
-            <p className="mt-4 text-sm text-slate-400">
+            <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">
               {engineContext.notes}
             </p>
           )}
@@ -1489,8 +1626,8 @@ ${chatText}
       )}
 
       {faultCodeContext && faultCodeContext.foundCodes.length > 0 && (
-        <section className="mt-5 rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl shadow-blue-950/20">
-          <p className="mb-4 text-sm font-semibold uppercase tracking-wide text-blue-400">
+        <section className="mt-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/60 transition-colors dark:border-slate-800 dark:bg-slate-900/80 dark:shadow-blue-950/20">
+          <p className="mb-4 text-sm font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-400">
             Erkannte Fehlercodes
           </p>
 
@@ -1498,39 +1635,39 @@ ${chatText}
             {faultCodeContext.foundCodes.map((faultCode) => (
               <div
                 key={faultCode.code}
-                className="rounded-2xl border border-slate-800 bg-slate-950/70 p-5"
+                className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950/70"
               >
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div>
                     <p className="text-sm text-slate-500">Fehlercode</p>
-                    <h3 className="mt-1 text-2xl font-bold text-white">
+                    <h3 className="mt-1 text-2xl font-bold text-slate-950 dark:text-white">
                       {faultCode.code}
                     </h3>
                   </div>
 
                   <div className="md:text-right">
                     <p className="text-sm text-slate-500">System</p>
-                    <p className="mt-1 font-semibold text-blue-300">
+                    <p className="mt-1 font-semibold text-blue-700 dark:text-blue-300">
                       {faultCode.system}
                     </p>
                   </div>
                 </div>
 
-                <h4 className="mt-5 text-xl font-bold text-white">
+                <h4 className="mt-5 text-xl font-bold text-slate-950 dark:text-white">
                   {faultCode.title}
                 </h4>
 
-                <p className="mt-3 leading-7 text-slate-400">
+                <p className="mt-3 leading-7 text-slate-600 dark:text-slate-400">
                   {faultCode.description}
                 </p>
 
                 <div className="mt-6 grid gap-6 lg:grid-cols-2">
                   <div>
-                    <p className="mb-3 font-semibold text-white">
+                    <p className="mb-3 font-semibold text-slate-950 dark:text-white">
                       Typische Ursachen
                     </p>
 
-                    <ul className="space-y-2 text-slate-300">
+                    <ul className="space-y-2 text-slate-700 dark:text-slate-300">
                       {faultCode.typicalCauses.map((cause) => (
                         <li key={cause} className="flex gap-3">
                           <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-blue-400" />
@@ -1541,11 +1678,11 @@ ${chatText}
                   </div>
 
                   <div>
-                    <p className="mb-3 font-semibold text-white">
+                    <p className="mb-3 font-semibold text-slate-950 dark:text-white">
                       Empfohlene Prüfungen
                     </p>
 
-                    <ol className="space-y-2 text-slate-300">
+                    <ol className="space-y-2 text-slate-700 dark:text-slate-300">
                       {faultCode.suggestedChecks.map((check, index) => (
                         <li key={check} className="flex gap-3">
                           <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
@@ -1564,18 +1701,20 @@ ${chatText}
       )}
 
       {qualityCheck && (
-        <section className="mt-5 rounded-2xl border border-slate-800 bg-slate-900/80 p-5">
-          <p className="text-sm font-semibold uppercase tracking-wide text-blue-400">
+        <section className="mt-5 rounded-2xl border border-slate-200 bg-white p-5 transition-colors dark:border-slate-800 dark:bg-slate-900/80">
+          <p className="text-sm font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-400">
             Qualitätsprüfung
           </p>
 
-          <p className="mt-2 text-slate-300">{qualityCheck}</p>
+          <p className="mt-2 text-slate-700 dark:text-slate-300">
+            {qualityCheck}
+          </p>
         </section>
       )}
 
       {messages.length > 0 && (
-        <section className="mt-8 space-y-5 rounded-3xl border border-slate-800 bg-slate-900/80 p-8 shadow-2xl shadow-blue-950/30">
-          <p className="text-sm font-semibold uppercase tracking-wide text-blue-400">
+        <section className="mt-8 space-y-5 rounded-3xl border border-slate-200 bg-white p-8 shadow-2xl shadow-slate-200/60 transition-colors dark:border-slate-800 dark:bg-slate-900/80 dark:shadow-blue-950/30">
+          <p className="text-sm font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-400">
             Diagnoseverlauf
           </p>
 
@@ -1591,7 +1730,7 @@ ${chatText}
               className={
                 message.role === "user"
                   ? "ml-auto max-w-3xl rounded-2xl bg-blue-600 px-5 py-4 text-white"
-                  : "mr-auto max-w-4xl scroll-mt-28 rounded-2xl border border-slate-800 bg-slate-950/70 px-5 py-4 text-slate-300"
+                  : "mr-auto max-w-4xl scroll-mt-28 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-slate-700 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-300"
               }
             >
               <div className="mb-2 flex items-center justify-between gap-4">
@@ -1601,15 +1740,16 @@ ${chatText}
 
                 {message.role === "assistant" && (
                   <button
+                    type="button"
                     onClick={() => copySingleMessage(message.content, index)}
-                    className="rounded-lg border border-slate-700 px-3 py-1 text-xs font-semibold text-slate-400 transition hover:border-blue-500 hover:text-blue-300"
+                    className="rounded-lg border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
                   >
-                    {copiedMessageIndex === index ? "Kopiert" : "Antwort kopieren"}
+                    {copiedMessageIndex === index ? "Kopiert" : "Kopieren"}
                   </button>
                 )}
               </div>
 
-              <div className="whitespace-pre-wrap leading-8">
+              <div className="whitespace-pre-wrap leading-7">
                 {message.content}
               </div>
             </div>
@@ -1618,18 +1758,12 @@ ${chatText}
           {loading && (
             <div
               ref={loadingMessageRef}
-              className="mr-auto max-w-4xl rounded-2xl border border-blue-500/30 bg-blue-500/10 px-5 py-4 text-blue-300"
+              className="mr-auto max-w-4xl rounded-2xl border border-blue-500/30 bg-blue-500/10 px-5 py-4 text-blue-700 dark:text-blue-300"
             >
-              DiagnoseHUB analysiert...
+              DiagnoseHUB analysiert den Fall...
             </div>
           )}
         </section>
-      )}
-
-      {error && (
-        <div className="mt-6 rounded-xl border border-red-500/30 bg-red-500/10 px-6 py-4 text-red-300">
-          {error}
-        </div>
       )}
     </div>
   );

@@ -115,7 +115,7 @@ export default function LearningQuizClient() {
   const [loading, setLoading] = useState(false);
   const [checkingQuestionId, setCheckingQuestionId] = useState("");
   const [error, setError] = useState("");
-
+const [debugRunId, setDebugRunId] = useState("");
   const answeredCount = Object.keys(answerResults).length;
 
   const correctCount = Object.values(answerResults).filter(

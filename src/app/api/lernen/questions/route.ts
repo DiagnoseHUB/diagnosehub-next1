@@ -1,3 +1,4 @@
+import { randomInt } from "crypto";
 import { NextResponse } from "next/server";
 import { isValidUserPlan, type UserPlan } from "@/config/plans";
 import { loadPublishedLearningQuestions } from "@/lib/supabase/learningQuestionStorage";
@@ -23,6 +24,9 @@ const VALID_QUESTION_TYPES: LearningQuestionType[] = [
   "text",
 ];
 
+const MAX_PUBLIC_LIMIT = 100;
+const INTERNAL_POOL_LIMIT = 100;
+
 function isLearningDifficulty(value: unknown): value is LearningDifficulty {
   return (
     typeof value === "string" &&
@@ -44,7 +48,7 @@ function normalizeLimit(value: unknown) {
     return 20;
   }
 
-  return Math.min(Math.max(Math.round(numericValue), 1), 100);
+  return Math.min(Math.max(Math.round(numericValue), 1), MAX_PUBLIC_LIMIT);
 }
 
 function normalizeStringList(value: string | null) {
@@ -58,6 +62,21 @@ function normalizeStringList(value: string | null) {
     .filter(Boolean);
 }
 
+function shuffleArray<T>(items: T[]): T[] {
+  const shuffledItems = [...items];
+
+  for (let index = shuffledItems.length - 1; index > 0; index--) {
+    const randomIndex = randomInt(index + 1);
+
+    [shuffledItems[index], shuffledItems[randomIndex]] = [
+      shuffledItems[randomIndex],
+      shuffledItems[index],
+    ];
+  }
+
+  return shuffledItems;
+}
+
 function sanitizeQuestion(question: LearningQuestion) {
   return {
     id: question.id,
@@ -69,7 +88,16 @@ function sanitizeQuestion(question: LearningQuestion) {
     questionType: question.questionType,
     difficulty: question.difficulty,
     requiredPlan: question.requiredPlan,
+
+    /*
+      Wichtig:
+      Antworten hier NICHT mischen.
+
+      Deine Antwortprüfung arbeitet mit den ursprünglichen Antwort-Indexen.
+      Antworten müssen im Client gemischt werden, während originalIndex erhalten bleibt.
+    */
     answers: question.answers,
+
     examArea: question.examArea,
     competenceArea: question.competenceArea,
     tags: question.tags,
@@ -100,7 +128,21 @@ export async function GET(request: Request) {
       ? requestedQuestionType
       : undefined;
 
-    const questions = await loadPublishedLearningQuestions({
+    /*
+      Das ist die Anzahl, die der Nutzer im Quiz sehen will:
+      z. B. 10, 20, 50 oder 100.
+    */
+    const requestedLimit = normalizeLimit(searchParams.get("limit"));
+
+    /*
+      Wichtig:
+      Wir laden intern mehr Fragen als angezeigt werden sollen.
+      Danach mischen wir serverseitig und schneiden erst dann auf requestedLimit.
+      Dadurch kommen nicht immer nur die ersten 10/20 Fragen.
+    */
+    const internalFetchLimit = Math.max(requestedLimit, INTERNAL_POOL_LIMIT);
+
+    const questionPool = await loadPublishedLearningQuestions({
       userPlan,
       categorySlug: searchParams.get("categorySlug") || undefined,
       moduleSlug: searchParams.get("moduleSlug") || undefined,
@@ -111,13 +153,33 @@ export async function GET(request: Request) {
       faultCodes: normalizeStringList(searchParams.get("faultCodes")),
       parts: normalizeStringList(searchParams.get("parts")),
       systems: normalizeStringList(searchParams.get("systems")),
-      limit: normalizeLimit(searchParams.get("limit")),
+      limit: internalFetchLimit,
     });
 
-    return NextResponse.json({
-      questions: questions.map(sanitizeQuestion),
-      count: questions.length,
-    });
+    const shuffledQuestions = shuffleArray(questionPool);
+    const selectedQuestions = shuffledQuestions.slice(0, requestedLimit);
+
+    return NextResponse.json(
+      {
+        questions: selectedQuestions.map(sanitizeQuestion),
+
+        /*
+          count = Fragenpool, aus dem zufällig gewählt wurde.
+          returnedCount = Anzahl, die wirklich angezeigt wird.
+          debugRunId = sichtbarer Kontrollwert zum Testen, ob die Route neu läuft.
+        */
+        count: questionPool.length,
+        returnedCount: selectedQuestions.length,
+        debugRunId: `${Date.now()}-${randomInt(1_000_000)}`,
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
+      }
+    );
   } catch (error) {
     console.error("Lernfragen konnten nicht geladen werden:", error);
 
@@ -128,7 +190,14 @@ export async function GET(request: Request) {
             ? error.message
             : "Lernfragen konnten nicht geladen werden.",
       },
-      { status: 500 }
+      {
+        status: 500,
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
+      }
     );
   }
 }

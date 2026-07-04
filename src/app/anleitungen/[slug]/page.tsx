@@ -2,12 +2,20 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import Header from "@/components/Header";
 import PrintButton from "../../../components/PrintButton";
+import TrainingMode from "@/components/TrainingMode";
 import { getInstructionBySlug, instructions } from "../../../data/instructions";
 import type { InstructionGuide } from "../../../types/instruction";
 import { loadSavedInstructionGuideBySlug } from "@/lib/supabase/instructionGuideStorage";
+import type { RawTrainingQuestion } from "@/lib/trainingShuffle";
 
 type InstructionDetailPageProps = {
   params: Promise<{ slug: string }>;
+};
+
+type InstructionWithTraining = InstructionGuide & {
+  trainingQuestions?: RawTrainingQuestion[];
+  questions?: RawTrainingQuestion[];
+  quizQuestions?: RawTrainingQuestion[];
 };
 
 export function generateStaticParams() {
@@ -32,6 +40,35 @@ async function getInstruction(slug: string): Promise<InstructionGuide | null> {
   }
 }
 
+function getTrainingQuestions(
+  instruction: InstructionGuide
+): RawTrainingQuestion[] {
+  const instructionWithTraining = instruction as InstructionWithTraining;
+
+  if (
+    Array.isArray(instructionWithTraining.trainingQuestions) &&
+    instructionWithTraining.trainingQuestions.length > 0
+  ) {
+    return instructionWithTraining.trainingQuestions;
+  }
+
+  if (
+    Array.isArray(instructionWithTraining.questions) &&
+    instructionWithTraining.questions.length > 0
+  ) {
+    return instructionWithTraining.questions;
+  }
+
+  if (
+    Array.isArray(instructionWithTraining.quizQuestions) &&
+    instructionWithTraining.quizQuestions.length > 0
+  ) {
+    return instructionWithTraining.quizQuestions;
+  }
+
+  return [];
+}
+
 export default async function InstructionDetailPage({
   params,
 }: InstructionDetailPageProps) {
@@ -41,6 +78,8 @@ export default async function InstructionDetailPage({
   if (!instruction) {
     notFound();
   }
+
+  const trainingQuestions = getTrainingQuestions(instruction);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-950 transition-colors dark:bg-slate-950 dark:text-slate-100">
@@ -166,6 +205,13 @@ export default async function InstructionDetailPage({
               </p>
             </section>
           )}
+
+          <section className="mt-6 print:hidden">
+            <TrainingMode
+              title={`Training: ${instruction.title}`}
+              questions={trainingQuestions}
+            />
+          </section>
 
           <footer className="mt-8 rounded-2xl border border-yellow-300 bg-yellow-50 p-5 text-sm leading-6 text-yellow-950 dark:border-yellow-700/60 dark:bg-yellow-950/40 dark:text-yellow-100">
             <strong>Hinweis:</strong> Diese Anleitung ersetzt keine

@@ -159,13 +159,13 @@ const stopWords = new Set([
   "ersetzen",
   "reparieren",
   "machen",
-  "durchfuehren",
+  "durchführen",
   "durchführen",
   "am",
   "an",
   "bei",
   "mit",
-  "fuer",
+  "für",
   "für",
   "der",
   "die",
@@ -193,29 +193,22 @@ const stopWords = new Set([
 
 const synonymMap: Record<string, string> = {
   oel: "oel",
-  öl: "oel",
 
   motoroel: "oelwechsel",
-  motoröl: "oelwechsel",
   oelwechsel: "oelwechsel",
-  ölwechsel: "oelwechsel",
   oelservice: "oelwechsel",
-  ölservice: "oelwechsel",
   motorservice: "oelwechsel",
   serviceoel: "oelwechsel",
 
   oelfilter: "oelfilter",
-  ölfilter: "oelfilter",
 
   radwechsel: "reifenwechsel",
   raederwechsel: "reifenwechsel",
-  räderwechsel: "reifenwechsel",
   reifenwechsel: "reifenwechsel",
   sommerreifen: "reifenwechsel",
   winterreifen: "reifenwechsel",
   rad: "reifen",
   raeder: "reifen",
-  räder: "reifen",
 
   steuertrieb: "steuerkette",
   kettenwechsel: "steuerkette",
@@ -231,14 +224,12 @@ const synonymMap: Record<string, string> = {
   bremsen: "bremse",
   bremsbelag: "bremse",
   bremsbelaege: "bremse",
-  bremsbeläge: "bremse",
   bremsscheibe: "bremse",
   bremsscheiben: "bremse",
 
   klima: "klimaanlage",
   klimaanlage: "klimaanlage",
   kaeltemittel: "klimaanlage",
-  kältemittel: "klimaanlage",
   kompressor: "klimaanlage",
 
   turbo: "turbolader",
@@ -267,9 +258,9 @@ const workTypeTokens = new Set([
 function normalizeSearchText(value: string) {
   return value
     .toLowerCase()
-    .replaceAll("ä", "ae")
-    .replaceAll("ö", "oe")
-    .replaceAll("ü", "ue")
+    .replaceAll("ae", "ae")
+    .replaceAll("oe", "oe")
+    .replaceAll("ue", "ue")
     .replaceAll("ß", "ss")
     .replace(/[^a-z0-9]+/g, " ")
     .replace(/\s+/g, " ")

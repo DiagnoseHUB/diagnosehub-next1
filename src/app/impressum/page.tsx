@@ -24,7 +24,7 @@ export default function ImpressumPage() {
           <div className="mt-8 space-y-8 leading-8 text-slate-300">
             <section>
               <h2 className="text-2xl font-bold text-white">
-                Angaben gemäß § 5 DDG
+                Angaben gemaeß § 5 DDG
               </h2>
 
               <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-950/70 p-5">
@@ -60,7 +60,7 @@ export default function ImpressumPage() {
 
               <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-950/70 p-5">
                 <p>
-                  Kleinunternehmer gemäß § 19 UStG. Eine Umsatzsteuer-ID ist
+                  Kleinunternehmer gemaeß § 19 UStG. Eine Umsatzsteuer-ID ist
                   derzeit nicht vorhanden.
                 </p>
               </div>
@@ -86,7 +86,7 @@ export default function ImpressumPage() {
 
               <p className="mt-4">
                 DiagnoseHUB befindet sich aktuell in einer technischen
-                Beta-Phase. Die Plattform dient der digitalen Unterstützung bei
+                Beta-Phase. Die Plattform dient der digitalen Unterstuetzung bei
                 Kfz-Diagnose, Dokumentation und Lernfunktionen.
               </p>
 
@@ -106,9 +106,9 @@ export default function ImpressumPage() {
               </h2>
 
               <p className="mt-4">
-                Die Inhalte dieser Website werden mit größtmöglicher Sorgfalt
-                erstellt. Für Richtigkeit, Vollständigkeit und Aktualität der
-                Inhalte kann jedoch keine Gewähr übernommen werden.
+                Die Inhalte dieser Website werden mit groeßtmöglicher Sorgfalt
+                erstellt. Für Richtigkeit, Vollständigkeit und Aktualitaet der
+                Inhalte kann jedoch keine Gewähr uebernommen werden.
               </p>
             </section>
 
@@ -130,8 +130,8 @@ export default function ImpressumPage() {
 
               <p className="mt-4">
                 Die durch den Seitenbetreiber erstellten Inhalte und Werke auf
-                dieser Website unterliegen dem deutschen Urheberrecht. Beiträge
-                Dritter werden als solche gekennzeichnet. Eine Vervielfältigung,
+                dieser Website unterliegen dem deutschen Urheberrecht. Beitraege
+                Dritter werden als solche gekennzeichnet. Eine Vervielfaeltigung,
                 Bearbeitung, Verbreitung oder sonstige Verwertung außerhalb der
                 Grenzen des Urheberrechts bedarf der vorherigen schriftlichen
                 Zustimmung des jeweiligen Rechteinhabers.

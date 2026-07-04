@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -26,7 +27,7 @@ export default function StripeSuccessStatus() {
       if (!sessionId) {
         setStatus("missing-session");
         setMessage(
-          "Die Zahlung war erfolgreich, aber es wurde keine Stripe-Session-ID übergeben."
+          "Die Zahlung war erfolgreich, aber es wurde keine Stripe-Session-ID uebergeben."
         );
         return;
       }
@@ -69,7 +70,9 @@ export default function StripeSuccessStatus() {
 
         setStatus("success");
         setMessage(
-          "Dein Pro-Zugang wurde erfolgreich aktiviert. Du kannst DiagnoseHUB jetzt mit Pro-Funktionen nutzen."
+          data.plan === "service_reminder"
+            ? "Deine Service-Erinnerung wurde erfolgreich aktiviert. Du kannst deine Fahrzeuge jetzt zentral verwalten."
+            : "Dein Pro-Zugang wurde erfolgreich aktiviert. Du kannst DiagnoseHUB jetzt mit Pro-Funktionen nutzen."
         );
       } catch (error) {
         console.error("Stripe Erfolgseite Fehler:", error);
@@ -105,7 +108,7 @@ export default function StripeSuccessStatus() {
             }
           >
             {isSuccess
-              ? "Pro aktiviert"
+              ? "Aktiviert"
               : isLoading
                 ? "Prüfung läuft"
                 : "Prüfung erforderlich"}
@@ -136,31 +139,31 @@ export default function StripeSuccessStatus() {
           {isMissingSession && (
             <div className="mt-6 rounded-2xl border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-800 dark:border-yellow-500/30 dark:bg-yellow-500/10 dark:text-yellow-300">
               Das passiert meistens, wenn noch ein alter Checkout-Link ohne
-              session_id verwendet wurde. Starte Pro erneut über die Preise-Seite.
+              session_id verwendet wurde. Starte Pro erneut ueber die Preise-Seite.
             </div>
           )}
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <a
+            <Link
               href="/#diagnose"
               className="rounded-2xl bg-blue-600 px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-blue-700"
             >
               Zur KI-Diagnose
-            </a>
+            </Link>
 
-            <a
+            <Link
               href="/preise"
               className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3 text-center text-sm font-semibold text-slate-800 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-blue-500 dark:hover:bg-blue-500/10 dark:hover:text-blue-300"
             >
               Zur Preise-Seite
-            </a>
+            </Link>
 
-            <a
+            <Link
               href="/login"
               className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-center text-sm font-semibold text-slate-800 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-blue-500 dark:hover:bg-blue-500/10 dark:hover:text-blue-300"
             >
               Account ansehen
-            </a>
+            </Link>
           </div>
         </section>
       </div>

@@ -11,7 +11,7 @@ const productLinks = [
   },
   {
     label: "Prüfprotokoll",
-    href: "/pruefprotokoll",
+    href: "/prüfprotokoll",
   },
   {
     label: "Premium vormerken",

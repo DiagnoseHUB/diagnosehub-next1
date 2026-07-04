@@ -13,6 +13,14 @@ import type {
   LearningQuizQuestion,
   RelatedLearningModule,
 } from "@/types/learning";
+import {
+  LOCAL_LEARNING_CATEGORIES,
+  LOCAL_LEARNING_MODULES,
+  getLocalCategoryById,
+  getLocalLessonBySlug,
+  getLocalLessonsForModule,
+  getLocalModuleBySlug,
+} from "@/data/localLearningCatalog";
 import { createSupabaseAdminClient } from "./supabaseAdmin";
 
 type LearningCategoryDatabaseRow = {
@@ -283,6 +291,113 @@ function convertProgressRow(row: LearningProgressDatabaseRow): LearningProgress 
   };
 }
 
+function applyModuleAccess(
+  module: LearningModule,
+  userPlan: UserPlan = "free"
+): LearningModule {
+  return {
+    ...module,
+    isLocked: !canAccessPlan(userPlan, module.requiredPlan),
+  };
+}
+
+function applyLessonAccess(
+  lesson: LearningLesson,
+  userPlan: UserPlan = "free",
+  includeProtectedContent = true
+): LearningLesson {
+  const isLocked = !canAccessPlan(userPlan, lesson.requiredPlan);
+
+  return {
+    ...lesson,
+    contentBlocks:
+      isLocked && !includeProtectedContent ? [] : lesson.contentBlocks,
+    checklist: isLocked && !includeProtectedContent ? [] : lesson.checklist,
+    quizQuestions:
+      isLocked && !includeProtectedContent ? [] : lesson.quizQuestions,
+    isLocked,
+  };
+}
+
+function mergeBySlug<T extends { slug: string; sortOrder: number; title: string }>(
+  primaryItems: T[],
+  fallbackItems: T[]
+) {
+  const knownSlugs = new Set(primaryItems.map((item) => item.slug));
+  const mergedItems = [
+    ...primaryItems,
+    ...fallbackItems.filter((item) => !knownSlugs.has(item.slug)),
+  ];
+
+  return mergedItems.sort(
+    (a, b) => a.sortOrder - b.sortOrder || a.title.localeCompare(b.title)
+  );
+}
+
+function buildLocalModuleDetail(
+  slug: string,
+  userPlan: UserPlan = "free"
+): LearningModuleDetail | null {
+  const learningModule = getLocalModuleBySlug(slug);
+
+  if (!learningModule) {
+    return null;
+  }
+
+  const category = getLocalCategoryById(learningModule.categoryId);
+
+  if (!category) {
+    return null;
+  }
+
+  const moduleWithAccess = applyModuleAccess(learningModule, userPlan);
+  const lessons = getLocalLessonsForModule(learningModule.id).map((lesson) =>
+    applyLessonAccess(lesson, userPlan, false)
+  );
+
+  return {
+    category,
+    module: moduleWithAccess,
+    lessons,
+    hasAccess: !moduleWithAccess.isLocked,
+  };
+}
+
+function buildLocalLessonDetail(
+  slug: string,
+  userPlan: UserPlan = "free"
+): LearningLessonDetail | null {
+  const lesson = getLocalLessonBySlug(slug);
+
+  if (!lesson) {
+    return null;
+  }
+
+  const learningModule = LOCAL_LEARNING_MODULES.find(
+    (entry) => entry.id === lesson.moduleId
+  );
+
+  if (!learningModule) {
+    return null;
+  }
+
+  const category = getLocalCategoryById(learningModule.categoryId);
+
+  if (!category) {
+    return null;
+  }
+
+  const moduleWithAccess = applyModuleAccess(learningModule, userPlan);
+  const lessonWithAccess = applyLessonAccess(lesson, userPlan, false);
+
+  return {
+    category,
+    module: moduleWithAccess,
+    lesson: lessonWithAccess,
+    hasAccess: !moduleWithAccess.isLocked && !lessonWithAccess.isLocked,
+  };
+}
+
 export async function loadLearningCategories() {
   const supabase = createSupabaseAdminClient();
 
@@ -297,7 +412,11 @@ export async function loadLearningCategories() {
     throw new Error(`Lernkategorien konnten nicht geladen werden: ${error.message}`);
   }
 
-  return ((data || []) as LearningCategoryDatabaseRow[]).map(convertCategoryRow);
+  const databaseCategories = ((data || []) as LearningCategoryDatabaseRow[]).map(
+    convertCategoryRow
+  );
+
+  return mergeBySlug(databaseCategories, LOCAL_LEARNING_CATEGORIES);
 }
 
 export async function loadPublishedLearningModules(
@@ -317,9 +436,14 @@ export async function loadPublishedLearningModules(
     throw new Error(`Lernmodule konnten nicht geladen werden: ${error.message}`);
   }
 
-  return ((data || []) as LearningModuleDatabaseRow[]).map((row) =>
+  const databaseModules = ((data || []) as LearningModuleDatabaseRow[]).map((row) =>
     convertModuleRow(row, userPlan)
   );
+  const localModules = LOCAL_LEARNING_MODULES.map((module) =>
+    applyModuleAccess(module, userPlan)
+  );
+
+  return mergeBySlug(databaseModules, localModules);
 }
 
 export async function loadLearningOverview(
@@ -355,10 +479,10 @@ export async function loadLearningModuleBySlug(
   }
 
   if (!moduleData) {
-    return null;
+    return buildLocalModuleDetail(slug, userPlan);
   }
 
-  const module = convertModuleRow(
+  const learningModule = convertModuleRow(
     moduleData as LearningModuleDatabaseRow,
     userPlan
   );
@@ -366,7 +490,7 @@ export async function loadLearningModuleBySlug(
   const { data: categoryData, error: categoryError } = await supabase
     .from("learning_categories")
     .select("*")
-    .eq("id", module.categoryId)
+    .eq("id", learningModule.categoryId)
     .eq("is_active", true)
     .maybeSingle();
 
@@ -383,7 +507,7 @@ export async function loadLearningModuleBySlug(
   const { data: lessonsData, error: lessonsError } = await supabase
     .from("learning_lessons")
     .select("*")
-    .eq("module_id", module.id)
+    .eq("module_id", learningModule.id)
     .eq("is_published", true)
     .not("published_at", "is", null)
     .order("sort_order", { ascending: true })
@@ -399,9 +523,9 @@ export async function loadLearningModuleBySlug(
 
   return {
     category: convertCategoryRow(categoryData as LearningCategoryDatabaseRow),
-    module,
+    module: learningModule,
     lessons,
-    hasAccess: !module.isLocked,
+    hasAccess: !learningModule.isLocked,
   };
 }
 
@@ -424,7 +548,7 @@ export async function loadLearningLessonBySlug(
   }
 
   if (!lessonData) {
-    return null;
+    return buildLocalLessonDetail(slug, userPlan);
   }
 
   const lessonRow = lessonData as LearningLessonDatabaseRow;
@@ -445,7 +569,7 @@ export async function loadLearningLessonBySlug(
     return null;
   }
 
-  const module = convertModuleRow(
+  const learningModule = convertModuleRow(
     moduleData as LearningModuleDatabaseRow,
     userPlan
   );
@@ -453,7 +577,7 @@ export async function loadLearningLessonBySlug(
   const { data: categoryData, error: categoryError } = await supabase
     .from("learning_categories")
     .select("*")
-    .eq("id", module.categoryId)
+    .eq("id", learningModule.categoryId)
     .eq("is_active", true)
     .maybeSingle();
 
@@ -468,11 +592,11 @@ export async function loadLearningLessonBySlug(
   }
 
   const lesson = convertLessonRow(lessonRow, userPlan, false);
-  const hasAccess = !module.isLocked && !lesson.isLocked;
+  const hasAccess = !learningModule.isLocked && !lesson.isLocked;
 
   return {
     category: convertCategoryRow(categoryData as LearningCategoryDatabaseRow),
-    module,
+    module: learningModule,
     lesson,
     hasAccess,
   };

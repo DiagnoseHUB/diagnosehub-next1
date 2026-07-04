@@ -93,7 +93,7 @@ function sanitizeQuestion(question: LearningQuestion) {
       Wichtig:
       Antworten hier NICHT mischen.
 
-      Deine Antwortprüfung arbeitet mit den ursprünglichen Antwort-Indexen.
+      Deine Antwortprüfung arbeitet mit den urspruenglichen Antwort-Indexen.
       Antworten müssen im Client gemischt werden, während originalIndex erhalten bleibt.
     */
     answers: question.answers,
@@ -164,7 +164,7 @@ export async function GET(request: Request) {
         questions: selectedQuestions.map(sanitizeQuestion),
 
         /*
-          count = Fragenpool, aus dem zufällig gewählt wurde.
+          count = Fragenpool, aus dem zufaellig gewählt wurde.
           returnedCount = Anzahl, die wirklich angezeigt wird.
           debugRunId = sichtbarer Kontrollwert zum Testen, ob die Route neu läuft.
         */

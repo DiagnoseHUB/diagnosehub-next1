@@ -784,7 +784,7 @@ export default function DashboardPage() {
     );
 
     if (target === "protocol") {
-      window.location.href = "/pruefprotokoll";
+      window.location.href = "/prüfprotokoll";
       return;
     }
 
@@ -880,7 +880,7 @@ export default function DashboardPage() {
             </h1>
 
             <p className="mt-4 max-w-3xl leading-8 text-slate-400">
-              Übersicht über Werkstattprofil, Diagnosefälle, Nutzungszähler und
+              Uebersicht ueber Werkstattprofil, Diagnosefälle, Nutzungszähler und
               Premium-Vormerkungen. Dieses Dashboard ist nur mit aktivem
               Supabase-Login sichtbar.
             </p>
@@ -934,7 +934,7 @@ export default function DashboardPage() {
           <DashboardCard
             title="Diagnosen heute"
             value={`${normalizedUsage.count}/${currentDailyLimit}`}
-            description={`${remainingDiagnoses} Diagnosen heute noch verfügbar.`}
+            description={`${remainingDiagnoses} Diagnosen heute noch verfuegbar.`}
           >
             <SourceBadge source={usageSource} />
           </DashboardCard>

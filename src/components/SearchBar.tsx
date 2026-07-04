@@ -9,6 +9,7 @@ import {
 } from "react";
 import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 import RelatedLearningPanel from "@/components/RelatedLearningPanel";
+import TechnicalSchemaImage from "@/components/TechnicalSchemaImage";
 import { createClient } from "@/lib/supabase/client";
 import {
   deleteDiagnosisCaseFromSupabase,
@@ -106,7 +107,7 @@ function buildDynamicQuickQuestions(
   if (engineContext?.engineType === "Benziner") {
     questions.push(
       "Fuel Trims prüfen?",
-      "Zündaussetzer je Zylinder prüfen?",
+      "Zuendaussetzer je Zylinder prüfen?",
       "Falschluft prüfen?",
       "Kraftstoffdruck prüfen?",
       "Ladedruck Soll/Ist prüfen?",
@@ -171,10 +172,10 @@ function buildDynamicQuickQuestions(
 
     if (system.includes("verbrennung") || system.includes("laufunruhe")) {
       questions.push(
-        "Aussetzerzähler prüfen?",
+        "Aussetzerzähller prüfen?",
         "Zylinder eingrenzen?",
         "Kompression prüfen?",
-        "Injektor/Zündung quer prüfen?",
+        "Injektor/Zuendung quer prüfen?",
       );
     }
   }
@@ -398,6 +399,21 @@ function getCaseTitle(messages: ChatMessage[]) {
   }
 
   return `${cleanTitle.slice(0, 70)}...`;
+}
+
+function getSchemaSubjectForAssistantMessage(
+  messages: ChatMessage[],
+  assistantIndex: number,
+) {
+  for (let index = assistantIndex - 1; index >= 0; index -= 1) {
+    if (messages[index].role === "user") {
+      const content = messages[index].content.replace(/\s+/g, " ").trim();
+
+      return content.length > 120 ? `${content.slice(0, 120)}...` : content;
+    }
+  }
+
+  return getCaseTitle(messages);
 }
 
 function formatDateTime(value: string) {
@@ -797,7 +813,7 @@ export default function SearchBar() {
       );
       setCaseStorageSource("local");
       setError(
-        "Supabase-Fallhistorie konnte nicht geladen werden. Lokale Fälle bleiben verfügbar.",
+        "Supabase-Fallhistorie konnte nicht geladen werden. Lokale Fälle bleiben verfuegbar.",
       );
       loadLocalSavedCasesIntoState();
     } finally {
@@ -836,7 +852,7 @@ export default function SearchBar() {
   function changeUserPlan(nextPlan: UserPlan) {
     if (user) {
       setError(
-        "Bei aktivem Supabase-Login wird der Plan über Login/Profil gespeichert. Die Schnellumschaltung ist nur für lokale Tests ohne Login aktiv.",
+        "Bei aktivem Supabase-Login wird der Plan ueber Login/Profil gespeichert. Die Schnellumschaltung ist nur für lokale Tests ohne Login aktiv.",
       );
       return;
     }
@@ -948,8 +964,8 @@ Regeln für diese Antwort:
 - Nicht schreiben "Zugang schaffen", sondern konkrete typische Demontage nennen.
 - Konkrete Verkleidungen, Abdeckungen, Stecker, Halter, Befestigungen und Richtung/Lage nennen, wenn sinnvoll.
 - Linksgewinde nennen, wenn möglich oder typisch.
-- Schrauben, Exzenter, Einstellpunkte oder Markierungen nennen, die nicht gelöst oder nicht verstellt werden dürfen.
-- Keine erfundenen Drehmomente, Füllmengen oder Herstellersollwerte.
+- Schrauben, Exzenter, Einstellpunkte oder Markierungen nennen, die nicht geloest oder nicht verstellt werden dürfen.
+- Keine erfundenen Drehmomente, Fuellmengen oder Herstellersollwerte.
 - Daten sichern nur nennen, wenn Steuergerät/Codierung/Programmierung/Anlernung betroffen ist.
 - Batterie abklemmen nur nennen, wenn technisch notwendig.
 
@@ -1275,7 +1291,7 @@ ${faultCode.suggestedChecks.map((check) => `- ${check}`).join("\n")}`;
 
     const causingPartText = causingPart.trim()
       ? `Schadensverursachendes Teil:\n${causingPart.trim()}`
-      : "Schadensverursachendes Teil:\nüber Eingabe/Fallverlauf";
+      : "Schadensverursachendes Teil:\nueber Eingabe/Fallverlauf";
 
     const chatText = messages
       .map((message) => {
@@ -1363,7 +1379,7 @@ ${chatText}
           onKeyDown={handleKeyDown}
           placeholder={
             messages.length === 0
-              ? "Diagnose oder Anleitung eingeben, z. B. VW Passat P0299 Leistungsverlust oder Qashqai Gebläsemotor ausbauen..."
+              ? "Diagnose oder Anleitung eingeben, z. B. VW Passat P0299 Leistungsverlust oder Qashqai Geblaesemotor ausbauen..."
               : "Folgefrage, Messwertfrage oder Anleitung eingeben, z. B. Ladedruck Sollwert? oder Ausbauanleitung AGR-Ventil..."
           }
           rows={4}
@@ -1431,7 +1447,7 @@ ${chatText}
               </div>
 
               <p className="mt-2 text-sm text-slate-500">
-                {currentPlan.description} Noch verfügbar:{" "}
+                {currentPlan.description} Noch verfuegbar:{" "}
                 <span className="font-bold text-slate-300">
                   {remainingDiagnoses}
                 </span>{" "}
@@ -1631,7 +1647,21 @@ ${chatText}
               </div>
 
               {message.role === "assistant" ? (
-                <AssistantAnswer content={message.content} />
+                <>
+                  <AssistantAnswer content={message.content} />
+
+                  <TechnicalSchemaImage
+                    context="diagnosis"
+                    title="Diagnose-Schema"
+                    subject={getSchemaSubjectForAssistantMessage(
+                      messages,
+                      index,
+                    )}
+                    details={message.content}
+                    autoGenerate={index === latestAssistantMessageIndex}
+                    className="mt-5"
+                  />
+                </>
               ) : (
                 <div className="whitespace-pre-wrap leading-8">
                   {message.content}

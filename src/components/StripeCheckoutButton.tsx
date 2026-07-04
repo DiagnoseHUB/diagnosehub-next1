@@ -6,11 +6,13 @@ import { createClient } from "@/lib/supabase/client";
 type StripeCheckoutButtonProps = {
   className?: string;
   children?: React.ReactNode;
+  plan?: "pro" | "service_reminder";
 };
 
 export default function StripeCheckoutButton({
   className = "",
   children = "Pro aktivieren",
+  plan = "pro",
 }: StripeCheckoutButtonProps) {
   const supabase = createClient();
 
@@ -43,7 +45,7 @@ export default function StripeCheckoutButton({
           Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
-          plan: "pro",
+          plan,
         }),
       });
 

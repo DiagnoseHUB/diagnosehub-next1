@@ -11,6 +11,7 @@ import {
 import { useSearchParams } from "next/navigation";
 import Header from "@/components/Header";
 import InstructionCard from "../../components/InstructionCard";
+import TechnicalSchemaImage from "@/components/TechnicalSchemaImage";
 import { instructions } from "../../data/instructions";
 import type {
   InstructionCategory,
@@ -135,7 +136,7 @@ async function pollGeneratedInstruction(
   }
 
   throw new Error(
-    "Die KI-Anleitung dauert länger als 10 Minuten. Bitte die Anfrage etwas kürzer formulieren oder später erneut versuchen."
+    "Die KI-Anleitung dauert laenger als 10 Minuten. Bitte die Anfrage etwas kuerzer formulieren oder später erneut versuchen."
   );
 }
 
@@ -428,7 +429,7 @@ function InstructionsPageContent() {
           </p>
 
           <h1 className="mt-3 text-3xl font-black tracking-tight text-slate-950 dark:text-slate-100 sm:text-4xl">
-            Reparatur- und Diagnoseabläufe
+            Reparatur- und Diagnoseablaeufe
           </h1>
 
           <p className="mt-4 max-w-3xl text-base leading-7 text-slate-700 dark:text-slate-300">
@@ -459,7 +460,7 @@ function InstructionsPageContent() {
                   setSearchTerm(event.target.value);
                   resetGeneratedInstruction();
                 }}
-                placeholder="z. B. Golf VII GTI Ölservice..."
+                placeholder="z. B. Golf VII GTI Oelservice..."
                 className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-950 outline-none ring-blue-500 transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500"
               />
             </div>
@@ -575,8 +576,8 @@ function InstructionsPageContent() {
               </p>
 
               <p className="mt-2 text-sm leading-6 text-yellow-950 dark:text-yellow-100">
-                Über den blauen Button sucht DiagnoseHUB zusätzlich nach
-                ähnlichen gespeicherten Anleitungen. Falls nichts Passendes
+                Ueber den blauen Button sucht DiagnoseHUB zusätzlich nach
+                aehnlichen gespeicherten Anleitungen. Falls nichts Passendes
                 gefunden wird, wird automatisch eine neue KI-Anleitung erstellt
                 und in Supabase gespeichert.
               </p>
@@ -620,7 +621,7 @@ function InstructionsPageContent() {
             </h2>
             <p className="mt-2 text-sm text-slate-700 dark:text-slate-300">
               Suche nach Bauteil, Symptom, Fahrzeugmodell oder Fehlerbereich —
-              oder prüfe per blauem Button, ob eine ähnliche Anleitung existiert
+              oder prüfe per blauem Button, ob eine aehnliche Anleitung existiert
               oder neu erstellt werden muss.
             </p>
           </div>
@@ -704,6 +705,20 @@ function GeneratedInstructionPanel({
           </>
         )}
       </div>
+
+      <TechnicalSchemaImage
+        context="instruction"
+        title={instruction.title}
+        subject={instruction.title}
+        details={[
+          instruction.subtitle,
+          instruction.vehicleApplicability,
+          ...instruction.initialChecks,
+          ...instruction.steps.map((step) => step.title),
+          ...instruction.commonCauses,
+        ].join(" ")}
+        className="mb-6"
+      />
 
       <div className="grid gap-5 lg:grid-cols-2">
         <GeneratedBox title="Symptome" items={instruction.symptoms} />

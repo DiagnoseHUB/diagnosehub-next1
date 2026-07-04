@@ -8,6 +8,7 @@ import {
 export const runtime = "nodejs";
 
 type UserPlan = "free" | "pro";
+type CheckoutPlan = "pro" | "service_reminder";
 
 type StripeObject = Record<string, unknown>;
 
@@ -290,6 +291,10 @@ function getSessionSupabaseUserId(session: StripeCheckoutSession) {
   return null;
 }
 
+function getCheckoutPlan(session: StripeCheckoutSession): CheckoutPlan {
+  return session.metadata?.plan === "service_reminder" ? "service_reminder" : "pro";
+}
+
 async function retrieveStripeCheckoutSession(sessionId: string) {
   const stripeSecretKey = getRequiredEnv("STRIPE_SECRET_KEY");
 
@@ -397,13 +402,13 @@ function validatePaidCheckoutSession({
 
   if (!sessionUserId) {
     throw new Error(
-      "Diese Stripe-Zahlung enthält keine Supabase-User-ID. Bitte Checkout erneut über die Preise-Seite starten."
+      "Diese Stripe-Zahlung enthaelt keine Supabase-User-ID. Bitte Checkout erneut ueber die Preise-Seite starten."
     );
   }
 
   if (sessionUserId !== user.id) {
     throw new Error(
-      "Diese Stripe-Zahlung gehört nicht zum aktuell eingeloggten DiagnoseHUB-Account."
+      "Diese Stripe-Zahlung gehoert nicht zum aktuell eingeloggten DiagnoseHUB-Account."
     );
   }
 
@@ -450,6 +455,15 @@ export async function POST(request: NextRequest) {
     });
 
     const subscriptionStatus = getSubscriptionStatus(session);
+    const checkoutPlan = getCheckoutPlan(session);
+
+    if (checkoutPlan === "service_reminder") {
+      return NextResponse.json({
+        ok: true,
+        plan: checkoutPlan,
+        subscriptionStatus,
+      });
+    }
 
     await updateWorkshopProfile({
       supabaseUserId: user.id,

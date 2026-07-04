@@ -57,11 +57,13 @@ export default function ThemeToggle() {
   const [theme, setTheme] = useState<ThemeMode>("dark");
 
   useEffect(() => {
-    const initialTheme = getStoredTheme() ?? getSystemTheme();
+    const initialThemeTimer = window.setTimeout(() => {
+      const initialTheme = getStoredTheme() ?? getSystemTheme();
 
-    setTheme(initialTheme);
-    applyTheme(initialTheme);
-    setMounted(true);
+      setTheme(initialTheme);
+      applyTheme(initialTheme);
+      setMounted(true);
+    }, 0);
 
     function handleThemeChanged(event: Event) {
       const customEvent = event as CustomEvent<ThemeMode>;
@@ -105,6 +107,7 @@ export default function ThemeToggle() {
     mediaQuery.addEventListener("change", handleSystemThemeChange);
 
     return () => {
+      window.clearTimeout(initialThemeTimer);
       window.removeEventListener(THEME_CHANGE_EVENT, handleThemeChanged);
       window.removeEventListener("storage", handleStorageChange);
       mediaQuery.removeEventListener("change", handleSystemThemeChange);

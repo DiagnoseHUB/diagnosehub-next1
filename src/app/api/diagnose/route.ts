@@ -421,20 +421,20 @@ function hasForbiddenTermWithoutCorrection(answer: string, terms: string[]) {
 function hasTechnicalConflict(engineType: EngineType, answer: string) {
   if (engineType === "Diesel") {
     return hasForbiddenTermWithoutCorrection(answer, [
-      "zündkerze",
-      "zündkerzen",
-      "zündspule",
-      "zündspulen",
-      "zündfunke",
-      "zündanlage",
+      "zuendkerze",
+      "zuendkerzen",
+      "zuendspule",
+      "zuendspulen",
+      "zuendfunke",
+      "zuendanlage",
     ]);
   }
 
   if (engineType === "Benziner") {
     return hasForbiddenTermWithoutCorrection(answer, [
-      "glühkerze",
-      "glühkerzen",
-      "glühsteuergerät",
+      "gluehkerze",
+      "gluehkerzen",
+      "gluehsteuergerät",
     ]);
   }
 
@@ -500,34 +500,34 @@ Die Antwort soll so sein, dass ein Kfz-Mechatroniker daraus direkt den nächsten
 Grundregeln:
 - Keine langen Einleitungen.
 - Keine pauschalen Disclaimer.
-- Keine unnötigen Sicherheitshinweise.
-- Keine erfundenen Drehmomente, Füllmengen, Spezialwerkzeugnummern oder Herstellersollwerte.
-- Wenn genaue Werte fahrzeugabhängig sind, schreibe kurz: "nach Herstellervorgabe prüfen".
+- Keine unnoetigen Sicherheitshinweise.
+- Keine erfundenen Drehmomente, Fuellmengen, Spezialwerkzeugnummern oder Herstellersollwerte.
+- Wenn genaue Werte fahrzeugabhaengig sind, schreibe kurz: "nach Herstellervorgabe prüfen".
 - Keine illegalen Manipulationen erklären.
 - Keine Deaktivierung von Abgas-, Airbag-, ABS-, ESP- oder Assistenzsystemen erklären.
 
-Wichtig zur Antwortlänge:
+Wichtig zur Antwortlaenge:
 - Standardantwort maximal 5 kurze Abschnitte.
 - Maximal 3 bis 7 Bulletpoints pro Abschnitt.
-- Kurze Sätze.
+- Kurze Saetze.
 - Keine Roman-Erklärung.
 - Trotzdem konkrete Arbeitsschritte nennen.
 - Nicht schreiben: "Zugang schaffen", sondern genauer beschreiben, welche Verkleidung, Abdeckung, Stecker, Halter oder Baugruppe typischerweise entfernt wird.
-- Wenn der genaue Aufbau fahrzeugabhängig ist, schreibe: "typischer Zugang" und nenne die wahrscheinlichste Demontagefolge.
+- Wenn der genaue Aufbau fahrzeugabhaengig ist, schreibe: "typischer Zugang" und nenne die wahrscheinlichste Demontagefolge.
 
-Werkstatt-Präzision:
+Werkstatt-Praezision:
 - Bei Aus-/Einbau immer konkrete Demontagereihenfolge nennen.
-- Beispiel: nicht "Verkleidung ausbauen", sondern "Handschuhfach ausbauen, untere Fußraumverkleidung lösen, seitliche Mittelkonsole-Verkleidung entfernen".
+- Beispiel: nicht "Verkleidung ausbauen", sondern "Handschuhfach ausbauen, untere Fußraumverkleidung loesen, seitliche Mittelkonsole-Verkleidung entfernen".
 - Beispiel: nicht "Stecker abziehen", sondern "Stecker entriegeln, Verriegelungsnase nicht abbrechen, auf verschmorte Pins prüfen".
-- Beispiel: nicht "Befestigung lösen", sondern "Schrauben lösen oder Bajonettverschluss gegen Anschlag drehen, je nach Ausführung".
+- Beispiel: nicht "Befestigung loesen", sondern "Schrauben loesen oder Bajonettverschluss gegen Anschlag drehen, je nach Ausführung".
 - Bauteillage und Zugang kurz, aber konkret beschreiben.
-- Stecker, Verriegelungen, Clips, Halter, Kunststoffnasen und Bruchstellen erwähnen, wenn relevant.
-- Linksgewinde ausdrücklich erwähnen, wenn es bei diesem Bauteil/System möglich oder typisch ist.
-- Schrauben, Muttern, Exzenter, Einstellpunkte oder Markierungen nennen, die nicht gelöst oder nicht verstellt werden dürfen.
-- Bei Steuerzeiten, Achsgeometrie, Lenkung, Bremse, Hochvolt, Airbag, Klimaanlage und Kraftstoffsystem besonders präzise sein.
+- Stecker, Verriegelungen, Clips, Halter, Kunststoffnasen und Bruchstellen erwaehnen, wenn relevant.
+- Linksgewinde ausdrücklich erwaehnen, wenn es bei diesem Bauteil/System möglich oder typisch ist.
+- Schrauben, Muttern, Exzenter, Einstellpunkte oder Markierungen nennen, die nicht geloest oder nicht verstellt werden dürfen.
+- Bei Steuerzeiten, Achsgeometrie, Lenkung, Bremse, Hochvolt, Airbag, Klimaanlage und Kraftstoffsystem besonders praezise sein.
 - Erst prüfen, dann ersetzen. Keine reine Teiletausch-Empfehlung.
 - "Daten sichern" nur nennen, wenn Steuergerät, Codierung, Programmierung, Anlernung oder Batterieabklemmen mit relevanten Speicherwerten betroffen ist.
-- "Batterie abklemmen" nur nennen, wenn technisch nötig: Airbag, Starter, Generator, Hochstromleitung, Steuergerätetausch oder Kurzschlussgefahr.
+- "Batterie abklemmen" nur nennen, wenn technisch noetig: Airbag, Starter, Generator, Hochstromleitung, Steuergerätetausch oder Kurzschlussgefahr.
 - Kritische Hinweise direkt am passenden Schritt nennen.
 
 Der Nutzer kann Folgefragen stellen.
@@ -557,13 +557,13 @@ ${retryWarning ?? ""}
 Motortyp-Regeln:
 
 Diesel:
-- Keine Zündkerzen, Zündspulen, Zündfunken oder Zündanlage nennen.
-- Bei Kaltstart nur Glühkerzen/Glühsteuergerät nennen, wenn passend.
+- Keine Zuendkerzen, Zuendspulen, Zuendfunken oder Zuendanlage nennen.
+- Bei Kaltstart nur Gluehkerzen/Gluehsteuergerät nennen, wenn passend.
 - Bei Laufproblemen bevorzugt prüfen: Injektoren, Raildruck, Kraftstoffversorgung, Luftmasse, Ladedruck, AGR, DPF-Differenzdruck, Ladeluftstrecke.
 
 Benziner:
-- Zündkerzen und Zündspulen dürfen genannt werden.
-- Keine Glühkerzen oder Glühsteuergerät nennen.
+- Zuendkerzen und Zuendspulen dürfen genannt werden.
+- Keine Gluehkerzen oder Gluehsteuergerät nennen.
 - Bei TSI/TFSI/FSI auch Falschluft, KGE, Injektoren, Hochdruckpumpe, Verkokung, Ladedruck und Steuerzeiten berücksichtigen.
 
 Unbekannter Motortyp:
@@ -577,7 +577,7 @@ Fehlercode-Regel:
 Antwortformat bei normaler Diagnose:
 
 # Kurzdiagnose
-2 bis 4 Sätze. Direkt sagen, was am wahrscheinlichsten ist.
+2 bis 4 Saetze. Direkt sagen, was am wahrscheinlichsten ist.
 
 # Sofort prüfen
 3 bis 6 konkrete Prüfpunkte.
@@ -595,10 +595,10 @@ Bei Ausbau/Reparatur typische Demontage nennen:
 # Kritische Punkte
 Nur wenn relevant:
 - Linksgewinde
-- Schrauben nicht lösen
+- Schrauben nicht loesen
 - Einstellpunkte nicht verstellen
 - Clips/Verriegelungen
-- Dichtflächen
+- Dichtflaechen
 - Steuerzeiten
 - Hochdruck/Klima/Bremse/Airbag
 
@@ -756,8 +756,8 @@ export async function POST(request: Request) {
           `
 ACHTUNG: Die vorherige Antwort enthielt ein Bauteil, das zum erkannten Motortyp nicht passt.
 Erzeuge die Antwort neu und beachte den Motortyp zwingend.
-Bei Diesel keine Zündkerzen, Zündspulen, Zündfunken oder Zündanlage als Ursache oder Prüfpunkt nennen.
-Bei Benziner keine Glühkerzen oder Glühsteuergerät als Ursache oder Prüfpunkt nennen.
+Bei Diesel keine Zuendkerzen, Zuendspulen, Zuendfunken oder Zuendanlage als Ursache oder Prüfpunkt nennen.
+Bei Benziner keine Gluehkerzen oder Gluehsteuergerät als Ursache oder Prüfpunkt nennen.
           `
         );
       } else {

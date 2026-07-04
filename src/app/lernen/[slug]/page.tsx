@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import Header from "@/components/Header";
+import LearningLessonList from "@/components/LearningLessonList";
+import LearningLessonProgress from "@/components/LearningLessonProgress";
+import TechnicalSchemaImage from "@/components/TechnicalSchemaImage";
 import {
   loadLearningLessonBySlug,
   loadLearningModuleBySlug,
@@ -93,7 +96,7 @@ function AccessBox({ requiredPlan }: { requiredPlan: string }) {
       <h2 className="text-xl font-black">Lerninhalt gesperrt</h2>
 
       <p className="mt-3 leading-7">
-        Dieser Inhalt benötigt mindestens den Plan{" "}
+        Dieser Inhalt benoetigt mindestens den Plan{" "}
         <strong>{getPlanLabel(requiredPlan)}</strong>. Für Testwerkstätten kann
         der Zugang später kostenlos über Supabase freigeschaltet werden.
       </p>
@@ -175,15 +178,37 @@ function ModulePage({ detail }: { detail: LearningModuleDetail }) {
             </div>
           )}
 
+          {hasAccess && (
+            <TechnicalSchemaImage
+              context="learning"
+              title={module.title}
+              subject={module.title}
+              details={[
+                module.subtitle,
+                module.description,
+                ...module.tags,
+                ...module.relatedFaultCodes,
+                ...module.relatedParts,
+                ...module.relatedSystems,
+                ...lessons.map((lesson) => lesson.title),
+              ].join(" ")}
+              className="mt-6"
+            />
+          )}
+
           <section className="mt-8">
             <h2 className="text-2xl font-black text-slate-950 dark:text-slate-100">
               Lektionen
             </h2>
 
-            <div className="mt-5 grid gap-4">
+            <div className="mt-5">
+              <LearningLessonList lessons={lessons} />
+            </div>
+
+            <div className="hidden">
               {lessons.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900">
-                  Noch keine veröffentlichten Lektionen vorhanden.
+                  Noch keine veroeffentlichten Lektionen vorhanden.
                 </div>
               ) : (
                 lessons.map((lesson, index) => (
@@ -305,6 +330,35 @@ function LessonPage({ detail }: { detail: LearningLessonDetail }) {
             </div>
           ) : (
             <>
+              <LearningLessonProgress
+                lesson={{
+                  lessonId: lesson.id,
+                  lessonSlug: lesson.slug,
+                  lessonTitle: lesson.title,
+                  moduleId: module.id,
+                  moduleSlug: module.slug,
+                  moduleTitle: module.title,
+                  difficulty: lesson.difficulty,
+                }}
+                estimatedMinutes={lesson.estimatedMinutes}
+              />
+
+              <TechnicalSchemaImage
+                context="learning"
+                title={lesson.title}
+                subject={lesson.title}
+                details={[
+                  lesson.summary,
+                  ...lesson.contentBlocks.flatMap((block) => [
+                    block.title || "",
+                    block.content || "",
+                    ...(block.items || []),
+                  ]),
+                  ...lesson.checklist,
+                ].join(" ")}
+                className="mt-8"
+              />
+
               <section className="mt-8 space-y-5">
                 {lesson.contentBlocks.map(renderContentBlock)}
               </section>

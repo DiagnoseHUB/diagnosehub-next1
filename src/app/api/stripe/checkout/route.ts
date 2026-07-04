@@ -15,14 +15,24 @@ type StripeCheckoutResponse = {
   };
 };
 
+type CheckoutPlan = "pro" | "service_reminder";
+
+const SERVICE_REMINDER_PRICE_ID = "price_1TpVO842X13b5UMoMVnPM0Dd";
+
 function getBaseUrl(request: NextRequest) {
   const envUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
 
   if (envUrl) {
-    return envUrl.replace(/\/$/, "");
+    const normalizedEnvUrl = envUrl.startsWith("//")
+      ? `https:${envUrl}`
+      : /^https?:\/\//i.test(envUrl)
+        ? envUrl
+        : `https://${envUrl}`;
+
+    return new URL(normalizedEnvUrl).origin;
   }
 
-  return request.nextUrl.origin;
+  return new URL(request.nextUrl.origin).origin;
 }
 
 function getRequiredEnv(name: string) {
@@ -93,18 +103,24 @@ async function loadUserFromAuthorizationHeader(
 async function createStripeCheckoutSession({
   request,
   user,
+  plan,
 }: {
   request: NextRequest;
   user: User | null;
+  plan: CheckoutPlan;
 }) {
   const stripeSecretKey = getRequiredEnv("STRIPE_SECRET_KEY");
-  const proPriceId = getRequiredEnv("STRIPE_PRO_PRICE_ID");
+  const priceId =
+    plan === "service_reminder"
+      ? process.env.STRIPE_SERVICE_REMINDER_PRICE_ID?.trim() ||
+        SERVICE_REMINDER_PRICE_ID
+      : getRequiredEnv("STRIPE_PRO_PRICE_ID");
   const baseUrl = getBaseUrl(request);
 
   const body = new URLSearchParams();
 
   body.set("mode", "subscription");
-  body.set("line_items[0][price]", proPriceId);
+  body.set("line_items[0][price]", priceId);
   body.set("line_items[0][quantity]", "1");
 
   body.set(
@@ -118,10 +134,10 @@ async function createStripeCheckoutSession({
   body.set("locale", "de");
   body.set("automatic_tax[enabled]", "false");
 
-  body.set("metadata[plan]", "pro");
+  body.set("metadata[plan]", plan);
   body.set("metadata[source]", "diagnosehub_checkout");
 
-  body.set("subscription_data[metadata][plan]", "pro");
+  body.set("subscription_data[metadata][plan]", plan);
   body.set("subscription_data[metadata][source]", "diagnosehub_checkout");
 
   if (user) {
@@ -201,14 +217,18 @@ async function readPlanFromRequest(request: NextRequest) {
 }
 
 function validatePlan(plan: string | null) {
-  if (plan !== "pro") {
+  if (plan !== "pro" && plan !== "service_reminder") {
     return NextResponse.json(
-      { error: "Ungültiger Tarif. Aktuell ist nur Pro über Stripe aktiv." },
+      { error: "Ungültiger Tarif." },
       { status: 400 }
     );
   }
 
   return null;
+}
+
+function toCheckoutPlan(plan: string | null): CheckoutPlan {
+  return plan === "service_reminder" ? "service_reminder" : "pro";
 }
 
 export async function GET(request: NextRequest) {
@@ -223,6 +243,7 @@ export async function GET(request: NextRequest) {
     const stripeSession = await createStripeCheckoutSession({
       request,
       user: null,
+      plan: toCheckoutPlan(plan),
     });
 
     return NextResponse.redirect(stripeSession.url as string, 303);
@@ -265,6 +286,7 @@ export async function POST(request: NextRequest) {
     const stripeSession = await createStripeCheckoutSession({
       request,
       user,
+      plan: toCheckoutPlan(plan),
     });
 
     return NextResponse.json({

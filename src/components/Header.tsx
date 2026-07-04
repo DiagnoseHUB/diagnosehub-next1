@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -21,6 +22,7 @@ type AccountSource = "none" | "localStorage" | "supabase";
 const navigationLinks = [
   { label: "KI-Diagnose", href: "/#diagnose" },
   { label: "Lernen", href: "/lernen" },
+  { label: "Service", href: "/service-erinnerung" },
   { label: "Preise", href: "/preise" },
 ];
 
@@ -91,7 +93,7 @@ function Header() {
       name: "Supabase Nutzer",
       workshop: "Profil noch nicht gespeichert",
       email: session.user.email || "nicht hinterlegt",
-      role: "Werkstatt",
+      role: "Privat",
       plan: localPlan,
       updatedAt: new Date().toISOString(),
       supabaseUserId: session.user.id,
@@ -164,7 +166,9 @@ function Header() {
   }
 
   useEffect(() => {
-    void loadAccountState();
+    const initialLoadId = window.setTimeout(() => {
+      void loadAccountState();
+    }, 0);
 
     const {
       data: { subscription },
@@ -183,6 +187,7 @@ function Header() {
     window.addEventListener("diagnosehub-account-updated", handleAccountChange);
 
     return () => {
+      window.clearTimeout(initialLoadId);
       subscription.unsubscribe();
       window.removeEventListener("storage", handleAccountChange);
       window.removeEventListener("focus", handleAccountChange);
@@ -201,7 +206,7 @@ function Header() {
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/90 text-slate-950 backdrop-blur-xl transition-colors dark:border-slate-800 dark:bg-slate-950/90 dark:text-slate-100">
       <div className="mx-auto max-w-7xl px-6">
         <div className="flex items-center justify-between py-4">
-          <a href="/" className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-blue-200 bg-white p-2 shadow-lg shadow-blue-100 transition-colors dark:border-blue-500/20 dark:bg-slate-900 dark:shadow-blue-950/30">
               <Image
                 src="/diagnosehub-logo.png"
@@ -218,10 +223,10 @@ function Header() {
                 DiagnoseHUB
               </p>
               <p className="text-xs text-slate-600 transition-colors dark:text-slate-400">
-                KI-Diagnose für Werkstätten
+                KI-Diagnose für private Nutzer
               </p>
             </div>
-          </a>
+          </Link>
 
           <nav className="hidden items-center gap-7 text-sm font-medium text-slate-700 transition-colors dark:text-slate-300 lg:flex">
             {navigationLinks.map((link) => (

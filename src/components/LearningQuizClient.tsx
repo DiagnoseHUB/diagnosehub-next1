@@ -465,7 +465,7 @@ const [debugRunId, setDebugRunId] = useState("");
           </h2>
 
           <p className="mt-3 text-slate-600 dark:text-slate-400">
-            Die Quiz-Seite ist vorbereitet. Als Nächstes fügen wir die ersten
+            Die Quiz-Seite ist vorbereitet. Als Nächstes fuegen wir die ersten
             Fragen in den Supabase-Fragenpool ein.
           </p>
 

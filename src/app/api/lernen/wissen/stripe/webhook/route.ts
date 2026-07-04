@@ -51,7 +51,7 @@ async function saveSubscriptionFromStripe(subscription: Stripe.Subscription) {
 
   if (!userId) {
     throw new Error(
-      `Stripe Subscription ${subscription.id} enthält keine user_id.`
+      `Stripe Subscription ${subscription.id} enthaelt keine user_id.`
     );
   }
 
@@ -93,7 +93,7 @@ async function handleCheckoutSessionCompleted(
   const subscriptionId = getStringId(session.subscription);
 
   if (!subscriptionId) {
-    throw new Error("Checkout Session enthält keine Subscription-ID.");
+    throw new Error("Checkout Session enthaelt keine Subscription-ID.");
   }
 
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);

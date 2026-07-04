@@ -56,7 +56,7 @@ export async function POST(request: Request) {
       custom_text: {
         submit: {
           message:
-            "Endpreis 49 € pro Monat. Keine Umsatzsteuerberechnung gemäß § 19 UStG.",
+            "Endpreis 49 € pro Monat. Keine Umsatzsteuerberechnung gemaeß § 19 UStG.",
         },
       },
     };

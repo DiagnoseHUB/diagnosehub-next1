@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import TechnicalSchemaImage from "@/components/TechnicalSchemaImage";
 
 const EXAMPLES = [
   "AGR-Ventil",
@@ -87,7 +88,7 @@ export default function LearningKnowledgeSearch() {
     }
   }
 
-  function useExample(value: string) {
+  function selectExample(value: string) {
     setQuery(value);
     setError("");
     setAnswer("");
@@ -138,7 +139,7 @@ export default function LearningKnowledgeSearch() {
             <button
               key={example}
               type="button"
-              onClick={() => useExample(example)}
+              onClick={() => selectExample(example)}
               className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
             >
               {example}
@@ -173,9 +174,19 @@ export default function LearningKnowledgeSearch() {
               <div className="h-4 w-2/3 animate-pulse rounded bg-slate-200" />
             </div>
           ) : (
-            <div className="whitespace-pre-wrap text-sm leading-7 text-slate-800">
-              {answer}
-            </div>
+            <>
+              <div className="whitespace-pre-wrap text-sm leading-7 text-slate-800">
+                {answer}
+              </div>
+
+              <TechnicalSchemaImage
+                context="learning"
+                title={lastQuery || query}
+                subject={lastQuery || query}
+                details={answer}
+                className="mt-6"
+              />
+            </>
           )}
         </div>
       )}

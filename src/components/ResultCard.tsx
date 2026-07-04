@@ -32,7 +32,7 @@ function ResultCard({ diagnosis }: ResultCardProps) {
 
       <div className="mb-8 grid gap-4 md:grid-cols-3">
         <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-5">
-          <p className="text-sm text-slate-500">Priorität</p>
+          <p className="text-sm text-slate-500">Prioritaet</p>
           <p className="mt-2 text-xl font-bold text-yellow-400">
             {diagnosis.priority}
           </p>

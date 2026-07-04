@@ -21,7 +21,7 @@ export default function DatenschutzPage() {
             Datenschutzerklärung
           </h1>
 
-          <p className="mt-4 text-sm text-slate-400">Stand: 02.07.2026</p>
+          <p className="mt-4 text-sm text-slate-400">Stand: 04.07.2026</p>
 
           <div className="mt-8 space-y-8 leading-8 text-slate-300">
             <section>
@@ -187,7 +187,39 @@ export default function DatenschutzPage() {
 
             <section>
               <h2 className="text-2xl font-bold text-white">
-                8. Cookies, Local Storage und technisch erforderliche Speicherung
+                8. Service-Erinnerungen per E-Mail
+              </h2>
+
+              <p className="mt-4">
+                Wenn du die Service-Erinnerung aktivierst, verarbeiten wir deine
+                gespeicherten Fahrzeugdaten, Fälligkeiten, Kilometerstände und
+                die E-Mail-Adresse deines Nutzerkontos, um dich automatisch an
+                Hauptuntersuchung, AU, Hersteller-Service und Wartungspunkte zu
+                erinnern.
+              </p>
+
+              <p className="mt-4">
+                Die E-Mails sind sachliche Funktionsmails und enthalten keine
+                Werbung. Du kannst die E-Mail-Erinnerungen jederzeit in
+                DiagnoseHUB deaktivieren oder über den Abmeldelink in jeder Mail
+                abbestellen. Zur Vermeidung doppelter Erinnerungen speichern wir
+                ein Versandprotokoll mit Erinnerungstyp, Fälligkeit, Empfänger
+                und Versandzeitpunkt.
+              </p>
+
+              <p className="mt-4">
+                Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO, soweit die
+                Erinnerungen Bestandteil des gebuchten Service sind. Soweit du
+                die Benachrichtigung freiwillig aktivierst, erfolgt die
+                Verarbeitung zusätzlich auf Grundlage deiner Einwilligung gemäß
+                Art. 6 Abs. 1 lit. a DSGVO; diese kannst du jederzeit mit Wirkung
+                für die Zukunft widerrufen.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-2xl font-bold text-white">
+                9. Cookies, Local Storage und technisch erforderliche Speicherung
               </h2>
 
               <p className="mt-4">
@@ -211,7 +243,7 @@ export default function DatenschutzPage() {
 
             <section>
               <h2 className="text-2xl font-bold text-white">
-                9. Empfänger und eingesetzte Dienstleister
+                10. Empfaenger und eingesetzte Dienstleister
               </h2>
 
               <p className="mt-4">
@@ -224,6 +256,10 @@ export default function DatenschutzPage() {
                 <li>Supabase für Authentifizierung, Datenbank und Nutzerprofile,</li>
                 <li>OpenAI für KI-Funktionen,</li>
                 <li>Stripe für Zahlungsabwicklung und Abonnements,</li>
+                <li>
+                  Resend oder einen vergleichbaren E-Mail-Dienstleister für
+                  automatisierte Service-Erinnerungen,
+                </li>
                 <li>ALL-INKL/Kasserver für Domain und E-Mail-Infrastruktur.</li>
               </ul>
 
@@ -236,7 +272,7 @@ export default function DatenschutzPage() {
 
             <section>
               <h2 className="text-2xl font-bold text-white">
-                10. Drittlandübermittlungen
+                11. Drittlandübermittlungen
               </h2>
 
               <p className="mt-4">
@@ -251,7 +287,7 @@ export default function DatenschutzPage() {
 
             <section>
               <h2 className="text-2xl font-bold text-white">
-                11. Speicherdauer
+                12. Speicherdauer
               </h2>
 
               <p className="mt-4">
@@ -260,6 +296,13 @@ export default function DatenschutzPage() {
                 für die Dauer des Nutzerkontos gespeichert. Gespeicherte
                 Diagnosefälle bleiben erhalten, bis sie gelöscht werden oder das
                 Konto gelöscht wird.
+              </p>
+
+              <p className="mt-4">
+                Versandprotokolle für Service-Erinnerungen werden nur so lange
+                gespeichert, wie sie zur Vermeidung doppelter Erinnerungen, zur
+                Nachvollziehbarkeit des Dienstes und zur Fehleranalyse
+                erforderlich sind.
               </p>
 
               <p className="mt-4">
@@ -272,7 +315,7 @@ export default function DatenschutzPage() {
 
             <section>
               <h2 className="text-2xl font-bold text-white">
-                12. Deine Rechte
+                13. Deine Rechte
               </h2>
 
               <p className="mt-4">
@@ -292,7 +335,7 @@ export default function DatenschutzPage() {
 
             <section>
               <h2 className="text-2xl font-bold text-white">
-                13. Beschwerderecht bei einer Aufsichtsbehörde
+                14. Beschwerderecht bei einer Aufsichtsbehörde
               </h2>
 
               <p className="mt-4">
@@ -304,7 +347,7 @@ export default function DatenschutzPage() {
 
             <section>
               <h2 className="text-2xl font-bold text-white">
-                14. Keine automatisierte Einzelentscheidung
+                15. Keine automatisierte Einzelentscheidung
               </h2>
 
               <p className="mt-4">
@@ -317,7 +360,7 @@ export default function DatenschutzPage() {
 
             <section>
               <h2 className="text-2xl font-bold text-white">
-                15. Änderungen dieser Datenschutzerklärung
+                16. Änderungen dieser Datenschutzerklärung
               </h2>
 
               <p className="mt-4">

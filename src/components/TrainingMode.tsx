@@ -234,7 +234,7 @@ export default function TrainingMode({
           onClick={handleRestart}
           className="mt-5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white transition hover:bg-blue-700"
         >
-          Neuer zufälliger Durchlauf
+          Neuer zufaelliger Durchlauf
         </button>
       </div>
     );

@@ -2,7 +2,7 @@ import type { SupabaseClient, User } from "@supabase/supabase-js";
 
 export type DiagnosisUsage = {
   /**
-   * Ab jetzt kein Tagesdatum mehr, sondern Monatsschlüssel.
+   * Ab jetzt kein Tagesdatum mehr, sondern Monatsschluessel.
    * Beispiel: 2026-07-01
    */
   date: string;
@@ -28,7 +28,7 @@ function getCurrentDateGermany() {
 }
 
 /**
- * Kompatibilitätsname bleibt erhalten.
+ * Kompatibilitaetsname bleibt erhalten.
  * Bedeutet ab jetzt: aktueller Monats-Key.
  *
  * Beispiel:

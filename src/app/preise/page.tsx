@@ -1,9 +1,11 @@
+import Link from "next/link";
+import Header from "@/components/Header";
 import StripeCheckoutButton from "@/components/StripeCheckoutButton";
 
 export const metadata = {
   title: "Preise | DiagnoseHUB",
   description:
-    "Wähle den passenden DiagnoseHUB-Tarif für Kfz-Diagnose, Lernen und Werkstattpraxis.",
+    "Wähle den passenden DiagnoseHUB-Tarif für Kfz-Diagnose, Lernen und private Fahrzeugpflege.",
 };
 
 const plans = [
@@ -24,6 +26,24 @@ const plans = [
     type: "link",
   },
   {
+    name: "Service-Erinnerung",
+    price: "9,99 €",
+    interval: "/ Jahr",
+    description: "Für private Nutzer: HU, AU, Service und Wartungstermine.",
+    features: [
+      "Eigene Fahrzeuge und Kilometerstände verwalten",
+      "HU/AU-Fälligkeit berechnen",
+      "Hersteller-Serviceintervall nach Datum und km berücksichtigen",
+      "Bremsflüssigkeit und eigene Wartungstermine vorbereiten",
+      "Zentrale Speicherung im DiagnoseHUB Account",
+    ],
+    cta: "Service-Erinnerung aktivieren",
+    href: "/service-erinnerung",
+    highlighted: false,
+    type: "stripe",
+    plan: "service_reminder",
+  },
+  {
     name: "Pro",
     price: "49 €",
     interval: "/ Monat",
@@ -33,28 +53,29 @@ const plans = [
       "Mehr Quizfragen und Lernfunktionen",
       "Bauteilwissen für Sensoren, Aktoren und Systeme",
       "Praxisnahe Prüfstrategien",
-      "Geeignet für Azubis, Gesellen und Werkstattalltag",
+      "Geeignet für Azubis, Gesellen und private Schrauber",
       "Weitere Funktionen werden laufend ergänzt",
     ],
     cta: "Pro aktivieren",
     href: "",
     highlighted: true,
     type: "stripe",
+    plan: "pro",
   },
   {
-    name: "Werkstatt",
+    name: "Privat Plus",
     price: "Auf Anfrage",
     interval: "",
-    description: "Für Betriebe mit mehreren Nutzern.",
+    description: "Für Familien, mehrere Fahrzeuge oder intensivere Nutzung.",
     features: [
-      "Mehrere Nutzer möglich",
-      "Geeignet für Ausbildung und Werkstattteam",
-      "Zentrale Nutzung im Betrieb",
-      "Perspektivisch Teamverwaltung",
+      "Mehrere Fahrzeuge möglich",
+      "Geeignet für Lernen und eigene Wartungsplanung",
+      "Zentrale Nutzung im Account",
+      "Perspektivisch Familienfreigabe",
       "Individuelle Einführung möglich",
     ],
-    cta: "Werkstatt-Zugang anfragen",
-    href: "mailto:info@diagnosehub.de?subject=Werkstatt-Zugang%20DiagnoseHUB",
+    cta: "Privat Plus anfragen",
+    href: "mailto:info@diagnosehub.de?subject=Privat%20Plus%20DiagnoseHUB",
     highlighted: false,
     type: "link",
   },
@@ -62,8 +83,11 @@ const plans = [
 
 export default function PreisePage() {
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-950 transition-colors dark:bg-slate-950 dark:text-slate-100 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-6xl">
+    <div className="min-h-screen bg-slate-50 text-slate-950 transition-colors dark:bg-slate-950 dark:text-slate-100">
+      <Header />
+
+      <main className="px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-6xl">
         <section className="mb-10">
           <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400">
             DiagnoseHUB Preise
@@ -79,7 +103,7 @@ export default function PreisePage() {
           </p>
         </section>
 
-        <section className="grid gap-5 lg:grid-cols-3">
+        <section className="grid gap-5 lg:grid-cols-4">
           {plans.map((plan) => (
             <article
               key={plan.name}
@@ -128,9 +152,23 @@ export default function PreisePage() {
               </ul>
 
               {plan.type === "stripe" ? (
-                <StripeCheckoutButton className="block w-full rounded-2xl bg-blue-600 px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-blue-700">
-                  {plan.cta}
-                </StripeCheckoutButton>
+                <>
+                  <StripeCheckoutButton
+                    plan={plan.plan as "pro" | "service_reminder"}
+                    className="block w-full rounded-2xl bg-blue-600 px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-blue-700"
+                  >
+                    {plan.cta}
+                  </StripeCheckoutButton>
+
+                  {plan.href && (
+                    <Link
+                      href={plan.href}
+                      className="mt-3 block rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3 text-center text-sm font-semibold text-slate-800 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-blue-500 dark:hover:bg-blue-500/10 dark:hover:text-blue-300"
+                    >
+                      Service-Seite ansehen
+                    </Link>
+                  )}
+                </>
               ) : (
                 <a
                   href={plan.href}
@@ -157,7 +195,8 @@ export default function PreisePage() {
             Preise können sich bis zum offiziellen Start noch ändern.
           </p>
         </section>
-      </div>
-    </main>
+        </div>
+      </main>
+    </div>
   );
 }

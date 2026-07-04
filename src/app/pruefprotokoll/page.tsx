@@ -101,7 +101,7 @@ const defaultProfile: InspectionProfile = {
     "Kundenbeanstandung exakt dokumentieren",
     "Fehlerspeicher aller relevanten Steuergeräte auslesen",
     "Freeze-Frame-Daten und Umgebungsbedingungen sichern",
-    "Sichtprüfung auf Undichtigkeiten, Beschädigungen, lose Steckverbindungen und Marderbiss durchführen",
+    "Sichtprüfung auf Undichtigkeiten, Beschaedigungen, lose Steckverbindungen und Marderbiss durchführen",
     "Batteriespannung, Massepunkte und Spannungsversorgung prüfen",
     "Relevante Istwerte bei Leerlauf, Teillast und Last vergleichen",
     "Fehler löschen und Probefahrt mit Live-Daten durchführen",
@@ -131,9 +131,9 @@ const boostPressureProfile: InspectionProfile = {
     "Undichtigkeit in der Ladeluftstrecke",
     "Ladeluftschlauch eingerissen oder abgesprungen",
     "Ladedrucksensor verschmutzt oder unplausibel",
-    "Unterdruckleitung undicht oder porös",
+    "Unterdruckleitung undicht oder poroes",
     "Druckwandler / Magnetventil für Ladedruckregelung fehlerhaft",
-    "VTG-Verstellung schwergängig oder Wastegate klemmt",
+    "VTG-Verstellung schwergaengig oder Wastegate klemmt",
     "Turbolader mechanisch verschlissen",
     "Abgasgegendruck zu hoch, zum Beispiel durch DPF-Probleme",
   ],
@@ -141,17 +141,17 @@ const boostPressureProfile: InspectionProfile = {
     "Fehlerspeicher mit Freeze-Frame auslesen",
     "Ladedruck Soll/Ist bei Probefahrt unter Last aufzeichnen",
     "Ladeluftstrecke abdrücken",
-    "Schläuche, Schellen, Ladeluftkühler und O-Ringe prüfen",
+    "Schlaeuche, Schellen, Ladeluftkühler und O-Ringe prüfen",
     "Unterdruckversorgung mit Handpumpe prüfen",
     "Druckwandler/Magnetventil elektrisch und pneumatisch prüfen",
     "VTG- oder Wastegate-Stellgliedtest durchführen",
-    "Ladedrucksensor mit Atmosphärendruck und Lastwerten plausibilisieren",
+    "Ladedrucksensor mit Atmosphaerendruck und Lastwerten plausibilisieren",
     "Abgasgegendruck beziehungsweise DPF-Differenzdruck prüfen",
   ],
   measurementValues: [
     "Ladedruck Sollwert",
     "Ladedruck Istwert",
-    "Atmosphärendruck",
+    "Atmosphaerendruck",
     "Luftmasse Istwert",
     "Ansteuerung Ladedrucksteller / N75 / Druckwandler",
     "Unterdruck am Druckwandler",
@@ -173,7 +173,7 @@ const fuelPressureProfile: InspectionProfile = {
     "Dieses Profil dient zur Eingrenzung von Niederdruckversorgung, Hochdrucksystem, Mengenregelung, Sensorik und Injektorrücklauf.",
   typicalCauses: [
     "Kraftstofffilter zugesetzt",
-    "Niederdruckpumpe liefert zu wenig Fördermenge",
+    "Niederdruckpumpe liefert zu wenig Foerdermenge",
     "Luft im Kraftstoffsystem",
     "Mengenregelventil oder Druckregelventil fehlerhaft",
     "Raildrucksensor unplausibel",
@@ -189,7 +189,7 @@ const fuelPressureProfile: InspectionProfile = {
     "Mengenregelventil und Druckregelventil elektrisch prüfen",
     "Raildrucksensor auf Plausibilität prüfen",
     "Kraftstoffsystem auf Luftblasen und Undichtigkeiten prüfen",
-    "Bei Verdacht Kraftstoffprobe auf Späne oder Verunreinigung prüfen",
+    "Bei Verdacht Kraftstoffprobe auf Spaene oder Verunreinigung prüfen",
   ],
   measurementValues: [
     "Raildruck Sollwert",
@@ -255,13 +255,13 @@ const dpfProfile: InspectionProfile = {
   description:
     "Dieses Profil prüft DPF-Beladung, Differenzdrucksensorik, Regenerationsbedingungen, Temperatursensorik und Abgasgegendruck.",
   typicalCauses: [
-    "DPF mit Ruß oder Asche überladen",
+    "DPF mit Ruß oder Asche ueberladen",
     "Differenzdrucksensor fehlerhaft",
     "Differenzdruckleitungen verstopft oder undicht",
     "Abgastemperatursensor unplausibel",
     "Regeneration wird wegen anderem Fehler nicht freigegeben",
     "Viele Kurzstrecken oder abgebrochene Regenerationen",
-    "Injektorproblem oder Ölverbrauch verursacht erhöhte Rußbildung",
+    "Injektorproblem oder Oelverbrauch verursacht erhöhte Rußbildung",
   ],
   recommendedChecks: [
     "DPF-Differenzdruck im Leerlauf und bei erhöhter Drehzahl prüfen",
@@ -269,9 +269,9 @@ const dpfProfile: InspectionProfile = {
     "Regenerationsstatus und letzte Regeneration prüfen",
     "Differenzdruckleitungen auf Durchgang und Dichtheit prüfen",
     "Abgastemperatursensoren plausibilisieren",
-    "Motorölstand prüfen, Ölverdünnung bewerten",
+    "Motoroelstand prüfen, Oelverduennung bewerten",
     "Vorgelagerte Fehler beheben, bevor Regeneration angestoßen wird",
-    "Probefahrt oder Serviceregeneration nur bei erfüllten Bedingungen durchführen",
+    "Probefahrt oder Serviceregeneration nur bei erfuellten Bedingungen durchführen",
   ],
   measurementValues: [
     "DPF-Differenzdruck Leerlauf",
@@ -298,7 +298,7 @@ const mixtureProfile: InspectionProfile = {
     "Dieses Profil grenzt Falschluft, Kraftstoffversorgung, Lambdaregelung, Luftmassenmessung und Einspritzung ein.",
   typicalCauses: [
     "Falschluft im Ansaugsystem",
-    "Kurbelgehäuseentlüftung undicht",
+    "Kurbelgehaeuseentlueftung undicht",
     "Luftmassenmesser unplausibel",
     "Lambdasonde gealtert oder fehlerhaft",
     "Kraftstoffdruck zu niedrig oder zu hoch",
@@ -308,7 +308,7 @@ const mixtureProfile: InspectionProfile = {
   recommendedChecks: [
     "Short Term und Long Term Fuel Trim auslesen",
     "Ansaugsystem abnebeln",
-    "Kurbelgehäuseentlüftung prüfen",
+    "Kurbelgehaeuseentlueftung prüfen",
     "Luftmassenmesser auf Plausibilität prüfen",
     "Lambdasondensignal vor und nach Kat prüfen",
     "Kraftstoffdruck messen",
@@ -337,10 +337,10 @@ const misfireProfile: InspectionProfile = {
   title: "Individuelles Prüfprofil: Verbrennungsaussetzer / Laufunruhe",
   subtitle: "Für Fehler wie P0300, P0301, P0302, P0303, P0304",
   description:
-    "Dieses Profil grenzt zylinderbezogene Aussetzer über Zündung, Einspritzung, Kompression, Falschluft und mechanische Ursachen ein.",
+    "Dieses Profil grenzt zylinderbezogene Aussetzer ueber Zuendung, Einspritzung, Kompression, Falschluft und mechanische Ursachen ein.",
   typicalCauses: [
-    "Zündkerze verschlissen oder falscher Elektrodenabstand",
-    "Zündspule fehlerhaft",
+    "Zuendkerze verschlissen oder falscher Elektrodenabstand",
+    "Zuendspule fehlerhaft",
     "Einspritzventil fehlerhaft oder verschmutzt",
     "Kompressionsverlust",
     "Falschluft an zylindernahem Ansaugkanal",
@@ -348,9 +348,9 @@ const misfireProfile: InspectionProfile = {
     "Mechanischer Schaden an Ventiltrieb oder Kolben",
   ],
   recommendedChecks: [
-    "Aussetzerzähler je Zylinder auslesen",
-    "Zündkerzenbild prüfen",
-    "Zündspule zylinderweise quer tauschen",
+    "Aussetzerzähller je Zylinder auslesen",
+    "Zuendkerzenbild prüfen",
+    "Zuendspule zylinderweise quer tauschen",
     "Einspritzventil zylinderweise prüfen oder quer tauschen",
     "Kompressionstest durchführen",
     "Druckverlusttest bei Verdacht durchführen",
@@ -358,18 +358,18 @@ const misfireProfile: InspectionProfile = {
     "Stecker und Kabelbaum am betroffenen Zylinder prüfen",
   ],
   measurementValues: [
-    "Aussetzerzähler je Zylinder",
+    "Aussetzerzähller je Zylinder",
     "Laufunruhewerte",
     "Kompressionsdruck je Zylinder",
     "Druckverlust Prozent",
     "Fuel Trims",
-    "Zündwinkelrücknahme",
+    "Zuendwinkelrücknahme",
   ],
   documentationNotes: [
     "Betroffenen Zylinder eindeutig dokumentieren",
     "Quer-Tausch-Prüfung mit Ergebnis erfassen",
     "Kompressionswerte tabellarisch notieren",
-    "Probefahrt nach Reparatur mit Aussetzerzähler dokumentieren",
+    "Probefahrt nach Reparatur mit Aussetzerzähller dokumentieren",
   ],
 };
 
@@ -384,7 +384,7 @@ const airMassProfile: InspectionProfile = {
     "Falschluft nach Luftmassenmesser",
     "Luftfilter zugesetzt",
     "Ansaugschlauch beschädigt",
-    "AGR-Einfluss verfälscht Luftmasse",
+    "AGR-Einfluss verfaelscht Luftmasse",
     "Stecker oder Kabelbaumproblem am LMM",
     "Software-/Adaptionswert unplausibel",
   ],
@@ -510,7 +510,7 @@ function detectInspectionProfile(
     text.includes("p0402") ||
     text.includes("agr") ||
     text.includes("abgasrückführung") ||
-    text.includes("abgasrueckfuehrung")
+    text.includes("abgasrückführung")
   ) {
     return egrProfile;
   }
@@ -632,7 +632,7 @@ function NumberedList({ items }: { items: string[] }) {
   );
 }
 
-export default function PruefprotokollPage() {
+export default function PrüfprotokollPage() {
   const supabase = useMemo(() => createClient(), []);
 
   const [currentCase, setCurrentCase] = useState<CurrentDiagnosisCase | null>(
@@ -795,7 +795,7 @@ export default function PruefprotokollPage() {
             <h2 className="text-3xl font-bold">Kein Diagnosefall geladen</h2>
 
             <p className="mt-4 leading-8 text-slate-400">
-              Starte zuerst eine Diagnose oder öffne einen gespeicherten Fall.
+              Starte zuerst eine Diagnose oder oeffne einen gespeicherten Fall.
               Danach kann DiagnoseHUB daraus ein Prüfprotokoll erstellen.
             </p>
 

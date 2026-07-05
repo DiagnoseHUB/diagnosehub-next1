@@ -49,7 +49,9 @@ export default function LoginPage() {
 
   const [user, setUser] = useState<User | null>(null);
 
-  const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [authMode, setAuthMode] = useState<"login" | "register" | "reset">(
+    "login"
+  );
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
@@ -307,6 +309,45 @@ export default function LoginPage() {
       }
     } catch (error) {
       setAuthError(`Login fehlgeschlagen: ${getErrorMessage(error)}`);
+    } finally {
+      setAuthLoading(false);
+    }
+  }
+
+  async function handlePasswordResetRequest() {
+    resetMessages();
+
+    const cleanEmail = authEmail.trim().toLowerCase();
+
+    if (!cleanEmail || !cleanEmail.includes("@")) {
+      setAuthError("Bitte gib deine E-Mail-Adresse ein.");
+      return;
+    }
+
+    setAuthLoading(true);
+
+    try {
+      const redirectTo =
+        typeof window !== "undefined"
+          ? `${window.location.origin}/passwort-zuruecksetzen`
+          : undefined;
+
+      const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+        redirectTo,
+      });
+
+      if (error) {
+        setAuthError(error.message);
+        return;
+      }
+
+      setAuthMessage(
+        "Wenn zu dieser E-Mail ein Account existiert, wurde ein Link zum Zurücksetzen gesendet."
+      );
+    } catch (error) {
+      setAuthError(
+        `Passwort-Link konnte nicht gesendet werden: ${getErrorMessage(error)}`
+      );
     } finally {
       setAuthLoading(false);
     }
@@ -612,6 +653,7 @@ export default function LoginPage() {
                       />
                     </div>
 
+                    {authMode !== "reset" && (
                     <div>
                       <label className="mb-2 block text-sm font-semibold text-slate-300">
                         Passwort
@@ -632,11 +674,18 @@ export default function LoginPage() {
                         className="w-full rounded-2xl border border-slate-800 bg-slate-950 px-5 py-4 text-white outline-none placeholder:text-slate-600 focus:border-blue-500"
                       />
                     </div>
+                    )}
                   </div>
 
                   <button
                     type="button"
-                    onClick={authMode === "login" ? handleLogin : handleRegister}
+                    onClick={
+                      authMode === "login"
+                        ? handleLogin
+                        : authMode === "register"
+                          ? handleRegister
+                          : handlePasswordResetRequest
+                    }
                     disabled={authLoading}
                     className="mt-6 w-full rounded-2xl bg-blue-600 px-6 py-4 font-bold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
                   >
@@ -644,8 +693,37 @@ export default function LoginPage() {
                       ? "Bitte warten..."
                       : authMode === "login"
                         ? "Einloggen"
-                        : "Account erstellen"}
+                        : authMode === "register"
+                          ? "Account erstellen"
+                          : "Link senden"}
                   </button>
+
+                  <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-sm font-semibold">
+                    {authMode !== "reset" ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuthMode("reset");
+                          setAuthPassword("");
+                          resetMessages();
+                        }}
+                        className="text-blue-300 transition hover:text-blue-200"
+                      >
+                        Passwort vergessen?
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuthMode("login");
+                          resetMessages();
+                        }}
+                        className="text-blue-300 transition hover:text-blue-200"
+                      >
+                        Zurück zum Login
+                      </button>
+                    )}
+                  </div>
                 </>
               )}
 

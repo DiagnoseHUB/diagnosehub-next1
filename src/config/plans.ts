@@ -122,8 +122,8 @@ export const PLAN_CONFIG: Record<UserPlan, PlanConfig> = {
   },
 
   werkstatt: {
-    label: "Werkstatt Demo",
-    badge: "Premium Demo",
+    label: "Partner Zugang",
+    badge: "Partner Zugang",
     monthlyDiagnosisLimit: 100,
     dailyDiagnosisLimit: 100,
     savedCaseLimit: 25,

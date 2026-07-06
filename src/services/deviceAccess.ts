@@ -1,4 +1,4 @@
-import type { UserPlan } from "@/config/plans";
+import { normalizeUserPlan, type UserPlan } from "@/config/plans";
 import { fetchJsonWithTimeout } from "@/utils/clientApi";
 
 export const DEVICE_ID_STORAGE_KEY = "diagnosehub-device-id";
@@ -25,6 +25,9 @@ export type DeviceAccessResponse = {
   currentDeviceId: string;
   devices: DeviceRegistration[];
 };
+
+const PRIVATE_DEVICE_LIMIT = 2;
+const WORKSHOP_DEVICE_LIMIT = 3;
 
 function createFallbackDeviceId() {
   return `device-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
@@ -64,14 +67,83 @@ export function getDeviceName() {
   return [platform, touchHint].filter(Boolean).join(" · ") || "Dieses Gerät";
 }
 
+function normalizeAccountType(value: unknown): DeviceAccountType {
+  return value === "workshop" ? "workshop" : "private";
+}
+
+function normalizeDevice(value: unknown): DeviceRegistration | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const device = value as Partial<DeviceRegistration>;
+  const deviceId =
+    typeof device.deviceId === "string" && device.deviceId
+      ? device.deviceId
+      : typeof device.id === "string" && device.id
+        ? device.id
+        : "";
+
+  if (!deviceId) {
+    return null;
+  }
+
+  return {
+    id: typeof device.id === "string" ? device.id : deviceId,
+    deviceId,
+    deviceName:
+      typeof device.deviceName === "string" && device.deviceName
+        ? device.deviceName
+        : "Unbekanntes Gerät",
+    current: device.current === true,
+    createdAt:
+      typeof device.createdAt === "string" ? device.createdAt : "",
+    lastSeenAt:
+      typeof device.lastSeenAt === "string" ? device.lastSeenAt : "",
+  };
+}
+
+function normalizeDevices(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((device) => normalizeDevice(device))
+    .filter((device): device is DeviceRegistration => device !== null);
+}
+
 function parseDeviceResponse(
   response: Response,
   payload: Partial<DeviceAccessResponse>
-) {
+): DeviceAccessResponse {
+  const accountType = normalizeAccountType(payload.accountType);
+  const devices = normalizeDevices(payload.devices);
+  const fallbackMaxDevices =
+    accountType === "workshop" ? WORKSHOP_DEVICE_LIMIT : PRIVATE_DEVICE_LIMIT;
+
   return {
-    ...payload,
     ok: response.ok && payload.ok !== false,
-  } as DeviceAccessResponse;
+    code:
+      payload.code === "DEVICE_LIMIT_REACHED"
+        ? "DEVICE_LIMIT_REACHED"
+        : undefined,
+    error: typeof payload.error === "string" ? payload.error : undefined,
+    plan: normalizeUserPlan(payload.plan),
+    accountType,
+    maxDevices:
+      typeof payload.maxDevices === "number" && Number.isFinite(payload.maxDevices)
+        ? payload.maxDevices
+        : fallbackMaxDevices,
+    activeDeviceCount:
+      typeof payload.activeDeviceCount === "number" &&
+      Number.isFinite(payload.activeDeviceCount)
+        ? payload.activeDeviceCount
+        : devices.length,
+    currentDeviceId:
+      typeof payload.currentDeviceId === "string" ? payload.currentDeviceId : "",
+    devices,
+  };
 }
 
 export async function registerCurrentDevice(accessToken: string) {

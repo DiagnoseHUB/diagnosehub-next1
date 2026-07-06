@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type {
   AuthChangeEvent,
@@ -35,6 +35,21 @@ import {
 } from "@/services/workshopProfileSupabase";
 
 const DEFAULT_ROLE = "Privatnutzer";
+
+const setupSteps = [
+  {
+    title: "1. Account",
+    description: "Registrieren oder einloggen.",
+  },
+  {
+    title: "2. Profil",
+    description: "Name und optional Betrieb speichern.",
+  },
+  {
+    title: "3. Start",
+    description: "Diagnose, Lernen oder Service nutzen.",
+  },
+];
 
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString("de-DE", {
@@ -78,6 +93,7 @@ function getFriendlyAuthError(message: string) {
 
 export default function LoginPage() {
   const supabase = useMemo(() => createClient(), []);
+  const profileSectionRef = useRef<HTMLDivElement | null>(null);
 
   const [user, setUser] = useState<User | null>(null);
 
@@ -90,6 +106,7 @@ export default function LoginPage() {
   const [portalLoading, setPortalLoading] = useState(false);
   const [authError, setAuthError] = useState("");
   const [authMessage, setAuthMessage] = useState("");
+  const [profileGuidance, setProfileGuidance] = useState("");
 
   const [name, setName] = useState("");
   const [workshop, setWorkshop] = useState("");
@@ -127,6 +144,9 @@ export default function LoginPage() {
     loadLocalAccount();
 
     async function loadSession() {
+      const shouldOpenProfile =
+        typeof window !== "undefined" &&
+        new URLSearchParams(window.location.search).get("setup") === "profile";
       const { data, error } = await supabase.auth.getSession();
 
       if (error) {
@@ -141,8 +161,16 @@ export default function LoginPage() {
       }
 
       if (data.session?.user) {
-        await loadWorkshopProfile(data.session.user);
+        const profile = await loadWorkshopProfile(data.session.user);
         await loadDeviceAccess(data.session);
+
+        if (shouldOpenProfile || !profile) {
+          openProfileSetup(
+            profile
+              ? "Prüfe kurz dein Nutzerprofil und passe es bei Bedarf an."
+              : "Erstelle jetzt dein Nutzerprofil. Danach kannst du DiagnoseHUB sauber nutzen."
+          );
+        }
       }
     }
 
@@ -159,8 +187,14 @@ export default function LoginPage() {
         }
 
         if (nextSession?.user) {
-          await loadWorkshopProfile(nextSession.user);
+          const profile = await loadWorkshopProfile(nextSession.user);
           await loadDeviceAccess(nextSession);
+
+          if (!profile) {
+            openProfileSetup(
+              "Erstelle jetzt dein Nutzerprofil. Danach sind Dashboard, Diagnose und Service sauber mit deinem Account verbunden."
+            );
+          }
         } else {
           setDatabaseProfile(null);
           setSavedAccount(null);
@@ -238,7 +272,9 @@ export default function LoginPage() {
     }
   }
 
-  async function loadWorkshopProfile(currentUser: User) {
+  async function loadWorkshopProfile(
+    currentUser: User
+  ): Promise<WorkshopProfileDatabaseRow | null> {
     setProfileLoading(true);
     setError("");
 
@@ -251,14 +287,16 @@ export default function LoginPage() {
       if (!profile) {
         setDatabaseProfile(null);
         setSavedAccount(null);
-        return;
+        return null;
       }
 
       applyProfileToState(profile, currentUser);
+      return profile;
     } catch (error) {
       setError(
         `Nutzerprofil konnte nicht geladen werden: ${getErrorMessage(error)}`
       );
+      return null;
     } finally {
       setProfileLoading(false);
     }
@@ -277,6 +315,18 @@ export default function LoginPage() {
     setAuthMessage("");
     setError("");
     setSuccess("");
+    setProfileGuidance("");
+  }
+
+  function openProfileSetup(message: string) {
+    setProfileGuidance(message);
+
+    window.setTimeout(() => {
+      profileSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 120);
   }
 
   async function handleRegister() {
@@ -299,7 +349,7 @@ export default function LoginPage() {
     try {
       const redirectTo =
         typeof window !== "undefined"
-          ? `${window.location.origin}/login`
+          ? `${window.location.origin}/login?setup=profile`
           : undefined;
 
       const { data, error } = await supabase.auth.signUp({
@@ -318,7 +368,9 @@ export default function LoginPage() {
       if (data.session) {
         setUser(data.user);
         setAuthPassword("");
-        setAuthMessage("Registrierung erfolgreich. Du bist eingeloggt.");
+        setAuthMessage(
+          "Registrierung erfolgreich. Prüfe jetzt kurz dein Nutzerprofil."
+        );
 
         if (data.user) {
           try {
@@ -337,12 +389,18 @@ export default function LoginPage() {
             );
 
             applyProfileToState(profile, data.user);
+            openProfileSetup(
+              "Dein Profil wurde automatisch vorbereitet. Prüfe Name und optional Betrieb/Firma und speichere bei Bedarf."
+            );
           } catch (profileError) {
             console.error(
               "Nutzerprofil konnte nach Registrierung nicht automatisch erstellt werden:",
               profileError
             );
             await loadWorkshopProfile(data.user);
+            openProfileSetup(
+              "Bitte erstelle jetzt dein Nutzerprofil. Danach sind deine Daten zentral gespeichert."
+            );
           }
         }
 
@@ -354,7 +412,7 @@ export default function LoginPage() {
       }
 
       setAuthMessage(
-        "Registrierung erstellt. Prüfe deine E-Mails und bestätige den Account, falls Supabase eine Bestätigung verlangt."
+        "Registrierung erstellt. Prüfe deine E-Mails. Nach der Bestätigung kommst du automatisch zum Nutzerprofil."
       );
     } catch (error) {
       setAuthError(
@@ -400,7 +458,13 @@ export default function LoginPage() {
       setAuthMessage("Login erfolgreich.");
 
       if (data.user) {
-        await loadWorkshopProfile(data.user);
+        const profile = await loadWorkshopProfile(data.user);
+
+        if (!profile) {
+          openProfileSetup(
+            "Lege jetzt dein Nutzerprofil an. Danach kannst du DiagnoseHUB vollständig nutzen."
+          );
+        }
       }
 
       if (data.session) {
@@ -569,6 +633,7 @@ export default function LoginPage() {
       });
 
       applyProfileToState(profile, user);
+      setProfileGuidance("");
 
       showSuccess(
         "Nutzerprofil wurde gespeichert. Header, Dashboard und Diagnose nutzen diese Daten."
@@ -660,14 +725,29 @@ export default function LoginPage() {
             </div>
 
             <h1 className="mt-6 text-5xl font-black tracking-tight text-slate-950 dark:text-white md:text-6xl">
-              DiagnoseHUB Account.
+              Account einrichten.
             </h1>
 
             <p className="mt-6 text-lg leading-8 text-slate-600 dark:text-slate-300">
-              Diese Seite ist die zentrale Verwaltung für Login,
-              Nutzerprofil und Plan. Der gespeicherte Plan wird von
-              Dashboard, Diagnose und Prüfprotokoll verwendet.
+              Hier erledigst du alles, was ein Nutzer braucht: einloggen,
+              Profil speichern, Tarif prüfen und Geräte verwalten.
             </p>
+
+            <div className="mt-8 grid gap-3 sm:grid-cols-3">
+              {setupSteps.map((step) => (
+                <div
+                  key={step.title}
+                  className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                >
+                  <p className="font-black text-slate-950 dark:text-white">
+                    {step.title}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                    {step.description}
+                  </p>
+                </div>
+              ))}
+            </div>
 
             <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
               <p className="text-sm font-black uppercase tracking-wide text-blue-700 dark:text-blue-300">
@@ -836,7 +916,7 @@ export default function LoginPage() {
             )}
           </div>
 
-          <div className="space-y-8">
+          <div className="order-first space-y-8 lg:order-none">
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
               <p className="text-sm font-black uppercase tracking-wide text-blue-700 dark:text-blue-300">
                 Login
@@ -1003,22 +1083,33 @@ export default function LoginPage() {
               )}
             </div>
 
-            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
+            <div
+              id="nutzerprofil"
+              ref={profileSectionRef}
+              className={
+                profileGuidance
+                  ? "scroll-mt-28 rounded-3xl border border-blue-400 bg-white p-6 shadow-lg shadow-blue-100 ring-4 ring-blue-100 dark:border-blue-500 dark:bg-slate-900/80 dark:shadow-blue-950/20 dark:ring-blue-500/10"
+                  : "scroll-mt-28 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80"
+              }
+            >
               <p className="text-sm font-black uppercase tracking-wide text-blue-700 dark:text-blue-300">
                 Nutzerprofil
               </p>
 
               <h2 className="mt-3 text-3xl font-bold text-slate-950 dark:text-white">
-                In Supabase speichern
+                Nutzerprofil erstellen
               </h2>
 
+              {profileGuidance && (
+                <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 px-5 py-4 text-sm font-bold leading-6 text-blue-800 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200">
+                  {profileGuidance}
+                </div>
+              )}
+
               <p className="mt-3 leading-7 text-slate-600 dark:text-slate-300">
-                Diese Daten werden im bestehenden Profilbereich{" "}
-                <span className="font-mono text-slate-700 dark:text-slate-300">
-                  workshop_profiles
-                </span>{" "}
-                gespeichert. Der Plan wird danach serverseitig für Limits
-                verwendet.
+                Das Profil verbindet deinen Login mit Dashboard, Diagnose,
+                gespeicherten Fällen und Service-Erinnerung. Betrieb/Firma ist
+                optional und kann für private Nutzer leer bleiben.
               </p>
 
               <div className="mt-8 grid gap-4">

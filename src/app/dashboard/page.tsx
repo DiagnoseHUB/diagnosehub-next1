@@ -765,6 +765,44 @@ export default function DashboardPage() {
           </div>
         )}
 
+        <div className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {[
+            {
+              title: "Neue Diagnose",
+              text: "Direkt einen neuen Fehlerfall starten.",
+              href: "/#diagnose",
+            },
+            {
+              title: "Profil prüfen",
+              text: "Name, Betrieb/Firma und Tarif ansehen.",
+              href: "/login?setup=profile",
+            },
+            {
+              title: "Lernen",
+              text: "Module, Quiz und Prüfung öffnen.",
+              href: "/lernen",
+            },
+            {
+              title: "Service",
+              text: "Fahrzeuge und Erinnerungen verwalten.",
+              href: "/service-erinnerung",
+            },
+          ].map((action) => (
+            <Link
+              key={action.href}
+              href={action.href}
+              className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/80"
+            >
+              <p className="font-black text-slate-950 dark:text-white">
+                {action.title}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                {action.text}
+              </p>
+            </Link>
+          ))}
+        </div>
+
         <div className="mb-8 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
           <DashboardCard
             title="Account"

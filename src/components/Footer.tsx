@@ -12,16 +12,16 @@ const productLinks = [
     href: "/dashboard",
   },
   {
+    label: "Lernen",
+    href: "/lernen",
+  },
+  {
+    label: "Service-Erinnerung",
+    href: "/service-erinnerung",
+  },
+  {
     label: "Prüfprotokoll",
     href: "/pruefprotokoll",
-  },
-  {
-    label: "Preise",
-    href: "/preise",
-  },
-  {
-    label: "Login",
-    href: "/login",
   },
 ];
 
@@ -132,7 +132,7 @@ function Footer() {
               </span>
 
               <span className="rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-bold text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300">
-                Version 0.1
+                Version 0.2
               </span>
             </div>
           </div>
@@ -230,7 +230,7 @@ function Footer() {
               Preise
             </Link>
 
-            <span>Beta 0.1</span>
+            <span>Beta 0.2</span>
           </div>
         </div>
       </div>

@@ -38,6 +38,7 @@ import {
   isValidUserPlan,
   type UserPlan,
 } from "@/config/plans";
+import { fetchJsonWithTimeout } from "@/utils/clientApi";
 
 type CurrentDiagnosisCase = {
   messages: ChatMessage[];
@@ -96,6 +97,21 @@ function getErrorMessage(error: unknown) {
   }
 
   return "Unbekannter Fehler";
+}
+
+function getFriendlyDiagnosisError(error: unknown) {
+  const message = getErrorMessage(error);
+  const normalizedMessage = message.toLowerCase();
+
+  if (
+    normalizedMessage.includes("failed to fetch") ||
+    normalizedMessage.includes("networkerror") ||
+    normalizedMessage.includes("network error")
+  ) {
+    return "Die Diagnose konnte die Serververbindung nicht erreichen. Bitte prüfe Internet/VPN und versuche es erneut.";
+  }
+
+  return message;
 }
 
 function buildDynamicQuickQuestions(
@@ -1070,19 +1086,22 @@ Antwortformat exakt:
     try {
       const accessToken = await getAccessTokenForServerLimit();
 
-      const response = await fetch("/api/diagnose", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          input: diagnosisInput,
-          messages,
-          accessToken,
-        }),
-      });
-
-      const data = (await response.json()) as DiagnosisApiResponse;
+      const { response, data } =
+        await fetchJsonWithTimeout<DiagnosisApiResponse>(
+          "/api/diagnose",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              input: diagnosisInput,
+              messages,
+              accessToken,
+            }),
+          },
+          65000
+        );
 
       if (!response.ok) {
         if (data.usageLimit) {
@@ -1117,7 +1136,7 @@ Antwortformat exakt:
       }
     } catch (error) {
       console.error(error);
-      setError(getErrorMessage(error));
+      setError(getFriendlyDiagnosisError(error));
       shouldAutoScrollRef.current = false;
     } finally {
       setLoading(false);

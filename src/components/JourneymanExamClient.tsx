@@ -8,6 +8,7 @@ import type {
   ExamQuestion,
   JourneymanExam,
 } from "@/data/journeymanExams";
+import { fetchJsonWithTimeout } from "@/utils/clientApi";
 
 type JourneymanExamClientProps = {
   exams: JourneymanExam[];
@@ -282,25 +283,26 @@ export default function JourneymanExamClient({
         throw new Error("Bitte zuerst einloggen.");
       }
 
-      const response = await fetch(
-        "/api/lernen/gesellenpruefung/fallbewertung",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
+      const { response, data } =
+        await fetchJsonWithTimeout<CaseEvaluationApiResponse>(
+          "/api/lernen/gesellenpruefung/fallbewertung",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              examTitle: activeExam.title,
+              taskTitle: task.title,
+              prompt: task.prompt,
+              expectedPoints: task.expectedPoints,
+              maxPoints: task.points,
+              answer,
+            }),
           },
-          body: JSON.stringify({
-            examTitle: activeExam.title,
-            taskTitle: task.title,
-            prompt: task.prompt,
-            expectedPoints: task.expectedPoints,
-            maxPoints: task.points,
-            answer,
-          }),
-        },
-      );
-      const data = (await response.json()) as CaseEvaluationApiResponse;
+          45000
+        );
 
       if (!response.ok || !data.evaluation) {
         throw new Error(data.error || "Fallaufgabe konnte nicht bewertet werden.");

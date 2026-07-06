@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { CheckoutPlan } from "@/config/plans";
+import { fetchJsonWithTimeout } from "@/utils/clientApi";
 
 type StripeCheckoutButtonProps = {
   className?: string;
@@ -39,21 +40,23 @@ export default function StripeCheckoutButton({
         return;
       }
 
-      const response = await fetch("/api/stripe/checkout", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          plan,
-        }),
-      });
-
-      const data = (await response.json()) as {
+      const { response, data } = await fetchJsonWithTimeout<{
         url?: string;
         error?: string;
-      };
+      }>(
+        "/api/stripe/checkout",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            plan,
+          }),
+        },
+        20000
+      );
 
       if (!response.ok) {
         throw new Error(data.error || "Stripe Checkout konnte nicht gestartet werden.");

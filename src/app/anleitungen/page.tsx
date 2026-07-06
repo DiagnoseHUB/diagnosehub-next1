@@ -17,6 +17,7 @@ import type {
   InstructionCategory,
   InstructionGuide,
 } from "../../types/instruction";
+import { fetchJsonWithTimeout } from "@/utils/clientApi";
 
 const allCategoryLabel = "Alle";
 
@@ -233,12 +234,15 @@ function InstructionsPageContent() {
       setSavedInstructionsError("");
 
       try {
-        const response = await fetch("/api/anleitungen/saved", {
-          method: "GET",
-          cache: "no-store",
-        });
-
-        const data = (await response.json()) as SavedInstructionsResponse;
+        const { response, data } =
+          await fetchJsonWithTimeout<SavedInstructionsResponse>(
+            "/api/anleitungen/saved",
+            {
+              method: "GET",
+              cache: "no-store",
+            },
+            12000
+          );
 
         if (!response.ok) {
           throw new Error(

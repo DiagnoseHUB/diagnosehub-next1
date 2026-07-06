@@ -9,6 +9,7 @@ import type {
   LearningQuestionAnswerResult,
   LearningQuestionType,
 } from "@/types/learning";
+import { fetchJsonWithTimeout } from "@/utils/clientApi";
 
 type PublicLearningQuestion = {
   id: string;
@@ -149,14 +150,17 @@ export default function LearningQuizClient() {
         );
       }
 
-      const response = await fetch(requestUrl, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      const data = (await response.json()) as QuestionsApiResponse;
+      const { response, data } =
+        await fetchJsonWithTimeout<QuestionsApiResponse>(
+          requestUrl,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+            },
+          },
+          25000
+        );
 
       if (!response.ok) {
         throw new Error(data.error || "Fragen konnten nicht geladen werden.");
@@ -226,19 +230,21 @@ export default function LearningQuizClient() {
         );
       }
 
-      const response = await fetch("/api/lernen/questions/answer", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
+      const { response, data } = await fetchJsonWithTimeout<AnswerApiResponse>(
+        "/api/lernen/questions/answer",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            questionId: question.id,
+            selectedAnswerIndexes,
+          }),
         },
-        body: JSON.stringify({
-          questionId: question.id,
-          selectedAnswerIndexes,
-        }),
-      });
-
-      const data = (await response.json()) as AnswerApiResponse;
+        30000
+      );
 
       if (!response.ok || !data.result) {
         throw new Error(data.error || "Antwort konnte nicht geprüft werden.");

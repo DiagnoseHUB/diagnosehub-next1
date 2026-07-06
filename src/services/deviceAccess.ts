@@ -1,4 +1,5 @@
 import type { UserPlan } from "@/config/plans";
+import { fetchJsonWithTimeout } from "@/utils/clientApi";
 
 export const DEVICE_ID_STORAGE_KEY = "diagnosehub-device-id";
 
@@ -63,9 +64,10 @@ export function getDeviceName() {
   return [platform, touchHint].filter(Boolean).join(" · ") || "Dieses Gerät";
 }
 
-async function parseDeviceResponse(response: Response) {
-  const payload = (await response.json().catch(() => ({}))) as Partial<DeviceAccessResponse>;
-
+function parseDeviceResponse(
+  response: Response,
+  payload: Partial<DeviceAccessResponse>
+) {
   return {
     ...payload,
     ok: response.ok && payload.ok !== false,
@@ -73,44 +75,59 @@ async function parseDeviceResponse(response: Response) {
 }
 
 export async function registerCurrentDevice(accessToken: string) {
-  const response = await fetch("/api/account/devices", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      deviceId: getOrCreateDeviceId(),
-      deviceName: getDeviceName(),
-    }),
-  });
+  const { response, data } =
+    await fetchJsonWithTimeout<Partial<DeviceAccessResponse>>(
+      "/api/account/devices",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          deviceId: getOrCreateDeviceId(),
+          deviceName: getDeviceName(),
+        }),
+      },
+      9000
+    );
 
-  return parseDeviceResponse(response);
+  return parseDeviceResponse(response, data);
 }
 
 export async function loadRegisteredDevices(accessToken: string) {
-  const response = await fetch("/api/account/devices", {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "x-diagnosehub-device-id": getOrCreateDeviceId(),
-    },
-  });
+  const { response, data } =
+    await fetchJsonWithTimeout<Partial<DeviceAccessResponse>>(
+      "/api/account/devices",
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "x-diagnosehub-device-id": getOrCreateDeviceId(),
+        },
+      },
+      9000
+    );
 
-  return parseDeviceResponse(response);
+  return parseDeviceResponse(response, data);
 }
 
 export async function removeRegisteredDevice(
   accessToken: string,
   deviceId: string
 ) {
-  const response = await fetch("/api/account/devices", {
-    method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ deviceId }),
-  });
+  const { response, data } =
+    await fetchJsonWithTimeout<Partial<DeviceAccessResponse>>(
+      "/api/account/devices",
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ deviceId }),
+      },
+      9000
+    );
 
-  return parseDeviceResponse(response);
+  return parseDeviceResponse(response, data);
 }

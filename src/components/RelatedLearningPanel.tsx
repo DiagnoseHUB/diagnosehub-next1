@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { PLAN_CONFIG, type UserPlan } from "@/config/plans";
 import { createClient } from "@/lib/supabase/client";
 import type { RelatedLearningModule } from "@/types/learning";
+import { fetchJsonWithTimeout } from "@/utils/clientApi";
 
 type RelatedLearningResponse = {
   modules?: RelatedLearningModule[];
@@ -76,7 +77,7 @@ export default function RelatedLearningPanel({
       return () => window.clearTimeout(resetTimer);
     }
 
-    const controller = new AbortController();
+    let ignoreResult = false;
 
     async function loadRelatedLearningModules() {
       setLoading(true);
@@ -93,17 +94,23 @@ export default function RelatedLearningPanel({
           );
         }
 
-        const response = await fetch("/api/lernen/related", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: requestKey,
-          signal: controller.signal,
-        });
+        const { response, data } =
+          await fetchJsonWithTimeout<RelatedLearningResponse>(
+            "/api/lernen/related",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${session.access_token}`,
+              },
+              body: requestKey,
+            },
+            15000
+          );
 
-        const data = (await response.json()) as RelatedLearningResponse;
+        if (ignoreResult) {
+          return;
+        }
 
         if (!response.ok) {
           throw new Error(
@@ -113,7 +120,7 @@ export default function RelatedLearningPanel({
 
         setModules(data.modules || []);
       } catch (error) {
-        if (controller.signal.aborted) {
+        if (ignoreResult) {
           return;
         }
 
@@ -124,7 +131,7 @@ export default function RelatedLearningPanel({
             : "Passende Lerninhalte konnten nicht geladen werden."
         );
       } finally {
-        if (!controller.signal.aborted) {
+        if (!ignoreResult) {
           setLoading(false);
         }
       }
@@ -133,7 +140,7 @@ export default function RelatedLearningPanel({
     void loadRelatedLearningModules();
 
     return () => {
-      controller.abort();
+      ignoreResult = true;
     };
   }, [requestKey, payload, supabase.auth]);
 

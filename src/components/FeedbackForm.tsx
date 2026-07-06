@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { fetchJsonWithTimeout } from "@/utils/clientApi";
 
 type FeedbackStatus = "idle" | "sending" | "sent" | "error";
 
@@ -34,20 +35,25 @@ function FeedbackForm() {
     setStatus("sending");
 
     try {
-      const response = await fetch("/api/feedback", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const { response, data: payload } = await fetchJsonWithTimeout<{
+        error?: string;
+      }>(
+        "/api/feedback",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: name.trim(),
+            email: email.trim(),
+            message: cleanMessage,
+            page: getCurrentPage(),
+            company,
+          }),
         },
-        body: JSON.stringify({
-          name: name.trim(),
-          email: email.trim(),
-          message: cleanMessage,
-          page: getCurrentPage(),
-          company,
-        }),
-      });
-      const payload = (await response.json()) as { error?: string };
+        15000
+      );
 
       if (!response.ok) {
         throw new Error(payload.error || "Feedback konnte nicht gesendet werden.");

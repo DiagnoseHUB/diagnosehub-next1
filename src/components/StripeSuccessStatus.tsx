@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { PLAN_CONFIG, isValidUserPlan } from "@/config/plans";
+import { fetchJsonWithTimeout } from "@/utils/clientApi";
 
 type StatusState = "loading" | "success" | "error" | "missing-session";
 
@@ -48,18 +49,21 @@ export default function StripeSuccessStatus() {
           return;
         }
 
-        const response = await fetch("/api/stripe/checkout-status", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            sessionId,
-          }),
-        });
-
-        const data = (await response.json()) as CheckoutStatusResponse;
+        const { response, data } =
+          await fetchJsonWithTimeout<CheckoutStatusResponse>(
+            "/api/stripe/checkout-status",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${session.access_token}`,
+              },
+              body: JSON.stringify({
+                sessionId,
+              }),
+            },
+            25000
+          );
 
         if (!response.ok) {
           throw new Error(

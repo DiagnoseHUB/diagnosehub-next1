@@ -2,6 +2,12 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { fetchJsonWithTimeout } from "@/utils/clientApi";
+
+type VehicleKnowledgeSearchResponse = {
+  answer?: string;
+  error?: string;
+};
 
 const EXAMPLES = [
   "AGR-Ventil",
@@ -47,21 +53,24 @@ export default function VehicleKnowledgeSearch() {
         return;
       }
 
-      const response = await fetch("/api/wissen/search", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          query: cleanedQuery,
-        }),
-      });
-
-      const data = await response.json();
+      const { response, data } =
+        await fetchJsonWithTimeout<VehicleKnowledgeSearchResponse>(
+          "/api/wissen/search",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              query: cleanedQuery,
+            }),
+          },
+          30000
+        );
 
       if (!response.ok) {
-        throw new Error(data?.error || "Suche fehlgeschlagen.");
+        throw new Error(data.error || "Suche fehlgeschlagen.");
       }
 
       setAnswer(data.answer || "");

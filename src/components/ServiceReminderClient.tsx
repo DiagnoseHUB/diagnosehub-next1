@@ -7,6 +7,7 @@ import {
 } from "@/data/serviceIntervalPresets";
 import { createClient } from "@/lib/supabase/client";
 import StripeCheckoutButton from "@/components/StripeCheckoutButton";
+import { fetchJsonWithTimeout } from "@/utils/clientApi";
 
 type ReminderStatus = "overdue" | "soon" | "ok";
 
@@ -57,6 +58,21 @@ type VehicleFormState = {
   brakeFluidDate: string;
   brakeFluidIntervalMonths: string;
   note: string;
+};
+
+type ServiceVehiclesResponse = {
+  vehicles?: ServiceReminderVehicle[];
+  error?: string;
+};
+
+type ServiceReminderMutationResponse = {
+  vehicle?: ServiceReminderVehicle;
+  error?: string;
+};
+
+type ServiceReminderNotificationResponse = {
+  emailEnabled?: boolean;
+  error?: string;
 };
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
@@ -338,12 +354,16 @@ export default function ServiceReminderClient() {
         return;
       }
 
-      const response = await fetch("/api/service-reminders", {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-      const payload = await response.json();
+      const { response, data: payload } =
+        await fetchJsonWithTimeout<ServiceVehiclesResponse>(
+          "/api/service-reminders",
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          },
+          12000
+        );
 
       if (!response.ok) {
         throw new Error(payload.error || "Service-Erinnerungen konnten nicht geladen werden.");
@@ -368,12 +388,16 @@ export default function ServiceReminderClient() {
         return;
       }
 
-      const response = await fetch("/api/service-reminders/notifications", {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-      const payload = await response.json();
+      const { response, data: payload } =
+        await fetchJsonWithTimeout<ServiceReminderNotificationResponse>(
+          "/api/service-reminders/notifications",
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          },
+          12000
+        );
 
       if (!response.ok) {
         throw new Error(payload.error || "E-Mail-Erinnerungen konnten nicht geladen werden.");
@@ -485,21 +509,33 @@ export default function ServiceReminderClient() {
       throw new Error("Bitte melde dich an, damit DiagnoseHUB zentral speichern kann.");
     }
 
-    const response = await fetch("/api/service-reminders", {
-      method,
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-    const payload = await response.json();
+    const { response, data: payload } =
+      await fetchJsonWithTimeout<ServiceReminderMutationResponse>(
+        "/api/service-reminders",
+        {
+          method,
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        },
+        15000
+      );
 
     if (!response.ok) {
       throw new Error(payload.error || "Speichern fehlgeschlagen.");
     }
 
     return payload;
+  }
+
+  function requireVehiclePayload(payload: ServiceReminderMutationResponse) {
+    if (!payload.vehicle) {
+      throw new Error("Der Server hat kein Fahrzeug zur\u00fcckgegeben.");
+    }
+
+    return payload.vehicle;
   }
 
   async function updateEmailNotifications(nextValue: boolean) {
@@ -514,17 +550,21 @@ export default function ServiceReminderClient() {
         throw new Error("Bitte melde dich an, damit DiagnoseHUB E-Mail-Erinnerungen speichern kann.");
       }
 
-      const response = await fetch("/api/service-reminders/notifications", {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          emailEnabled: nextValue,
-        }),
-      });
-      const payload = await response.json();
+      const { response, data: payload } =
+        await fetchJsonWithTimeout<ServiceReminderNotificationResponse>(
+          "/api/service-reminders/notifications",
+          {
+            method: "PATCH",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              emailEnabled: nextValue,
+            }),
+          },
+          15000
+        );
 
       if (!response.ok) {
         throw new Error(payload.error || "E-Mail-Erinnerungen konnten nicht gespeichert werden.");
@@ -567,7 +607,9 @@ export default function ServiceReminderClient() {
           ) || detectedIntervalPreset.brakeFluidMonths,
       });
 
-      setVehicles((currentVehicles) => [payload.vehicle, ...currentVehicles]);
+      const vehicle = requireVehiclePayload(payload);
+
+      setVehicles((currentVehicles) => [vehicle, ...currentVehicles]);
       setFormState(defaultFormState);
       setLongLifeSelected(false);
       setNotice("Fahrzeug zentral gespeichert.");
@@ -601,10 +643,11 @@ export default function ServiceReminderClient() {
         id: vehicleId,
         currentMileage: mileage,
       });
+      const vehicleUpdate = requireVehiclePayload(payload);
 
       setVehicles((currentVehicles) =>
         currentVehicles.map((vehicle) =>
-          vehicle.id === vehicleId ? payload.vehicle : vehicle,
+          vehicle.id === vehicleId ? vehicleUpdate : vehicle,
         ),
       );
     } catch (error) {
@@ -636,10 +679,11 @@ export default function ServiceReminderClient() {
 
     try {
       const payload = await requestWithAuth("PATCH", updatePayload);
+      const vehicleUpdate = requireVehiclePayload(payload);
 
       setVehicles((currentVehicles) =>
         currentVehicles.map((currentVehicle) =>
-          currentVehicle.id === vehicleId ? payload.vehicle : currentVehicle,
+          currentVehicle.id === vehicleId ? vehicleUpdate : currentVehicle,
         ),
       );
       setNotice("Erinnerung aktualisiert.");

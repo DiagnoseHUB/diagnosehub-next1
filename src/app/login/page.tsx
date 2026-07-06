@@ -20,6 +20,7 @@ import {
   PLAN_CONFIG,
   type UserPlan,
 } from "@/config/plans";
+import { fetchJsonWithTimeout } from "@/utils/clientApi";
 import {
   clearLocalWorkshopProfileState,
   convertProfileToDemoAccount,
@@ -48,6 +49,31 @@ function getErrorMessage(error: unknown) {
   }
 
   return "Unbekannter Fehler";
+}
+
+function getFriendlyAuthError(message: string) {
+  const normalizedMessage = message.toLowerCase();
+
+  if (normalizedMessage.includes("rate limit")) {
+    return "Zu viele Registrierungs- oder E-Mail-Versuche in kurzer Zeit. Bitte warte ein paar Minuten und versuche es dann erneut.";
+  }
+
+  if (
+    normalizedMessage.includes("already registered") ||
+    normalizedMessage.includes("already exists") ||
+    normalizedMessage.includes("user already")
+  ) {
+    return "Diese E-Mail ist bereits registriert. Bitte nutze den Login oder setze das Passwort zurück.";
+  }
+
+  if (
+    normalizedMessage.includes("invalid login credentials") ||
+    normalizedMessage.includes("invalid credentials")
+  ) {
+    return "E-Mail oder Passwort stimmt nicht. Bitte prüfe die Eingabe oder setze das Passwort zurück.";
+  }
+
+  return message;
 }
 
 export default function LoginPage() {
@@ -104,7 +130,7 @@ export default function LoginPage() {
       const { data, error } = await supabase.auth.getSession();
 
       if (error) {
-        setAuthError(error.message);
+        setAuthError(getFriendlyAuthError(error.message));
         return;
       }
 
@@ -285,7 +311,7 @@ export default function LoginPage() {
       });
 
       if (error) {
-        setAuthError(error.message);
+        setAuthError(getFriendlyAuthError(error.message));
         return;
       }
 
@@ -295,7 +321,29 @@ export default function LoginPage() {
         setAuthMessage("Registrierung erfolgreich. Du bist eingeloggt.");
 
         if (data.user) {
-          await loadWorkshopProfile(data.user);
+          try {
+            const profile = await saveWorkshopProfileToSupabase(
+              supabase,
+              data.user,
+              {
+                fullName:
+                  name.trim() ||
+                  data.user.email?.split("@")[0] ||
+                  "DiagnoseHUB Nutzer",
+                workshopName: workshop.trim(),
+                email: data.user.email || cleanEmail,
+                role: role || DEFAULT_ROLE,
+              }
+            );
+
+            applyProfileToState(profile, data.user);
+          } catch (profileError) {
+            console.error(
+              "Nutzerprofil konnte nach Registrierung nicht automatisch erstellt werden:",
+              profileError
+            );
+            await loadWorkshopProfile(data.user);
+          }
         }
 
         if (data.session) {
@@ -309,7 +357,11 @@ export default function LoginPage() {
         "Registrierung erstellt. Prüfe deine E-Mails und bestätige den Account, falls Supabase eine Bestätigung verlangt."
       );
     } catch (error) {
-      setAuthError(`Registrierung fehlgeschlagen: ${getErrorMessage(error)}`);
+      setAuthError(
+        `Registrierung fehlgeschlagen: ${getFriendlyAuthError(
+          getErrorMessage(error)
+        )}`
+      );
     } finally {
       setAuthLoading(false);
     }
@@ -339,7 +391,7 @@ export default function LoginPage() {
       });
 
       if (error) {
-        setAuthError(error.message);
+        setAuthError(getFriendlyAuthError(error.message));
         return;
       }
 
@@ -355,7 +407,9 @@ export default function LoginPage() {
         await loadDeviceAccess(data.session);
       }
     } catch (error) {
-      setAuthError(`Login fehlgeschlagen: ${getErrorMessage(error)}`);
+      setAuthError(
+        `Login fehlgeschlagen: ${getFriendlyAuthError(getErrorMessage(error))}`
+      );
     } finally {
       setAuthLoading(false);
     }
@@ -384,7 +438,7 @@ export default function LoginPage() {
       });
 
       if (error) {
-        setAuthError(error.message);
+        setAuthError(getFriendlyAuthError(error.message));
         return;
       }
 
@@ -417,16 +471,19 @@ export default function LoginPage() {
         throw new Error("Bitte zuerst einloggen.");
       }
 
-      const response = await fetch("/api/stripe/portal", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-      const payload = (await response.json()) as {
+      const { response, data: payload } = await fetchJsonWithTimeout<{
         url?: string;
         error?: string;
-      };
+      }>(
+        "/api/stripe/portal",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
+        20000
+      );
 
       if (!response.ok) {
         throw new Error(

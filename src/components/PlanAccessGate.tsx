@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { PLAN_CONFIG, type UserPlan } from "@/config/plans";
 import { createClient } from "@/lib/supabase/client";
+import { fetchJsonWithTimeout } from "@/utils/clientApi";
 
 type AccessFeature = "learning" | "componentKnowledge";
 
@@ -62,14 +63,16 @@ export default function PlanAccessGate({
           throw new Error("Bitte zuerst einloggen.");
         }
 
-        const response = await fetch("/api/account/plan", {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
+        const { response, data } = await fetchJsonWithTimeout<PlanApiResponse>(
+          "/api/account/plan",
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+            },
           },
-        });
-
-        const data = (await response.json()) as PlanApiResponse;
+          12000
+        );
 
         if (!response.ok) {
           throw new Error(data.error || "Plan konnte nicht geladen werden.");

@@ -30,6 +30,8 @@ const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+const FALLBACK_DIAGNOSIS_MODEL = "gpt-4o-mini";
+
 type ChatMessage = {
   role: "user" | "assistant";
   content: string;
@@ -297,8 +299,23 @@ async function resolveUsageControl(
 
   const supabase = createAuthenticatedSupabaseClient(accessToken);
   const user = await loadUserFromAccessToken(supabase, accessToken);
-  const plan = await loadUserPlanFromSupabase(supabase, user);
-  const countBefore = await loadDiagnosisUsageCount(supabase, user, todayKey);
+  let plan: UserPlan = "free";
+  let countBefore = 0;
+
+  try {
+    plan = await loadUserPlanFromSupabase(supabase, user);
+  } catch (error) {
+    console.error("Plan konnte nicht geladen werden, Free-Fallback aktiv:", error);
+  }
+
+  try {
+    countBefore = await loadDiagnosisUsageCount(supabase, user, todayKey);
+  } catch (error) {
+    console.error(
+      "Nutzungszähler konnte nicht geladen werden, Diagnose läuft ohne Blockade weiter:",
+      error
+    );
+  }
 
   return {
     enabled: true,
@@ -430,7 +447,40 @@ function getDiagnosisModel() {
   return (
     process.env.OPENAI_DIAGNOSIS_MODEL ||
     process.env.OPENAI_MODEL ||
-    "gpt-5.5"
+    FALLBACK_DIAGNOSIS_MODEL
+  );
+}
+
+function getOpenAiErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (
+    error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof (error as { message?: unknown }).message === "string"
+  ) {
+    return (error as { message: string }).message;
+  }
+
+  return String(error);
+}
+
+function shouldRetryWithFallbackModel(error: unknown, model: string) {
+  if (model === FALLBACK_DIAGNOSIS_MODEL) {
+    return false;
+  }
+
+  const message = getOpenAiErrorMessage(error).toLowerCase();
+
+  return (
+    message.includes("model") &&
+    (message.includes("not found") ||
+      message.includes("does not exist") ||
+      message.includes("unsupported") ||
+      message.includes("invalid"))
   );
 }
 
@@ -621,9 +671,10 @@ async function createDiagnosisAnswer(
   faultCodeContext: FaultCodeContext,
   messages: ChatMessage[],
   input: string,
-  retryWarning?: string
+  retryWarning?: string,
+  modelOverride?: string
 ) {
-  const model = getDiagnosisModel();
+  const model = modelOverride || getDiagnosisModel();
   const reasoningEffort = getDiagnosisReasoningEffort();
   const maxOutputTokens = getDiagnosisMaxOutputTokens();
 
@@ -659,9 +710,31 @@ ${input}
     ],
   };
 
-  const response = (await client.responses.create(
-    responseInput
-  )) as OpenAI.Responses.Response;
+  let response: OpenAI.Responses.Response;
+
+  try {
+    response = (await client.responses.create(
+      responseInput
+    )) as OpenAI.Responses.Response;
+  } catch (error) {
+    if (shouldRetryWithFallbackModel(error, model)) {
+      console.error(
+        `Diagnosemodell ${model} nicht verfuegbar, Fallback ${FALLBACK_DIAGNOSIS_MODEL} aktiv:`,
+        error
+      );
+
+      return createDiagnosisAnswer(
+        engineContext,
+        faultCodeContext,
+        messages,
+        input,
+        retryWarning,
+        FALLBACK_DIAGNOSIS_MODEL
+      );
+    }
+
+    throw error;
+  }
 
   const answer = response.output_text?.trim();
 

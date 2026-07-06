@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useSyncExternalStore } from "react";
-import { PLAN_CONFIG } from "@/config/plans";
+import { PLAN_CONFIG, getPlanLabel as getConfiguredPlanLabel } from "@/config/plans";
 import type { LearningLesson, LearningProgressStatus } from "@/types/learning";
 import {
   getLearningProgressServerSnapshot,
@@ -16,7 +16,7 @@ type LearningLessonListProps = {
 };
 
 function getPlanLabel(plan: string) {
-  return PLAN_CONFIG[plan as keyof typeof PLAN_CONFIG]?.label || plan;
+  return plan in PLAN_CONFIG ? getConfiguredPlanLabel(plan) : plan;
 }
 
 function getStatusLabel(status?: LearningProgressStatus) {

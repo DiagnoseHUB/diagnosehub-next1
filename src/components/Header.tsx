@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import DeviceAccessGuard from "@/components/DeviceAccessGuard";
 import ThemeToggle from "@/components/ThemeToggle";
-import { PLAN_CONFIG, type UserPlan } from "@/config/plans";
+import { PLAN_CONFIG, normalizeUserPlan, type UserPlan } from "@/config/plans";
 import { createClient } from "@/lib/supabase/client";
 import {
   clearLocalWorkshopProfileState,
@@ -82,7 +82,7 @@ function Header() {
     const localPlan = readLocalPlan();
 
     setDemoAccount(localAccount);
-    setUserPlan(localAccount?.plan || localPlan);
+    setUserPlan(normalizeUserPlan(localAccount?.plan || localPlan));
   }
 
   function applySupabaseFallback(session: Session) {
@@ -95,7 +95,7 @@ function Header() {
         email: session.user.email || localAccount.email,
         supabaseUserId: session.user.id,
       });
-      setUserPlan(localAccount.plan || localPlan);
+      setUserPlan(normalizeUserPlan(localAccount.plan || localPlan));
       return;
     }
 
@@ -108,7 +108,7 @@ function Header() {
       updatedAt: new Date().toISOString(),
       supabaseUserId: session.user.id,
     });
-    setUserPlan(localPlan);
+    setUserPlan(normalizeUserPlan(localPlan));
   }
 
   async function loadAccountState(existingSession?: Session | null) {
@@ -216,7 +216,7 @@ function Header() {
     demoAccount?.workshop && demoAccount.workshop !== "Nicht angegeben"
       ? demoAccount.workshop
       : demoAccount?.name || "Account";
-  const planLabel = PLAN_CONFIG[userPlan].label;
+  const planLabel = PLAN_CONFIG[normalizeUserPlan(userPlan)].label;
 
   return (
     <>

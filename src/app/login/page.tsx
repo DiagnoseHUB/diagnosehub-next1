@@ -18,6 +18,7 @@ import {
 } from "@/services/deviceAccess";
 import {
   PLAN_CONFIG,
+  normalizeUserPlan,
   type UserPlan,
 } from "@/config/plans";
 import { fetchJsonWithTimeout } from "@/utils/clientApi";
@@ -89,6 +90,10 @@ function getFriendlyAuthError(message: string) {
   }
 
   return message;
+}
+
+function getSafePlanConfig(plan: unknown) {
+  return PLAN_CONFIG[normalizeUserPlan(plan)];
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string) {
@@ -165,7 +170,9 @@ export default function LoginPage() {
       return "Nutzerprofil vorhanden";
     }
 
-    return `${savedAccount.workshop} · ${PLAN_CONFIG[savedAccount.plan].label}`;
+    return `${savedAccount.workshop} · ${getSafePlanConfig(
+      savedAccount.plan
+    ).label}`;
   }, [databaseProfile, savedAccount, user]);
 
   useEffect(() => {
@@ -256,7 +263,7 @@ export default function LoginPage() {
     setName(localAccount.name || "");
     setWorkshop(localAccount.workshop || "");
     setRole(localAccount.role || DEFAULT_ROLE);
-    setPlan(localAccount.plan || "free");
+    setPlan(normalizeUserPlan(localAccount.plan || "free"));
   }
 
   async function loadDeviceAccess(existingSession?: Session | null) {
@@ -298,7 +305,7 @@ export default function LoginPage() {
     setName(localAccount.name);
     setWorkshop(localAccount.workshop);
     setRole(localAccount.role);
-    setPlan(localAccount.plan);
+    setPlan(normalizeUserPlan(localAccount.plan));
     setDatabaseProfile(profile);
 
     syncWorkshopProfileToLocalStorage(profile);
@@ -834,7 +841,7 @@ export default function LoginPage() {
                       <p>
                         Plan:{" "}
                         <span className="font-semibold text-slate-950 dark:text-white">
-                          {PLAN_CONFIG[databaseProfile.plan].label}
+                          {getSafePlanConfig(databaseProfile.plan).label}
                         </span>
                       </p>
 
@@ -1221,15 +1228,15 @@ export default function LoginPage() {
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
                       <span className="inline-flex rounded-full border border-blue-300 bg-white px-3 py-1 text-xs font-bold uppercase tracking-wide text-blue-700 dark:border-blue-400/40 dark:bg-blue-500/20 dark:text-blue-200">
-                        {PLAN_CONFIG[plan].badge}
+                        {getSafePlanConfig(plan).badge}
                       </span>
 
                       <h3 className="mt-3 text-xl font-bold text-slate-950 dark:text-white">
-                        {PLAN_CONFIG[plan].label}
+                        {getSafePlanConfig(plan).label}
                       </h3>
 
                       <p className="mt-2 leading-7 text-slate-700 dark:text-slate-300">
-                        {PLAN_CONFIG[plan].description}
+                        {getSafePlanConfig(plan).description}
                       </p>
                     </div>
 
@@ -1239,7 +1246,7 @@ export default function LoginPage() {
                   </div>
 
                   <ul className="mt-4 grid gap-2 md:grid-cols-2">
-                    {PLAN_CONFIG[plan].features.map((feature) => (
+                    {getSafePlanConfig(plan).features.map((feature) => (
                       <li
                         key={feature}
                         className="flex gap-3 text-sm text-slate-700 dark:text-slate-300"

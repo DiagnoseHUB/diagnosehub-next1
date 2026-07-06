@@ -2,7 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { PLAN_CONFIG, type UserPlan } from "@/config/plans";
+import {
+  PLAN_CONFIG,
+  getPlanLabel as getConfiguredPlanLabel,
+  type UserPlan,
+} from "@/config/plans";
 import { createClient } from "@/lib/supabase/client";
 import type { RelatedLearningModule } from "@/types/learning";
 import { fetchJsonWithTimeout } from "@/utils/clientApi";
@@ -28,7 +32,7 @@ function normalizeList(values: string[]) {
 
 function getPlanLabel(plan: string) {
   if (plan in PLAN_CONFIG) {
-    return PLAN_CONFIG[plan as UserPlan].label;
+    return getConfiguredPlanLabel(plan);
   }
 
   return plan;

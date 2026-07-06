@@ -9,7 +9,7 @@ import Footer from "@/components/Footer";
 import { createClient } from "@/lib/supabase/client";
 import { readAccountScopedLocalStorage } from "@/services/accountScopedStorage";
 import {
-  PLAN_CONFIG,
+  getPlanConfig,
   hasPremiumAccess as hasPlanPremiumAccess,
   type UserPlan,
 } from "@/config/plans";
@@ -745,6 +745,7 @@ export default function PrüfprotokollPage() {
   }, [messages, faultCodeContext, engineContext]);
 
   const premiumAccess = hasPremiumAccess(userPlan);
+  const currentPlanConfig = getPlanConfig(userPlan);
 
   const activeProfile = premiumAccess
     ? detectedPremiumProfile
@@ -854,7 +855,7 @@ export default function PrüfprotokollPage() {
                   <p>
                     Plan:{" "}
                     <span className="font-semibold text-white print:text-black">
-                      {PLAN_CONFIG[userPlan].label}
+                      {currentPlanConfig.label}
                     </span>
                   </p>
                   <p>
@@ -892,7 +893,7 @@ export default function PrüfprotokollPage() {
               </p>
 
               <div className="mt-4 grid gap-4 md:grid-cols-3">
-                <InfoRow label="Aktiver Plan" value={PLAN_CONFIG[userPlan].label} />
+                <InfoRow label="Aktiver Plan" value={currentPlanConfig.label} />
                 <InfoRow
                   label="Premium-Prüfprofil"
                   value={premiumProfileStatus}

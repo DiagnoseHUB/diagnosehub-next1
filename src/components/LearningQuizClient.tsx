@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { PLAN_CONFIG, type UserPlan } from "@/config/plans";
+import { getPlanLabel as getConfiguredPlanLabel, type UserPlan } from "@/config/plans";
 import { createClient } from "@/lib/supabase/client";
 import type {
   LearningDifficulty,
@@ -79,7 +79,7 @@ function getQuestionTypeLabel(questionType: LearningQuestionType) {
 }
 
 function getPlanLabel(plan: UserPlan) {
-  return PLAN_CONFIG[plan]?.label || plan;
+  return getConfiguredPlanLabel(plan);
 }
 
 function normalizeSelection(values: number[]) {

@@ -238,6 +238,10 @@ export function isValidUserPlan(value: unknown): value is UserPlan {
   );
 }
 
+export function normalizeUserPlan(value: unknown): UserPlan {
+  return isValidUserPlan(value) ? value : "free";
+}
+
 export function isValidCheckoutPlan(value: unknown): value is CheckoutPlan {
   return (
     value === "diagnose_150" ||
@@ -255,61 +259,72 @@ export function checkoutPlanToUserPlan(plan: CheckoutPlan): UserPlan | null {
   return plan;
 }
 
-export function getPlanConfig(plan: UserPlan) {
-  return PLAN_CONFIG[plan];
+export function getPlanConfig(plan: unknown) {
+  return PLAN_CONFIG[normalizeUserPlan(plan)];
 }
 
-export function getPlanLabel(plan: UserPlan) {
-  return PLAN_CONFIG[plan].label;
+export function getPlanLabel(plan: unknown) {
+  return getPlanConfig(plan).label;
 }
 
-export function getMonthlyDiagnosisLimit(plan: UserPlan) {
-  return PLAN_CONFIG[plan].monthlyDiagnosisLimit;
+export function getMonthlyDiagnosisLimit(plan: unknown) {
+  return getPlanConfig(plan).monthlyDiagnosisLimit;
 }
 
 /**
  * Kompatibilität für alte Stellen.
  * Bedeutet ab jetzt Monatslimit.
  */
-export function getDailyDiagnosisLimit(plan: UserPlan) {
-  return PLAN_CONFIG[plan].monthlyDiagnosisLimit;
+export function getDailyDiagnosisLimit(plan: unknown) {
+  return getPlanConfig(plan).monthlyDiagnosisLimit;
 }
 
-export function getSavedCaseLimit(plan: UserPlan) {
-  return PLAN_CONFIG[plan].savedCaseLimit;
+export function getSavedCaseLimit(plan: unknown) {
+  return getPlanConfig(plan).savedCaseLimit;
 }
 
-export function hasLearningAccess(plan: UserPlan) {
-  return PLAN_CONFIG[plan].learningAccess;
+export function hasLearningAccess(plan: unknown) {
+  return getPlanConfig(plan).learningAccess;
 }
 
-export function hasComponentKnowledgeAccess(plan: UserPlan) {
-  return PLAN_CONFIG[plan].componentKnowledgeAccess;
+export function hasComponentKnowledgeAccess(plan: unknown) {
+  return getPlanConfig(plan).componentKnowledgeAccess;
 }
 
-export function hasServiceReminderAccess(plan: UserPlan) {
-  return PLAN_CONFIG[plan].serviceReminderAccess;
+export function hasServiceReminderAccess(plan: unknown) {
+  return getPlanConfig(plan).serviceReminderAccess;
 }
 
-export function hasPremiumAccess(plan: UserPlan) {
+export function hasPremiumAccess(plan: unknown) {
   return hasLearningAccess(plan) || hasComponentKnowledgeAccess(plan);
 }
 
-export function isUnlimitedPlan(plan: UserPlan) {
-  return PLAN_CONFIG[plan].monthlyDiagnosisLimit >= UNLIMITED_DIAGNOSIS_LIMIT;
+export function isUnlimitedPlan(plan: unknown) {
+  return getPlanConfig(plan).monthlyDiagnosisLimit >= UNLIMITED_DIAGNOSIS_LIMIT;
 }
 
 export function canAccessRequiredPlan(
-  userPlan: UserPlan,
-  requiredPlan: UserPlan
+  userPlan: unknown,
+  requiredPlan: unknown
 ) {
-  if (requiredPlan === "free") {
-    return true;
-  }
+  const normalizedUserPlan = normalizeUserPlan(userPlan);
 
-  if (!hasLearningAccess(userPlan)) {
+  if (!isValidUserPlan(requiredPlan)) {
     return false;
   }
 
-  return LEARNING_PLAN_RANK[userPlan] >= LEARNING_PLAN_RANK[requiredPlan];
+  const normalizedRequiredPlan = requiredPlan;
+
+  if (normalizedRequiredPlan === "free") {
+    return true;
+  }
+
+  if (!hasLearningAccess(normalizedUserPlan)) {
+    return false;
+  }
+
+  return (
+    LEARNING_PLAN_RANK[normalizedUserPlan] >=
+    LEARNING_PLAN_RANK[normalizedRequiredPlan]
+  );
 }

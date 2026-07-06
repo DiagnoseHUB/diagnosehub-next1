@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { PLAN_CONFIG, type UserPlan } from "@/config/plans";
+import { PLAN_CONFIG, getPlanConfig, type UserPlan } from "@/config/plans";
 import { createClient } from "@/lib/supabase/client";
 import { fetchJsonWithTimeout } from "@/utils/clientApi";
 
@@ -82,7 +82,7 @@ export default function PlanAccessGate({
           return;
         }
 
-        setPlanLabel(data.planLabel || PLAN_CONFIG[data.plan || "free"].label);
+        setPlanLabel(data.planLabel || getPlanConfig(data.plan).label);
         setAccessAllowed(hasFeatureAccess(feature, data));
       } catch (error) {
         if (ignoreResult) {

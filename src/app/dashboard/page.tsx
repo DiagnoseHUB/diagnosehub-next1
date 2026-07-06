@@ -23,7 +23,7 @@ import {
   normalizeDiagnosisUsage,
   type DiagnosisUsage,
 } from "@/services/diagnosisUsageSupabase";
-import { PLAN_CONFIG } from "@/config/plans";
+import { getPlanConfig } from "@/config/plans";
 import {
   defaultWorkshopProfileState,
   loadWorkshopProfileState,
@@ -331,7 +331,7 @@ export default function DashboardPage() {
   const [success, setSuccess] = useState("");
 
   const normalizedUsage = normalizeDiagnosisUsage(diagnosisUsage);
-  const currentPlanConfig = PLAN_CONFIG[workshopData.plan];
+  const currentPlanConfig = getPlanConfig(workshopData.plan);
   const currentDailyLimit = currentPlanConfig.dailyDiagnosisLimit;
   const currentSavedCaseLimit = currentPlanConfig.savedCaseLimit;
 

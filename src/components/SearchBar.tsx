@@ -34,6 +34,7 @@ import {
 import {
   PLAN_CONFIG,
   SELECTABLE_USER_PLANS,
+  getPlanConfig,
   isUnlimitedPlan,
   isValidUserPlan,
   type UserPlan,
@@ -534,7 +535,7 @@ export default function SearchBar() {
     return normalizeDiagnosisUsage(diagnosisUsage);
   }, [diagnosisUsage]);
 
-  const currentPlan = PLAN_CONFIG[userPlan];
+  const currentPlan = getPlanConfig(userPlan);
 
   const monthlyLimit = currentPlan.dailyDiagnosisLimit;
   const planIsUnlimited = isUnlimitedPlan(userPlan);
@@ -1054,14 +1055,15 @@ Antwortformat exakt:
     }
 
     const usageBeforeRequest = normalizeDiagnosisUsage(diagnosisUsage);
-    const limitBeforeRequest = PLAN_CONFIG[userPlan].dailyDiagnosisLimit;
+    const requestPlan = getPlanConfig(userPlan);
+    const limitBeforeRequest = requestPlan.dailyDiagnosisLimit;
 
     if (usageBeforeRequest.count >= limitBeforeRequest) {
       setDiagnosisUsage(usageBeforeRequest);
       saveUsageToLocalStorage(usageBeforeRequest);
 
       setError(
-        `Monatslimit erreicht: Im ${PLAN_CONFIG[userPlan].label}-Plan sind aktuell ${limitBeforeRequest} KI-Anfragen pro Monat vorgesehen. Folgefragen zählen mit.`,
+        `Monatslimit erreicht: Im ${requestPlan.label}-Plan sind aktuell ${limitBeforeRequest} KI-Anfragen pro Monat vorgesehen. Folgefragen zählen mit.`,
       );
 
       return;

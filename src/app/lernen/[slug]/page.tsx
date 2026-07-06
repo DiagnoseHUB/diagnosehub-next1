@@ -9,7 +9,7 @@ import {
   loadLearningLessonBySlug,
   loadLearningModuleBySlug,
 } from "@/lib/supabase/learningStorage";
-import { PLAN_CONFIG, type UserPlan } from "@/config/plans";
+import { PLAN_CONFIG, getPlanLabel as getConfiguredPlanLabel } from "@/config/plans";
 import type {
   LearningContentBlock,
   LearningDifficulty,
@@ -27,7 +27,7 @@ function getDifficultyLabel(difficulty: LearningDifficulty) {
 
 function getPlanLabel(plan: string) {
   if (plan in PLAN_CONFIG) {
-    return PLAN_CONFIG[plan as UserPlan].label;
+    return getConfiguredPlanLabel(plan);
   }
 
   return plan;

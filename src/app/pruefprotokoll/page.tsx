@@ -657,9 +657,11 @@ export default function PrüfprotokollPage() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
-      async (_event: AuthChangeEvent, nextSession: Session | null) => {
+      (_event: AuthChangeEvent, nextSession: Session | null) => {
         loadCurrentCase(nextSession?.user.id ?? null);
-        await loadPlanAndWorkshopData(nextSession);
+        window.setTimeout(() => {
+          void loadPlanAndWorkshopData(nextSession);
+        }, 0);
       }
     );
 

@@ -114,8 +114,10 @@ export default function DeviceAccessGuard() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
-      async (_event: AuthChangeEvent, nextSession: Session | null) => {
-        await checkDeviceAccess(nextSession);
+      (_event: AuthChangeEvent, nextSession: Session | null) => {
+        window.setTimeout(() => {
+          void checkDeviceAccess(nextSession);
+        }, 0);
       }
     );
 

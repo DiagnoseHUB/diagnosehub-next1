@@ -361,8 +361,10 @@ export default function DashboardPage() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
-      async (_event: AuthChangeEvent, nextSession: Session | null) => {
-        await loadDashboard(nextSession);
+      (_event: AuthChangeEvent, nextSession: Session | null) => {
+        window.setTimeout(() => {
+          void loadDashboard(nextSession);
+        }, 0);
       }
     );
 

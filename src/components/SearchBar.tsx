@@ -599,7 +599,7 @@ export default function SearchBar() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
-      async (_event: AuthChangeEvent, nextSession: Session | null) => {
+      (_event: AuthChangeEvent, nextSession: Session | null) => {
         const nextUser = nextSession?.user ?? null;
 
         setUser(nextUser);
@@ -607,9 +607,13 @@ export default function SearchBar() {
         if (nextUser) {
           loadCurrentCaseFromLocalStorage(nextUser.id);
           setSavedCases(loadLocalSavedCases(nextUser.id));
-          await loadPlanForAuthenticatedUser(nextUser);
-          await loadUsageForAuthenticatedUser(nextUser);
-          await loadCasesForAuthenticatedUser(nextUser, []);
+          window.setTimeout(() => {
+            void (async () => {
+              await loadPlanForAuthenticatedUser(nextUser);
+              await loadUsageForAuthenticatedUser(nextUser);
+              await loadCasesForAuthenticatedUser(nextUser, []);
+            })();
+          }, 0);
         } else {
           setCaseStorageSource("local");
           setUsageStorageSource("local");

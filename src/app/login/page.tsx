@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import Link from "next/link";
 import type {
   AuthChangeEvent,
@@ -91,6 +91,34 @@ function getFriendlyAuthError(message: string) {
   return message;
 }
 
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string) {
+  let timeoutId: number | null = null;
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = window.setTimeout(() => {
+      reject(new Error(`${label} dauerte zu lange.`));
+    }, timeoutMs);
+  });
+
+  return Promise.race([
+    promise.finally(() => {
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+    }),
+    timeoutPromise,
+  ]);
+}
+
+function scheduleProfileScroll(profileSectionRef: RefObject<HTMLDivElement | null>) {
+  window.setTimeout(() => {
+    profileSectionRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }, 120);
+}
+
 export default function LoginPage() {
   const supabase = useMemo(() => createClient(), []);
   const profileSectionRef = useRef<HTMLDivElement | null>(null);
@@ -179,23 +207,14 @@ export default function LoginPage() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
-      async (_event: AuthChangeEvent, nextSession: Session | null) => {
+      (_event: AuthChangeEvent, nextSession: Session | null) => {
         setUser(nextSession?.user ?? null);
 
         if (nextSession?.user?.email) {
           setAuthEmail(nextSession.user.email);
         }
 
-        if (nextSession?.user) {
-          const profile = await loadWorkshopProfile(nextSession.user);
-          await loadDeviceAccess(nextSession);
-
-          if (!profile) {
-            openProfileSetup(
-              "Erstelle jetzt dein Nutzerprofil. Danach sind Dashboard, Diagnose und Service sauber mit deinem Account verbunden."
-            );
-          }
-        } else {
+        if (!nextSession?.user) {
           setDatabaseProfile(null);
           setSavedAccount(null);
           setDeviceAccess(null);
@@ -203,7 +222,21 @@ export default function LoginPage() {
           setWorkshop("");
           setRole(DEFAULT_ROLE);
           setPlan("free");
+          return;
         }
+
+        window.setTimeout(() => {
+          void (async () => {
+            const profile = await loadWorkshopProfile(nextSession.user);
+            await loadDeviceAccess(nextSession);
+
+            if (!profile) {
+              openProfileSetup(
+                "Erstelle jetzt dein Nutzerprofil. Danach sind Dashboard, Diagnose und Service sauber mit deinem Account verbunden."
+              );
+            }
+          })();
+        }, 0);
       }
     );
 
@@ -241,7 +274,11 @@ export default function LoginPage() {
       }
 
       getOrCreateDeviceId();
-      const access = await loadRegisteredDevices(session.access_token);
+      const access = await withTimeout(
+        loadRegisteredDevices(session.access_token),
+        9000,
+        "Geräteprüfung"
+      );
       setDeviceAccess(access);
     } catch (error) {
       console.error("Gerätezugriff konnte nicht geladen werden:", error);
@@ -279,9 +316,10 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const profile = await loadWorkshopProfileFromSupabase(
-        supabase,
-        currentUser
+      const profile = await withTimeout(
+        loadWorkshopProfileFromSupabase(supabase, currentUser),
+        9000,
+        "Nutzerprofil"
       );
 
       if (!profile) {
@@ -320,13 +358,7 @@ export default function LoginPage() {
 
   function openProfileSetup(message: string) {
     setProfileGuidance(message);
-
-    window.setTimeout(() => {
-      profileSectionRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    }, 120);
+    scheduleProfileScroll(profileSectionRef);
   }
 
   async function handleRegister() {
@@ -458,17 +490,26 @@ export default function LoginPage() {
       setAuthMessage("Login erfolgreich.");
 
       if (data.user) {
-        const profile = await loadWorkshopProfile(data.user);
+        void (async () => {
+          try {
+            const profile = await loadWorkshopProfile(data.user);
 
-        if (!profile) {
-          openProfileSetup(
-            "Lege jetzt dein Nutzerprofil an. Danach kannst du DiagnoseHUB vollständig nutzen."
-          );
-        }
-      }
+            if (!profile) {
+              openProfileSetup(
+                "Lege jetzt dein Nutzerprofil an. Danach kannst du DiagnoseHUB vollständig nutzen."
+              );
+            }
 
-      if (data.session) {
-        await loadDeviceAccess(data.session);
+            if (data.session) {
+              await loadDeviceAccess(data.session);
+            }
+          } catch (setupError) {
+            console.error("Login-Nachbereitung fehlgeschlagen:", setupError);
+            openProfileSetup(
+              "Du bist eingeloggt. Profil oder Geräteprüfung konnten gerade nicht vollständig geladen werden."
+            );
+          }
+        })();
       }
     } catch (error) {
       setAuthError(

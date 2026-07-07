@@ -18,6 +18,8 @@ type GuideStep = {
   description: string;
   check?: string;
   warning?: string;
+  imageHint?: string;
+  imageAlt?: string;
 };
 
 type Guide = {
@@ -123,8 +125,21 @@ const instructionGuideTextFormat = {
             warning: {
               type: "string",
             },
+            imageHint: {
+              type: "string",
+            },
+            imageAlt: {
+              type: "string",
+            },
           },
-          required: ["title", "description", "check", "warning"],
+          required: [
+            "title",
+            "description",
+            "check",
+            "warning",
+            "imageHint",
+            "imageAlt",
+          ],
         },
       },
       commonCauses: {
@@ -253,6 +268,8 @@ function normalizeSteps(value: unknown): GuideStep[] {
         "Modell, Baujahr, Motorisierung, Motorkennbuchstaben und Getriebeart eindeutig erfassen.",
       check: "MKB und Fahrzeugdaten notieren.",
       warning: "",
+      imageHint: "Fahrzeugschein, Diagnosegerät und Motorraum-Übersicht.",
+      imageAlt: "Fahrzeugdaten vor Arbeitsbeginn prüfen.",
     },
     {
       title: "Arbeitsumfang festlegen",
@@ -260,6 +277,8 @@ function normalizeSteps(value: unknown): GuideStep[] {
         "Prüfen, ob nur Diagnose, Teilprüfung oder kompletter Austausch der Baugruppe geplant ist.",
       check: "Reparaturumfang eindeutig festlegen.",
       warning: "",
+      imageHint: "Werkzeugablage mit markierter Baugruppe und Checkliste.",
+      imageAlt: "Arbeitsumfang und benötigte Werkzeuge festlegen.",
     },
   ];
 
@@ -300,6 +319,14 @@ function normalizeSteps(value: unknown): GuideStep[] {
           typeof rawStep.warning === "string"
             ? truncate(rawStep.warning, 140)
             : "",
+        imageHint:
+          typeof rawStep.imageHint === "string"
+            ? truncate(rawStep.imageHint, 180)
+            : `Bildmotiv: ${title}`,
+        imageAlt:
+          typeof rawStep.imageAlt === "string"
+            ? truncate(rawStep.imageAlt, 140)
+            : title,
       };
     })
     .filter((step): step is GuideStep => Boolean(step))
@@ -334,7 +361,7 @@ function normalizeGuide(rawGuide: unknown, query: string): Guide {
     estimatedTime:
       typeof raw.estimatedTime === "string" && raw.estimatedTime.trim()
         ? truncate(raw.estimatedTime, 80)
-        : "Fahrzeugabhaengig",
+        : "Fahrzeugabhängig",
     vehicleApplicability:
       typeof raw.vehicleApplicability === "string" &&
       raw.vehicleApplicability.trim()
@@ -350,7 +377,7 @@ function normalizeGuide(rawGuide: unknown, query: string): Guide {
       raw.tools,
       [
         "Diagnosetester",
-        "Drehmomentschluessel",
+        "Drehmomentschlüssel",
         "geeignetes Handwerkzeug",
         "fahrzeugabhängiges Spezialwerkzeug",
       ],
@@ -519,9 +546,9 @@ Erstelle eine direkte, kompakte und fachlich brauchbare Werkstatt-Anleitung.
 Zielgruppe sind ambitionierte Schrauber, Kfz-Mechatroniker und freie Werkstätten.
 Schreibe wie ein Werkstattkollege, nicht wie ein Rechtsanwalt.
 Keine langen Sicherheitstexte.
-Keine unnoetigen Belehrungen.
+Keine unnötigen Belehrungen.
 Keine wiederholten Standardhinweise.
-Keine erfundenen Drehmomente, Schluesselweiten, Spezialwerkzeugnummern oder Herstellerwerte.
+Keine erfundenen Drehmomente, Schlüsselweiten, Spezialwerkzeugnummern oder Herstellerwerte.
 
 AUSGABE:
 Du musst ausschließlich gültiges JSON im vorgegebenen Schema ausgeben.
@@ -531,16 +558,18 @@ Lieber kompakter schreiben als wegen Tokenlimit unvollständig abbrechen.
 KOMPAKTHEIT:
 - safetyNotes maximal 2–4 kurze Punkte.
 - initialChecks maximal 3–5 kurze Punkte.
-- tools maximal 6–10 Eintraege.
-- symptoms maximal 3–6 Eintraege.
-- commonCauses maximal 3–6 Eintraege.
-- nextActions maximal 3–6 Eintraege.
-- proHint maximal 1–2 kurze Saetze.
-- check nur ausfuellen, wenn wirklich etwas geprüft, gemessen oder kontrolliert wird.
-- warning nur ausfuellen, wenn im konkreten Schritt ein echtes Risiko besteht.
-- Wenn kein konkreter Check noetig ist, check als leeren String ausgeben.
-- Wenn keine konkrete Warnung noetig ist, warning als leeren String ausgeben.
-- Keine langen Absaetze.
+- tools maximal 6–10 Einträge.
+- symptoms maximal 3–6 Einträge.
+- commonCauses maximal 3–6 Einträge.
+- nextActions maximal 3–6 Einträge.
+- proHint maximal 1–2 kurze Sätze.
+- check nur ausfüllen, wenn wirklich etwas geprüft, gemessen oder kontrolliert wird.
+- warning nur ausfüllen, wenn im konkreten Schritt ein echtes Risiko besteht.
+- imageHint für jeden Schritt ausfüllen: knapp beschreiben, welches Bild oder welche Skizze den Schritt verständlich macht.
+- imageAlt für jeden Schritt ausfüllen: kurzer Alternativtext für das Bild.
+- Wenn kein konkreter Check nötig ist, check als leeren String ausgeben.
+- Wenn keine konkrete Warnung nötig ist, warning als leeren String ausgeben.
+- Keine langen Absätze.
 - Keine doppelten Hinweise.
 - Keine Disclaimer-Wiederholungen.
 
@@ -554,6 +583,7 @@ DETAILTIEFE:
 - Beschreibung pro Schritt maximal ca. 220 Zeichen.
 - Check pro Schritt maximal ca. 120 Zeichen.
 - Warning pro Schritt maximal ca. 120 Zeichen.
+- ImageHint pro Schritt maximal ca. 150 Zeichen.
 - Keine langen Erklärtexte.
 - Lieber 24 saubere Werkstattschritte als eine unvollständige XXL-Anleitung.
 
@@ -569,7 +599,7 @@ MIKROSCHRITT-MODUS:
   5. Keilrippenriemen abnehmen.
   6. OT-Stellung herstellen.
   7. Steuerzeiten vor Demontage prüfen.
-  8. Dichtflaechen reinigen.
+  8. Dichtflächen reinigen.
   9. Motor von Hand durchdrehen.
   10. Fehlerspeicher prüfen.
 
@@ -580,16 +610,16 @@ Wenn passend, diese Reihenfolge verwenden:
 3. Vorbereitung / Batterie / Abdeckungen / Zugang
 4. Demontage fahrzeugabhängig
 5. Prüfung von Verschleiß- und Schadteilen
-6. Montage / Einstellung / Dichtflaechen / Schrauben
+6. Montage / Einstellung / Dichtflächen / Schrauben
 7. Drehmomentgruppen ohne Werte nennen
 8. Endkontrolle / Fehlerspeicher / Probefahrt / Dichtheitsprüfung
 
-QUALITAeTSREGEL:
+QUALITÄTSREGEL:
 Vor Ausgabe intern prüfen:
 - Passt jeder Schritt zum Suchthema "${query}"?
 - Wurde eine falsche Baugruppe genannt?
 - Wurden Drehmomente erfunden?
-- Wurden Schluesselweiten erfunden?
+- Wurden Schlüsselweiten erfunden?
 - Ist die Anleitung praktisch nutzbar?
 - Ist das JSON vollständig?
 - Ist die Antwort kompakt genug?
@@ -597,8 +627,8 @@ Vor Ausgabe intern prüfen:
 ${
   highRisk
     ? `
-REGEL FUeR SICHERHEITS-/MOTORRELEVANTE ARBEITEN:
-- Herstellerdaten einmal klar nennen, nicht staendig wiederholen.
+REGEL FÜR SICHERHEITS-/MOTORRELEVANTE ARBEITEN:
+- Herstellerdaten einmal klar nennen, nicht ständig wiederholen.
 - Relevante Drehmomentgruppen nennen, aber keine Werte erfinden.
 - Kritische Endkontrolle nennen.
 `
@@ -614,11 +644,11 @@ SPEZIALREGEL STEUERKETTE / STEUERTRIEB:
 - Für Nebenantrieb korrekt "Keilrippenriemen" oder "Nebenaggregateriemen" verwenden.
 - Motorkennbuchstabe ist Pflicht.
 - OT-Stellung, Steuerzeiten und Arretierung berücksichtigen.
-- Kettenspanner, Gleitschienen, Führungsschienen, Kettenraeder, Versteller, Dichtungen und Einmalschrauben berücksichtigen.
+- Kettenspanner, Gleitschienen, Führungsschienen, Kettenräder, Versteller, Dichtungen und Einmalschrauben berücksichtigen.
 - Stirndeckel/Kettengehäuse, Ventildeckel, Ölwanne, Motorlager und Riemenscheibe nur fahrzeugabhängig nennen, wenn nicht sicher.
 - Drehmomentgruppen nennen, aber keine Werte erfinden.
 - Nach Montage Motor von Hand durchdrehen und Steuerzeiten erneut prüfen.
-- Erster Start: Oeldruck, Geraeusche, Leckagen und Fehlerspeicher prüfen.
+- Erster Start: Öldruck, Geräusche, Leckagen und Fehlerspeicher prüfen.
 - Nicht jedes Variantenbauteil ausführlich erklären. Hauptreihenfolge kompakt darstellen.
 `
     : ""
@@ -630,7 +660,7 @@ ${
 VAG-/AUDI-STEUERTRIEB-SCHABLONE:
 - Modell, Baujahr, Motorcode und Getriebeart zuerst als Pflichtdaten nennen.
 - Bei VAG-Motoren keine pauschalen Aussagen treffen, wenn Motorcode fehlt.
-- Steuertrieb-Zugang, Motorlage und Demontageumfang als motorabhaengig markieren.
+- Steuertrieb-Zugang, Motorlage und Demontageumfang als motorabhängig markieren.
 - Reihenfolge kompakt halten: Identifikation, Zugang, OT, Arretierung, Demontage, Prüfung, Montage, Endkontrolle.
 `
     : ""
@@ -654,9 +684,9 @@ ${
     ? `
 SPEZIALREGEL BREMSE:
 - Achsweise arbeiten.
-- Belagführung, Führungsbolzen, Staubmanschetten, Radnabe und Auflageflaechen berücksichtigen.
+- Belagführung, Führungsbolzen, Staubmanschetten, Radnabe und Auflageflächen berücksichtigen.
 - Drehmomentgruppen nennen: Radschrauben, Sattelhalter, Bremssattel/Führungsbolzen.
-- Nach Montage Bremspedal vor Fahrt betaetigen.
+- Nach Montage Bremspedal vor Fahrt betätigen.
 - Endkontrolle und Probefahrt/Bremsenprüfung nennen.
 `
     : ""
@@ -666,10 +696,10 @@ ${
   climate
     ? `
 SPEZIALREGEL KLIMA:
-- Arbeiten am Kaeltemittelkreis nur mit Klimaservicegerät und Sachkunde.
-- Fuellmenge, Oelmenge, Druckwerte und Dichtheitsprüfung nach Herstellerdaten.
+- Arbeiten am Kältemittelkreis nur mit Klimaservicegerät und Sachkunde.
+- Füllmenge, Ölmenge, Druckwerte und Dichtheitsprüfung nach Herstellerdaten.
 - Hochdruck, Niederdruck, Lüfteransteuerung, Kompressorfreigabe, Sensorwerte und Spannungsversorgung berücksichtigen.
-- Keine Kaeltemittelarbeiten als einfache Heimwerkerarbeit darstellen.
+- Keine Kältemittelarbeiten als einfache Heimwerkerarbeit darstellen.
 `
     : ""
 }
@@ -680,8 +710,8 @@ ${
 SPEZIALREGEL TURBOLADER:
 - Ölversorgung, Ölzulauf, Ölrücklauf, Kurbelgehäuseentlüftung und Ladedruckstrecke berücksichtigen.
 - Bei wiederholtem Turboschaden Ursachenprüfung vor Teiletausch nennen.
-- Oelsiebe, Hohlschrauben, Leitungen und Oelqualität motorabhaengig prüfen.
-- Erststart mit Oeldruckaufbau und Dichtheitskontrolle nennen.
+- Ölsiebe, Hohlschrauben, Leitungen und Ölqualität motorabhängig prüfen.
+- Erststart mit Öldruckaufbau und Dichtheitskontrolle nennen.
 `
     : ""
 }
@@ -792,7 +822,7 @@ async function findReusableInstructionGuide(
 ) {
   const similarGuides = await findSimilarSavedInstructionGuides(query, {
     limit: 300,
-    minScore: source === "diagnosis" ? 72 : 64,
+    minScore: source === "diagnosis" ? 66 : 58,
   });
 
   const bestExistingGuide = similarGuides[0];
@@ -968,9 +998,9 @@ ${diagnosisText || "Nicht angegeben"}
 Aufgabe:
 Erstelle eine kompakte, direkte und fachlich brauchbare Werkstatt-Anleitung.
 Bei fehlenden Fahrzeugdaten kurz als Pflichtprüfung markieren.
-Keine erfundenen Drehmomente, Schluesselweiten, Spezialwerkzeugnummern oder Herstellerwerte.
+Keine erfundenen Drehmomente, Schlüsselweiten, Spezialwerkzeugnummern oder Herstellerwerte.
 Keine langen Disclaimer.
-Die Antwort muss vollständig bleiben und darf nicht wegen Laenge abbrechen.
+Die Antwort muss vollständig bleiben und darf nicht wegen Länge abbrechen.
 `;
 
     const response = (await client.responses.create(

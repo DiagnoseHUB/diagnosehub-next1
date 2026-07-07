@@ -8,6 +8,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
+import CaseFeedbackPanel from "@/components/CaseFeedbackPanel";
 import RelatedLearningPanel from "@/components/RelatedLearningPanel";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -52,6 +53,7 @@ type CurrentDiagnosisCase = {
 
 type CaseStorageSource = "local" | "supabase";
 type UsageStorageSource = "local" | "supabase";
+type DiagnosisAudienceMode = "workshop" | "hobby";
 
 type UsageLimitPayload = {
   enabled: boolean;
@@ -81,8 +83,45 @@ const STORAGE_KEY = "diagnosehub-current-case";
 const SAVED_CASES_STORAGE_KEY = "diagnosehub-saved-cases";
 const USER_PLAN_STORAGE_KEY = "diagnosehub-user-plan";
 const DIAGNOSIS_USAGE_STORAGE_KEY = "diagnosehub-diagnosis-usage";
+const AUDIENCE_MODE_STORAGE_KEY = "diagnosehub-audience-mode";
+const PENDING_PREFILL_STORAGE_KEY = "diagnosehub-pending-prefill";
 
 const showLocalPlanSwitcher = process.env.NODE_ENV === "development";
+
+const audienceModeOptions: Array<{
+  value: DiagnosisAudienceMode;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: "workshop",
+    label: "Werkstatt",
+    description: "Diagnosepfad, Messwerte, Plausibilität und Entscheidung.",
+  },
+  {
+    value: "hobby",
+    label: "Hobby",
+    description: "Normale Sprache, Machbarkeit, Werkzeug, Risiko und Kosten.",
+  },
+];
+
+function getInitialAudienceMode(): DiagnosisAudienceMode {
+  if (typeof window === "undefined") {
+    return "workshop";
+  }
+
+  try {
+    const storedMode = window.localStorage.getItem(AUDIENCE_MODE_STORAGE_KEY);
+
+    if (storedMode === "workshop" || storedMode === "hobby") {
+      return storedMode;
+    }
+  } catch {
+    return "workshop";
+  }
+
+  return "workshop";
+}
 
 const baseQuickQuestions = [
   "Kurze Ausbauanleitung erstellen",
@@ -134,7 +173,7 @@ function buildDynamicQuickQuestions(
   if (engineContext?.engineType === "Benziner") {
     questions.push(
       "Fuel Trims prüfen?",
-      "Zuendaussetzer je Zylinder prüfen?",
+      "Zündaussetzer je Zylinder prüfen?",
       "Falschluft prüfen?",
       "Kraftstoffdruck prüfen?",
       "Ladedruck Soll/Ist prüfen?",
@@ -500,6 +539,8 @@ export default function SearchBar() {
   const [qualityCheck, setQualityCheck] = useState("");
   const [savedCases, setSavedCases] = useState<SavedDiagnosisCase[]>([]);
   const [userPlan, setUserPlan] = useState<UserPlan>("free");
+  const [audienceMode, setAudienceMode] =
+    useState<DiagnosisAudienceMode>(getInitialAudienceMode);
   const [diagnosisUsage, setDiagnosisUsage] = useState<DiagnosisUsage>(
     getInitialDiagnosisUsage(),
   );
@@ -631,6 +672,58 @@ export default function SearchBar() {
       subscription.unsubscribe();
     };
   }, [supabase]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(AUDIENCE_MODE_STORAGE_KEY, audienceMode);
+    } catch {
+      // Lokale Einstellungen sind Komfort, die Diagnose funktioniert auch ohne.
+    }
+  }, [audienceMode]);
+
+  useEffect(() => {
+    function handlePrefillDiagnosis(event: Event) {
+      const detail = (event as CustomEvent<{ text?: unknown }>).detail;
+
+      if (!detail || typeof detail.text !== "string") {
+        return;
+      }
+
+      setSearch(detail.text);
+      setError("");
+    }
+
+    window.addEventListener(
+      "diagnosehub:prefill-diagnosis",
+      handlePrefillDiagnosis,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "diagnosehub:prefill-diagnosis",
+        handlePrefillDiagnosis,
+      );
+    };
+  }, []);
+
+  useEffect(() => {
+    try {
+      const pendingPrefill = window.sessionStorage.getItem(
+        PENDING_PREFILL_STORAGE_KEY,
+      );
+
+      if (pendingPrefill) {
+        window.sessionStorage.removeItem(PENDING_PREFILL_STORAGE_KEY);
+
+        window.setTimeout(() => {
+          setSearch(pendingPrefill);
+          setError("");
+        }, 0);
+      }
+    } catch {
+      // Komfortfunktion: Wenn Session Storage blockiert ist, bleibt die Diagnose normal nutzbar.
+    }
+  }, []);
 
   useEffect(() => {
     if (!hasLoadedCaseRef.current) {
@@ -1021,7 +1114,7 @@ Regeln für diese Antwort:
 - Konkrete Verkleidungen, Abdeckungen, Stecker, Halter, Befestigungen und Richtung/Lage nennen, wenn sinnvoll.
 - Linksgewinde nennen, wenn möglich oder typisch.
 - Schrauben, Exzenter, Einstellpunkte oder Markierungen nennen, die nicht gelöst oder nicht verstellt werden dürfen.
-- Keine erfundenen Drehmomente, Fuellmengen oder Herstellersollwerte.
+- Keine erfundenen Drehmomente, Füllmengen oder Herstellersollwerte.
 - Daten sichern nur nennen, wenn Steuergerät/Codierung/Programmierung/Anlernung betroffen ist.
 - Batterie abklemmen nur nennen, wenn technisch notwendig.
 
@@ -1104,6 +1197,7 @@ Antwortformat exakt:
               input: diagnosisInput,
               messages,
               accessToken,
+              audienceMode,
             }),
           },
           65000
@@ -1371,6 +1465,9 @@ ${faultCode.suggestedChecks.map((check) => `- ${check}`).join("\n")}`;
 Erstellt am:
 ${createdAt}
 
+Ausgabemodus:
+${audienceMode === "workshop" ? "Werkstatt-Modus" : "Hobby-Modus"}
+
 Motorkontext:
 ${motorInfo}
 
@@ -1438,6 +1535,42 @@ ${chatText}
   return (
     <div className="w-full">
       <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-4 shadow-2xl shadow-blue-950/30">
+        <div className="mb-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-sm font-black uppercase tracking-wide text-blue-300">
+                Ausgabemodus
+              </p>
+              <p className="mt-1 text-sm text-slate-400">
+                Gleicher Inhalt, aber Sprache, Risiko und Detailtiefe passen
+                sich an.
+              </p>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2 lg:min-w-[32rem]">
+              {audienceModeOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setAudienceMode(option.value)}
+                  className={
+                    audienceMode === option.value
+                      ? "rounded-2xl border border-blue-500 bg-blue-600 px-4 py-3 text-left text-white shadow-lg shadow-blue-950/30"
+                      : "rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-left text-slate-300 transition hover:border-blue-500 hover:text-blue-200"
+                  }
+                >
+                  <span className="block text-sm font-black">
+                    {option.label}
+                  </span>
+                  <span className="mt-1 block text-xs leading-5 opacity-85">
+                    {option.description}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
         <textarea
           value={search}
           onChange={(event) => setSearch(event.target.value)}
@@ -1450,6 +1583,18 @@ ${chatText}
           rows={4}
           className="w-full resize-none rounded-2xl border border-slate-800 bg-slate-950 p-5 text-white outline-none placeholder:text-slate-400 focus:border-blue-500"
         />
+
+        <label className="mt-3 grid gap-2">
+          <span className="text-xs font-black uppercase tracking-wide text-slate-400">
+            Interne Notiz / verursachendes Teil
+          </span>
+          <input
+            value={causingPart}
+            onChange={(event) => setCausingPart(event.target.value)}
+            placeholder="z. B. Ladeluftschlauch gerissen, AGR klemmt, noch offen"
+            className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-blue-500"
+          />
+        </label>
 
         <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-slate-400">
           <span className="rounded-full border border-slate-800 bg-slate-950/70 px-3 py-1.5">
@@ -1751,6 +1896,13 @@ ${chatText}
             ))}
           </div>
         </div>
+      )}
+
+      {messages.length > 0 && (
+        <CaseFeedbackPanel
+          caseTitle={getCaseTitle(messages)}
+          caseContext={buildCaseReport()}
+        />
       )}
 
       {messages.length > 0 && (

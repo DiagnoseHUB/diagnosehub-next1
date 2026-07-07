@@ -2,6 +2,7 @@ import Link from "next/link";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import LearningLevelOverview from "@/components/LearningLevelOverview";
+import LearningPracticeHub from "@/components/LearningPracticeHub";
 import PlanAccessGate from "@/components/PlanAccessGate";
 import { loadPublishedLearningModules } from "@/lib/supabase/learningStorage";
 
@@ -148,6 +149,8 @@ export default async function LernenPage() {
                 ))}
               </div>
             </section>
+
+            <LearningPracticeHub />
 
             <section id="lernmodule" className="mt-10">
               <div className="mb-5">

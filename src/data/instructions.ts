@@ -11,7 +11,7 @@ export const instructions: InstructionGuide[] = [
     difficulty: "mittel",
     estimatedTime: "30–60 Minuten",
     vehicleApplicability: "Universell für viele moderne Fahrzeuge mit geregeltem Klimakompressor",
-    tags: ["Klima", "Klimakompressor", "Kaeltemittel", "Drucksensor", "Mischklappe"],
+    tags: ["Klima", "Klimakompressor", "Kältemittel", "Drucksensor", "Mischklappe"],
     symptoms: [
       "Klimaanlage kühlt manchmal nicht",
       "Keine oder schwache Kaltluft",
@@ -27,12 +27,12 @@ export const instructions: InstructionGuide[] = [
       "Stromlaufplan bei Bedarf"
     ],
     safetyNotes: [
-      "Arbeiten am Kaeltemittelkreislauf nur mit geeignetem Klimaservicegerät durchführen.",
-      "Kaeltemittel nicht in die Umwelt ablassen.",
+      "Arbeiten am Kältemittelkreislauf nur mit geeignetem Klimaservicegerät durchführen.",
+      "Kältemittel nicht in die Umwelt ablassen.",
       "Druckwerte immer mit Herstellerangaben vergleichen."
     ],
     initialChecks: [
-      "Kaeltemittelmenge prüfen.",
+      "Kältemittelmenge prüfen.",
       "Fehlerspeicher von Klimabedienteil, Motorsteuergerät und Bordnetz prüfen.",
       "Außentemperaturwert im Istwertblock prüfen.",
       "Innenraumtemperatursensor und Sonnensensor prüfen.",
@@ -46,11 +46,11 @@ export const instructions: InstructionGuide[] = [
         check: "Ausblastemperatur an mittlerer Düse messen."
       },
       {
-        title: "Kaeltemittelmenge bewerten",
+        title: "Kältemittelmenge bewerten",
         description:
-          "Mit Klimaservicegerät absaugen und die Ist-Menge mit der Soll-Fuellmenge vergleichen. Eine geringe Abweichung muss nicht zwingend der Fehler sein, kann aber bei Grenzfällen relevant werden.",
+          "Mit Klimaservicegerät absaugen und die Ist-Menge mit der Soll-Füllmenge vergleichen. Eine geringe Abweichung muss nicht zwingend der Fehler sein, kann aber bei Grenzfällen relevant werden.",
         warning:
-          "Nicht blind nachfuellen. Erst absaugen, Menge prüfen, Anlage evakuieren und korrekt befuellen."
+          "Nicht blind nachfüllen. Erst absaugen, Menge prüfen, Anlage evakuieren und korrekt befüllen."
       },
       {
         title: "Druckwerte prüfen",
@@ -83,7 +83,7 @@ export const instructions: InstructionGuide[] = [
       }
     ],
     commonCauses: [
-      "Zu geringe oder falsche Kaeltemittelmenge",
+      "Zu geringe oder falsche Kältemittelmenge",
       "Defekter Drucksensor",
       "Kühlerlüfter läuft nicht",
       "Kompressorregelventil defekt",
@@ -222,7 +222,7 @@ export const instructions: InstructionGuide[] = [
       "Absteck-/Zentrierstifte",
       "Hebebuehne",
       "Achsvermessungsgerät",
-      "Drehmomentschluessel",
+      "Drehmomentschlüssel",
       "Herstellerunterlagen"
     ],
     safetyNotes: [
@@ -232,7 +232,7 @@ export const instructions: InstructionGuide[] = [
     ],
     initialChecks: [
       "Reifenluftdruck prüfen.",
-      "Felgen/Reifen auf Beschaedigung prüfen.",
+      "Felgen/Reifen auf Beschädigung prüfen.",
       "Querlenker, Radlagergehäuse und Hilfsrahmen auf Unfallschäden prüfen.",
       "Lenkgetriebe und Spurstangen auf Verzug prüfen.",
       "Karosserie-Aufnahmepunkte prüfen."
@@ -421,7 +421,7 @@ export const instructions: InstructionGuide[] = [
       {
         title: "Fehlerspeicher vollständig auslesen",
         description:
-          "Nicht nur DPF-Fehler betrachten. Ladedruck, AGR, Temperatursensoren und Gluehkerzen können Regenerationen verhindern."
+          "Nicht nur DPF-Fehler betrachten. Ladedruck, AGR, Temperatursensoren und Glühkerzen können Regenerationen verhindern."
       },
       {
         title: "Differenzdruck im Leerlauf prüfen",

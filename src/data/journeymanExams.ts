@@ -61,7 +61,7 @@ export const JOURNEYMAN_EXAMS: JourneymanExam[] = [
         type: "single_choice",
         area: "Arbeitsplanung",
         question:
-          "Welche erste Massnahme passt am besten, bevor am Fahrzeug gemessen oder demontiert wird?",
+          "Welche erste Maßnahme passt am besten, bevor am Fahrzeug gemessen oder demontiert wird?",
         answers: [
           "Batterie sofort ersetzen, weil Standzeit immer zu Sulfatierung führt.",
           "Kundenbeanstandung aufnehmen, Sichtprüfung durchführen und technische Unterlagen/Arbeitsanweisung prüfen.",
@@ -112,7 +112,7 @@ export const JOURNEYMAN_EXAMS: JourneymanExam[] = [
         type: "single_choice",
         area: "Fahrwerk",
         question:
-          "Ein Reifen ist innen deutlich staerker abgefahren als aussen. Welche Prüfung ist sinnvoll?",
+          "Ein Reifen ist innen deutlich stärker abgefahren als außen. Welche Prüfung ist sinnvoll?",
         answers: [
           "Nur den Reifendruck hinten prüfen.",
           "Achsgeometrie, Gelenke, Lager und Luftdruck prüfen.",
@@ -539,7 +539,7 @@ export const JOURNEYMAN_EXAMS: JourneymanExam[] = [
           "Nach Rauchtest zeigt sich eine Undichtigkeit am Ladeluftschlauch nach dem Ladeluftkühler. Erkläre, warum dies beide Fehlercodes erklären kann und welche Abschlussprüfung folgt.",
         expectedPoints: [
           "Undichtigkeit senkt den erreichten Ladedruck unter Last.",
-          "Luftmasse/Ladedruck werden unplausibel, weil gemessene und tatsaechlich genutzte Luftmenge nicht zusammenpassen.",
+          "Luftmasse/Ladedruck werden unplausibel, weil gemessene und tatsächlich genutzte Luftmenge nicht zusammenpassen.",
           "Schlauch/Dichtung/Schelle fachgerecht ersetzen oder befestigen.",
           "Istwerte nach Reparatur unter Last vergleichen.",
           "Fehlerspeicher löschen, Probefahrt und Dokumentation durchführen.",

@@ -417,7 +417,7 @@ function validatePaidCheckoutSession({
 
   if (sessionUserId !== user.id) {
     throw new Error(
-      "Diese Stripe-Zahlung gehoert nicht zum aktuell eingeloggten DiagnoseHUB-Account."
+      "Diese Stripe-Zahlung gehört nicht zum aktuell eingeloggten DiagnoseHUB-Account."
     );
   }
 

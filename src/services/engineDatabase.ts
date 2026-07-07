@@ -20,308 +20,308 @@ const ENGINE_CODE_DATABASE: Record<string, EngineInfo> = {
     code: "CDHB",
     engineType: "Benziner",
     label: "Audi/VW 1.8 TFSI Benziner",
-    notes: "EA888 TFSI, Ottomotor mit Zuendkerzen/Zuendspulen.",
+    notes: "EA888 TFSI, Ottomotor mit Zündkerzen/Zündspulen.",
   },
   CDAA: {
     code: "CDAA",
     engineType: "Benziner",
     label: "Audi/VW 1.8 TFSI Benziner",
-    notes: "EA888 TFSI, Ottomotor mit Zuendkerzen/Zuendspulen.",
+    notes: "EA888 TFSI, Ottomotor mit Zündkerzen/Zündspulen.",
   },
   CAWB: {
     code: "CAWB",
     engineType: "Benziner",
     label: "VW/Audi 2.0 TFSI Benziner",
-    notes: "EA888 TFSI, Ottomotor mit Zuendkerzen/Zuendspulen.",
+    notes: "EA888 TFSI, Ottomotor mit Zündkerzen/Zündspulen.",
   },
   CCZA: {
     code: "CCZA",
     engineType: "Benziner",
     label: "VW/Audi 2.0 TFSI Benziner",
-    notes: "EA888 TFSI, Ottomotor mit Zuendkerzen/Zuendspulen.",
+    notes: "EA888 TFSI, Ottomotor mit Zündkerzen/Zündspulen.",
   },
   CCTA: {
     code: "CCTA",
     engineType: "Benziner",
     label: "VW/Audi 2.0 TFSI Benziner",
-    notes: "EA888 TFSI, Ottomotor mit Zuendkerzen/Zuendspulen.",
+    notes: "EA888 TFSI, Ottomotor mit Zündkerzen/Zündspulen.",
   },
   CAXA: {
     code: "CAXA",
     engineType: "Benziner",
     label: "VW/Audi 1.4 TSI Benziner",
-    notes: "TSI-Ottomotor mit Zuendkerzen/Zuendspulen.",
+    notes: "TSI-Ottomotor mit Zündkerzen/Zündspulen.",
   },
   CAVD: {
     code: "CAVD",
     engineType: "Benziner",
     label: "VW/Audi 1.4 TSI Benziner",
-    notes: "TSI-Ottomotor mit Zuendkerzen/Zuendspulen.",
+    notes: "TSI-Ottomotor mit Zündkerzen/Zündspulen.",
   },
   CHHB: {
     code: "CHHB",
     engineType: "Benziner",
     label: "VW/Audi 2.0 TSI Benziner",
-    notes: "EA888 TSI, Ottomotor mit Zuendkerzen/Zuendspulen.",
+    notes: "EA888 TSI, Ottomotor mit Zündkerzen/Zündspulen.",
   },
   CJSA: {
     code: "CJSA",
     engineType: "Benziner",
     label: "VW/Audi 1.8 TFSI Benziner",
-    notes: "EA888 TFSI, Ottomotor mit Zuendkerzen/Zuendspulen.",
+    notes: "EA888 TFSI, Ottomotor mit Zündkerzen/Zündspulen.",
   },
   CJXA: {
     code: "CJXA",
     engineType: "Benziner",
     label: "VW/Audi 2.0 TSI Benziner",
-    notes: "EA888 TSI, Ottomotor mit Zuendkerzen/Zuendspulen.",
+    notes: "EA888 TSI, Ottomotor mit Zündkerzen/Zündspulen.",
   },
   CZEA: {
     code: "CZEA",
     engineType: "Benziner",
     label: "VW/Audi 1.4 TSI Benziner",
-    notes: "EA211 TSI, Ottomotor mit Zuendkerzen/Zuendspulen.",
+    notes: "EA211 TSI, Ottomotor mit Zündkerzen/Zündspulen.",
   },
   CZDA: {
     code: "CZDA",
     engineType: "Benziner",
     label: "VW/Audi 1.4 TSI Benziner",
-    notes: "EA211 TSI, Ottomotor mit Zuendkerzen/Zuendspulen.",
+    notes: "EA211 TSI, Ottomotor mit Zündkerzen/Zündspulen.",
   },
   CYVB: {
     code: "CYVB",
     engineType: "Benziner",
     label: "VW/Audi 1.2 TSI Benziner",
-    notes: "EA211 TSI, Ottomotor mit Zuendkerzen/Zuendspulen.",
+    notes: "EA211 TSI, Ottomotor mit Zündkerzen/Zündspulen.",
   },
   D14NEL: {
     code: "D14NEL",
     engineType: "Benziner",
     label: "Opel 1.4 Turbo Benziner",
-    notes: "Opel Ottomotor mit Zuendkerzen/Zuendspule.",
+    notes: "Opel Ottomotor mit Zündkerzen/Zündspule.",
   },
   A14NET: {
     code: "A14NET",
     engineType: "Benziner",
     label: "Opel 1.4 Turbo Benziner",
-    notes: "Opel Ottomotor mit Zuendkerzen/Zuendspule.",
+    notes: "Opel Ottomotor mit Zündkerzen/Zündspule.",
   },
   B14NET: {
     code: "B14NET",
     engineType: "Benziner",
     label: "Opel 1.4 Turbo Benziner",
-    notes: "Opel Ottomotor mit Zuendkerzen/Zuendspule.",
+    notes: "Opel Ottomotor mit Zündkerzen/Zündspule.",
   },
   N43B20: {
     code: "N43B20",
     engineType: "Benziner",
     label: "BMW N43 Benziner",
-    notes: "BMW Ottomotor mit Zuendkerzen/Zuendspulen.",
+    notes: "BMW Ottomotor mit Zündkerzen/Zündspulen.",
   },
   N46B20: {
     code: "N46B20",
     engineType: "Benziner",
     label: "BMW N46 Benziner",
-    notes: "BMW Ottomotor mit Zuendkerzen/Zuendspulen.",
+    notes: "BMW Ottomotor mit Zündkerzen/Zündspulen.",
   },
   N52B25: {
     code: "N52B25",
     engineType: "Benziner",
     label: "BMW N52 Benziner",
-    notes: "BMW Ottomotor mit Zuendkerzen/Zuendspulen.",
+    notes: "BMW Ottomotor mit Zündkerzen/Zündspulen.",
   },
   N52B30: {
     code: "N52B30",
     engineType: "Benziner",
     label: "BMW N52 Benziner",
-    notes: "BMW Ottomotor mit Zuendkerzen/Zuendspulen.",
+    notes: "BMW Ottomotor mit Zündkerzen/Zündspulen.",
   },
   N54B30: {
     code: "N54B30",
     engineType: "Benziner",
     label: "BMW N54 Benziner",
-    notes: "BMW Turbo-Ottomotor mit Zuendkerzen/Zuendspulen.",
+    notes: "BMW Turbo-Ottomotor mit Zündkerzen/Zündspulen.",
   },
   N55B30: {
     code: "N55B30",
     engineType: "Benziner",
     label: "BMW N55 Benziner",
-    notes: "BMW Turbo-Ottomotor mit Zuendkerzen/Zuendspulen.",
+    notes: "BMW Turbo-Ottomotor mit Zündkerzen/Zündspulen.",
   },
   B48B20: {
     code: "B48B20",
     engineType: "Benziner",
     label: "BMW B48 Benziner",
-    notes: "BMW Turbo-Ottomotor mit Zuendkerzen/Zuendspulen.",
+    notes: "BMW Turbo-Ottomotor mit Zündkerzen/Zündspulen.",
   },
   B58B30: {
     code: "B58B30",
     engineType: "Benziner",
     label: "BMW B58 Benziner",
-    notes: "BMW Turbo-Ottomotor mit Zuendkerzen/Zuendspulen.",
+    notes: "BMW Turbo-Ottomotor mit Zündkerzen/Zündspulen.",
   },
 
   CBAB: {
     code: "CBAB",
     engineType: "Diesel",
     label: "VW/Audi 2.0 TDI Diesel",
-    notes: "Common-Rail-Diesel, keine Zuendkerzen/Zuendspulen.",
+    notes: "Common-Rail-Diesel, keine Zündkerzen/Zündspulen.",
   },
   CAGA: {
     code: "CAGA",
     engineType: "Diesel",
     label: "Audi/VW 2.0 TDI Diesel",
-    notes: "Common-Rail-Diesel, keine Zuendkerzen/Zuendspulen.",
+    notes: "Common-Rail-Diesel, keine Zündkerzen/Zündspulen.",
   },
   CAGB: {
     code: "CAGB",
     engineType: "Diesel",
     label: "Audi/VW 2.0 TDI Diesel",
-    notes: "Common-Rail-Diesel, keine Zuendkerzen/Zuendspulen.",
+    notes: "Common-Rail-Diesel, keine Zündkerzen/Zündspulen.",
   },
   CAGC: {
     code: "CAGC",
     engineType: "Diesel",
     label: "Audi/VW 2.0 TDI Diesel",
-    notes: "Common-Rail-Diesel, keine Zuendkerzen/Zuendspulen.",
+    notes: "Common-Rail-Diesel, keine Zündkerzen/Zündspulen.",
   },
   CAHA: {
     code: "CAHA",
     engineType: "Diesel",
     label: "Audi/VW 2.0 TDI Diesel",
-    notes: "Common-Rail-Diesel, keine Zuendkerzen/Zuendspulen.",
+    notes: "Common-Rail-Diesel, keine Zündkerzen/Zündspulen.",
   },
   CAHB: {
     code: "CAHB",
     engineType: "Diesel",
     label: "Audi/VW 2.0 TDI Diesel",
-    notes: "Common-Rail-Diesel, keine Zuendkerzen/Zuendspulen.",
+    notes: "Common-Rail-Diesel, keine Zündkerzen/Zündspulen.",
   },
   CGLC: {
     code: "CGLC",
     engineType: "Diesel",
     label: "Audi/VW 2.0 TDI Diesel",
-    notes: "Common-Rail-Diesel, keine Zuendkerzen/Zuendspulen.",
+    notes: "Common-Rail-Diesel, keine Zündkerzen/Zündspulen.",
   },
   CGLD: {
     code: "CGLD",
     engineType: "Diesel",
     label: "Audi/VW 2.0 TDI Diesel",
-    notes: "Common-Rail-Diesel, keine Zuendkerzen/Zuendspulen.",
+    notes: "Common-Rail-Diesel, keine Zündkerzen/Zündspulen.",
   },
   CJCA: {
     code: "CJCA",
     engineType: "Diesel",
     label: "VW/Audi 2.0 TDI Diesel",
-    notes: "Common-Rail-Diesel, keine Zuendkerzen/Zuendspulen.",
+    notes: "Common-Rail-Diesel, keine Zündkerzen/Zündspulen.",
   },
   CJCB: {
     code: "CJCB",
     engineType: "Diesel",
     label: "VW/Audi 2.0 TDI Diesel",
-    notes: "Common-Rail-Diesel, keine Zuendkerzen/Zuendspulen.",
+    notes: "Common-Rail-Diesel, keine Zündkerzen/Zündspulen.",
   },
   CFFB: {
     code: "CFFB",
     engineType: "Diesel",
     label: "VW/Audi 2.0 TDI Diesel",
-    notes: "Common-Rail-Diesel, keine Zuendkerzen/Zuendspulen.",
+    notes: "Common-Rail-Diesel, keine Zündkerzen/Zündspulen.",
   },
   CFGB: {
     code: "CFGB",
     engineType: "Diesel",
     label: "VW/Audi 2.0 TDI Diesel",
-    notes: "Common-Rail-Diesel, keine Zuendkerzen/Zuendspulen.",
+    notes: "Common-Rail-Diesel, keine Zündkerzen/Zündspulen.",
   },
   CRLB: {
     code: "CRLB",
     engineType: "Diesel",
     label: "VW/Audi 2.0 TDI Diesel",
-    notes: "EA288 Common-Rail-Diesel, keine Zuendkerzen/Zuendspulen.",
+    notes: "EA288 Common-Rail-Diesel, keine Zündkerzen/Zündspulen.",
   },
   CUNA: {
     code: "CUNA",
     engineType: "Diesel",
     label: "VW/Audi 2.0 TDI Diesel",
-    notes: "EA288 Common-Rail-Diesel, keine Zuendkerzen/Zuendspulen.",
+    notes: "EA288 Common-Rail-Diesel, keine Zündkerzen/Zündspulen.",
   },
   CUAA: {
     code: "CUAA",
     engineType: "Diesel",
     label: "VW 2.0 BiTDI Diesel",
-    notes: "Common-Rail-Diesel, keine Zuendkerzen/Zuendspulen.",
+    notes: "Common-Rail-Diesel, keine Zündkerzen/Zündspulen.",
   },
   DDAA: {
     code: "DDAA",
     engineType: "Diesel",
     label: "VW 2.0 TDI Diesel",
-    notes: "Common-Rail-Diesel, keine Zuendkerzen/Zuendspulen.",
+    notes: "Common-Rail-Diesel, keine Zündkerzen/Zündspulen.",
   },
   DFGA: {
     code: "DFGA",
     engineType: "Diesel",
     label: "VW 2.0 TDI Diesel",
-    notes: "EA288 Common-Rail-Diesel, keine Zuendkerzen/Zuendspulen.",
+    notes: "EA288 Common-Rail-Diesel, keine Zündkerzen/Zündspulen.",
   },
   DETA: {
     code: "DETA",
     engineType: "Diesel",
     label: "VW/Audi 2.0 TDI Diesel",
-    notes: "EA288 Common-Rail-Diesel, keine Zuendkerzen/Zuendspulen.",
+    notes: "EA288 Common-Rail-Diesel, keine Zündkerzen/Zündspulen.",
   },
   DCXA: {
     code: "DCXA",
     engineType: "Diesel",
     label: "VW/Audi 2.0 TDI Diesel",
-    notes: "EA288 Common-Rail-Diesel, keine Zuendkerzen/Zuendspulen.",
+    notes: "EA288 Common-Rail-Diesel, keine Zündkerzen/Zündspulen.",
   },
   N47D20: {
     code: "N47D20",
     engineType: "Diesel",
     label: "BMW N47 Diesel",
-    notes: "Common-Rail-Diesel, keine Zuendkerzen/Zuendspulen.",
+    notes: "Common-Rail-Diesel, keine Zündkerzen/Zündspulen.",
   },
   B47D20: {
     code: "B47D20",
     engineType: "Diesel",
     label: "BMW B47 Diesel",
-    notes: "Common-Rail-Diesel, keine Zuendkerzen/Zuendspulen.",
+    notes: "Common-Rail-Diesel, keine Zündkerzen/Zündspulen.",
   },
   M57D30: {
     code: "M57D30",
     engineType: "Diesel",
     label: "BMW M57 Diesel",
-    notes: "Common-Rail-Diesel, keine Zuendkerzen/Zuendspulen.",
+    notes: "Common-Rail-Diesel, keine Zündkerzen/Zündspulen.",
   },
   N57D30: {
     code: "N57D30",
     engineType: "Diesel",
     label: "BMW N57 Diesel",
-    notes: "Common-Rail-Diesel, keine Zuendkerzen/Zuendspulen.",
+    notes: "Common-Rail-Diesel, keine Zündkerzen/Zündspulen.",
   },
   OM651: {
     code: "OM651",
     engineType: "Diesel",
     label: "Mercedes OM651 Diesel",
-    notes: "Common-Rail-Diesel, keine Zuendkerzen/Zuendspulen.",
+    notes: "Common-Rail-Diesel, keine Zündkerzen/Zündspulen.",
   },
   OM642: {
     code: "OM642",
     engineType: "Diesel",
     label: "Mercedes OM642 Diesel",
-    notes: "Common-Rail-Diesel, keine Zuendkerzen/Zuendspulen.",
+    notes: "Common-Rail-Diesel, keine Zündkerzen/Zündspulen.",
   },
   A17DTR: {
     code: "A17DTR",
     engineType: "Diesel",
     label: "Opel 1.7 CDTI Diesel",
-    notes: "Common-Rail-Diesel, keine Zuendkerzen/Zuendspulen.",
+    notes: "Common-Rail-Diesel, keine Zündkerzen/Zündspulen.",
   },
   Z17DTH: {
     code: "Z17DTH",
     engineType: "Diesel",
     label: "Opel 1.7 CDTI Diesel",
-    notes: "Common-Rail-Diesel, keine Zuendkerzen/Zuendspulen.",
+    notes: "Common-Rail-Diesel, keine Zündkerzen/Zündspulen.",
   },
 };
 
@@ -343,6 +343,15 @@ function findEngineCode(input: string): EngineInfo | null {
   return null;
 }
 
+function normalizeEngineSearchText(input: string) {
+  return input
+    .toLowerCase()
+    .replace(/\u00e4/g, "ae")
+    .replace(/\u00f6/g, "oe")
+    .replace(/\u00fc/g, "ue")
+    .replace(/\u00df/g, "ss");
+}
+
 export function detectEngineContext(input: string): EngineContext {
   const knownEngine = findEngineCode(input);
 
@@ -356,7 +365,7 @@ export function detectEngineContext(input: string): EngineContext {
     };
   }
 
-  const text = input.toLowerCase();
+  const text = normalizeEngineSearchText(input);
 
   const dieselTerms = [
     "diesel",
@@ -424,11 +433,11 @@ export function detectEngineContext(input: string): EngineContext {
   if (isDiesel && isPetrol) {
     return {
       engineType: "Unbekannt",
-      source: "Widerspruechliche Begriffe",
+      source: "Widersprüchliche Begriffe",
       label: "Motortyp nicht eindeutig",
       code: null,
       notes:
-        "Die Eingabe enthaelt Diesel- und Benziner-Begriffe. Motorcode oder Kraftstoffart angeben.",
+        "Die Eingabe enthält Diesel- und Benziner-Begriffe. Motorcode oder Kraftstoffart angeben.",
     };
   }
 

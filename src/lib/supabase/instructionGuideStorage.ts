@@ -175,6 +175,14 @@ const stopWords = new Set([
   "einer",
   "und",
   "oder",
+  "ausbau",
+  "ausbauen",
+  "einbau",
+  "einbauen",
+  "demontage",
+  "demontieren",
+  "montage",
+  "montieren",
   "von",
   "zum",
   "zur",
@@ -242,6 +250,51 @@ const synonymMap: Record<string, string> = {
 
   volkswagen: "vw",
   cupra: "seat",
+
+  abgasrueckfuehrung: "agr",
+  egr: "agr",
+  agr: "agr",
+  agrventil: "agr",
+
+  lmm: "luftmassenmesser",
+  luftmassenmesser: "luftmassenmesser",
+  luftmassenmesserwert: "luftmassenmesser",
+
+  ladeluftschlauch: "ladeluftstrecke",
+  ladeluftrohr: "ladeluftstrecke",
+  ladeluftkuehler: "ladeluftstrecke",
+  ansaugschlauch: "ansaugsystem",
+  ansaugtrakt: "ansaugsystem",
+  falschluft: "ansaugsystem",
+
+  geblaese: "innenraumluefter",
+  geblaesemotor: "innenraumluefter",
+  innenraumgeblaese: "innenraumluefter",
+  innenraumluefter: "innenraumluefter",
+  lueftermotor: "innenraumluefter",
+
+  einspritzduese: "injektor",
+  einspritzduesen: "injektor",
+  injektor: "injektor",
+  injektoren: "injektor",
+
+  gluehkerze: "gluehkerze",
+  gluehkerzen: "gluehkerze",
+  zuendkerze: "zuendkerze",
+  zuendkerzen: "zuendkerze",
+  zuendspule: "zuendspule",
+  zuendspulen: "zuendspule",
+
+  thermostat: "thermostat",
+  wasserpumpe: "wasserpumpe",
+  kuehlmittelpumpe: "wasserpumpe",
+
+  querlenker: "querlenker",
+  traggelenk: "traggelenk",
+  radlager: "radlager",
+  raddrehzahlsensor: "abs-sensor",
+  absgeber: "abs-sensor",
+  abssensor: "abs-sensor",
 };
 
 const workTypeTokens = new Set([
@@ -253,22 +306,50 @@ const workTypeTokens = new Set([
   "bremse",
   "klimaanlage",
   "turbolader",
+  "agr",
+  "luftmassenmesser",
+  "ladeluftstrecke",
+  "ansaugsystem",
+  "innenraumluefter",
+  "injektor",
+  "gluehkerze",
+  "zuendkerze",
+  "zuendspule",
+  "thermostat",
+  "wasserpumpe",
+  "querlenker",
+  "traggelenk",
+  "radlager",
+  "abs-sensor",
 ]);
 
 function normalizeSearchText(value: string) {
   return value
     .toLowerCase()
-    .replaceAll("ae", "ae")
-    .replaceAll("oe", "oe")
-    .replaceAll("ue", "ue")
-    .replaceAll("ß", "ss")
+    .replace(/\u00e4/g, "ae")
+    .replace(/\u00f6/g, "oe")
+    .replace(/\u00fc/g, "ue")
+    .replace(/\u00df/g, "ss")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
 
 function normalizeSearchToken(token: string) {
-  return synonymMap[token] || token;
+  const directToken = synonymMap[token] || token;
+
+  if (directToken !== token || token.length <= 5) {
+    return directToken;
+  }
+
+  const singularToken = token.replace(
+    /(ungen|innen|chen|ern|en|er|es|e|n|s)$/g,
+    ""
+  );
+
+  return synonymMap[singularToken] || singularToken || directToken;
 }
 
 function tokenizeSearchText(value: string) {
@@ -293,6 +374,14 @@ function buildGuideSearchText(guide: InstructionGuide) {
     ...(guide.symptoms || []),
     ...(guide.tools || []),
     ...(guide.initialChecks || []),
+    ...(guide.steps || []).flatMap((step) => [
+      step.title,
+      step.description,
+      step.check || "",
+      step.warning || "",
+      step.imageHint || "",
+      step.imageAlt || "",
+    ]),
     ...(guide.commonCauses || []),
     ...(guide.nextActions || []),
     guide.proHint || "",

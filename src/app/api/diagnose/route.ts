@@ -37,6 +37,8 @@ type ChatMessage = {
   content: string;
 };
 
+type DiagnosisAudienceMode = "workshop" | "hobby";
+
 type WorkshopProfileDatabaseRow = {
   id: string;
   full_name: string;
@@ -105,6 +107,15 @@ function sanitizeText(value: unknown, maxLength: number) {
   return value.trim().slice(0, maxLength);
 }
 
+function normalizeTechnicalSearchText(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/\u00e4/g, "ae")
+    .replace(/\u00f6/g, "oe")
+    .replace(/\u00fc/g, "ue")
+    .replace(/\u00df/g, "ss");
+}
+
 function formatHistory(messages: ChatMessage[]) {
   return messages
     .map((message) => {
@@ -151,6 +162,10 @@ function normalizeMessages(value: unknown): ChatMessage[] {
       return [];
     })
     .slice(-8);
+}
+
+function normalizeAudienceMode(value: unknown): DiagnosisAudienceMode {
+  return value === "hobby" ? "hobby" : "workshop";
 }
 
 function createAuthenticatedSupabaseClient(accessToken: string) {
@@ -409,7 +424,7 @@ function termHasNegationContext(text: string, term: string) {
 }
 
 function hasForbiddenTermWithoutCorrection(answer: string, terms: string[]) {
-  const text = answer.toLowerCase();
+  const text = normalizeTechnicalSearchText(answer);
 
   return terms.some((term) => {
     if (!text.includes(term)) {
@@ -519,9 +534,63 @@ function shouldAutoRetryDiagnosis() {
   return process.env.DIAGNOSIS_AUTO_RETRY === "true";
 }
 
+function buildAudienceModeInstructions(audienceMode: DiagnosisAudienceMode) {
+  if (audienceMode === "hobby") {
+    return `
+Ausgabemodus: Hobby-Modus.
+Gleicher technischer Inhalt wie im Werkstatt-Modus, aber in normaler Sprache.
+Fachbegriffe kurz erklären, ohne die Antwort aufzublasen.
+Risiko höher gewichten: Bremsen, Airbag, Hochvolt, Kraftstoff, Steuerzeiten, Lenkung, Klima-Kältemittel und ein möglicherweise fahruntüchtiges Fahrzeug klar markieren.
+
+Pflichtinhalt Hobby-Modus:
+- Fehlercode: Was bedeutet der Code normalsprachlich? Welche Systeme sind betroffen?
+- Selbst machbar?: Ja, nein oder eingeschränkt, mit Begründung.
+- Schwierigkeit: Einfach, mittel, schwer oder Profi.
+- Werkzeug: Grundwerkzeug, Spezialwerkzeug, Diagnosegerät, Hebebühne nötig?
+- Risiko: nur relevante Risiken nennen, aber klar.
+- Prüfreihenfolge: erst einfache Checks, dann Messungen, dann Teiletausch.
+- Werkstattkosten grob: optional; wenn genannt, immer als grobe Schätzung kennzeichnen.
+- Nächste Schritte: konkret und für den Nutzer verständlich.
+
+Antwortformat Hobby-Modus:
+# Fehlercode
+# Selbst machbar?
+# Schwierigkeit
+# Werkzeug
+# Risiko
+# Prüfreihenfolge
+# Werkstattkosten grob
+# Nächste Schritte
+`;
+  }
+
+  return `
+Ausgabemodus: Werkstatt-Modus.
+Gleicher technischer Inhalt wie im Hobby-Modus, aber knapp, fachlich und entscheidungsorientiert.
+Fokus: Diagnosepfad, Messlogik, Plausibilität und nächster Arbeitsschritt.
+
+Pflichtinhalt Werkstatt-Modus:
+- Diagnosepfad: Symptom -> mögliche Ursachen -> Prüfungen -> Messwerte -> Entscheidung.
+- Arbeitswerte/Teile: nur wenn sicher; sonst "als interne Daten/Herstellerdaten ergänzen" schreiben.
+- Spezialwerkzeug: klar benennen, wenn nötig; keine erfundenen Werkzeugnummern.
+- Typische Fehler: Fehldiagnosen, bekannte Schwachstellen, Plausibilitätschecks.
+- Speicherung: Fall speichern, später wiederfinden, interne Notizen/Schadteil dokumentieren.
+
+Antwortformat Werkstatt-Modus:
+# Diagnosepfad
+# Mögliche Ursachen
+# Prüfungen und Messwerte
+# Entscheidung
+# Spezialwerkzeug / Teile
+# Typische Fehler
+# Speicherung / Notizen
+`;
+}
+
 function buildSystemPrompt(
   engineContext: EngineContext,
   faultCodeContext: FaultCodeContext,
+  audienceMode: DiagnosisAudienceMode,
   retryWarning?: string
 ) {
   return `
@@ -535,39 +604,41 @@ Die Antwort soll so sein, dass ein Kfz-Mechatroniker daraus direkt den nächsten
 Grundregeln:
 - Keine langen Einleitungen.
 - Keine pauschalen Disclaimer.
-- Keine unnoetigen Sicherheitshinweise.
-- Keine erfundenen Drehmomente, Fuellmengen, Spezialwerkzeugnummern oder Herstellersollwerte.
-- Wenn genaue Werte fahrzeugabhaengig sind, schreibe kurz: "nach Herstellervorgabe prüfen".
+- Keine unnötigen Sicherheitshinweise.
+- Keine erfundenen Drehmomente, Füllmengen, Spezialwerkzeugnummern oder Herstellersollwerte.
+- Wenn genaue Werte fahrzeugabhängig sind, schreibe kurz: "nach Herstellervorgabe prüfen".
 - Keine illegalen Manipulationen erklären.
 - Keine Deaktivierung von Abgas-, Airbag-, ABS-, ESP- oder Assistenzsystemen erklären.
 
-Wichtig zur Antwortlaenge:
-- Standardantwort maximal 5 kurze Abschnitte.
+Wichtig zur Antwortlänge:
+- Standardantwort kompakt halten; die Pflichtabschnitte des aktiven Ausgabemodus haben Vorrang.
 - Maximal 3 bis 7 Bulletpoints pro Abschnitt.
-- Kurze Saetze.
+- Kurze Sätze.
 - Keine Roman-Erklärung.
 - Trotzdem konkrete Arbeitsschritte nennen.
 - Nicht schreiben: "Zugang schaffen", sondern genauer beschreiben, welche Verkleidung, Abdeckung, Stecker, Halter oder Baugruppe typischerweise entfernt wird.
-- Wenn der genaue Aufbau fahrzeugabhaengig ist, schreibe: "typischer Zugang" und nenne die wahrscheinlichste Demontagefolge.
+- Wenn der genaue Aufbau fahrzeugabhängig ist, schreibe: "typischer Zugang" und nenne die wahrscheinlichste Demontagefolge.
 
-Werkstatt-Praezision:
+Werkstatt-Präzision:
 - Bei Aus-/Einbau immer konkrete Demontagereihenfolge nennen.
 - Beispiel: nicht "Verkleidung ausbauen", sondern "Handschuhfach ausbauen, untere Fußraumverkleidung lösen, seitliche Mittelkonsole-Verkleidung entfernen".
 - Beispiel: nicht "Stecker abziehen", sondern "Stecker entriegeln, Verriegelungsnase nicht abbrechen, auf verschmorte Pins prüfen".
 - Beispiel: nicht "Befestigung lösen", sondern "Schrauben lösen oder Bajonettverschluss gegen Anschlag drehen, je nach Ausführung".
 - Bauteillage und Zugang kurz, aber konkret beschreiben.
-- Stecker, Verriegelungen, Clips, Halter, Kunststoffnasen und Bruchstellen erwaehnen, wenn relevant.
-- Linksgewinde ausdrücklich erwaehnen, wenn es bei diesem Bauteil/System möglich oder typisch ist.
+- Stecker, Verriegelungen, Clips, Halter, Kunststoffnasen und Bruchstellen erwähnen, wenn relevant.
+- Linksgewinde ausdrücklich erwähnen, wenn es bei diesem Bauteil/System möglich oder typisch ist.
 - Schrauben, Muttern, Exzenter, Einstellpunkte oder Markierungen nennen, die nicht gelöst oder nicht verstellt werden dürfen.
-- Bei Steuerzeiten, Achsgeometrie, Lenkung, Bremse, Hochvolt, Airbag, Klimaanlage und Kraftstoffsystem besonders praezise sein.
+- Bei Steuerzeiten, Achsgeometrie, Lenkung, Bremse, Hochvolt, Airbag, Klimaanlage und Kraftstoffsystem besonders präzise sein.
 - Erst prüfen, dann ersetzen. Keine reine Teiletausch-Empfehlung.
 - "Daten sichern" nur nennen, wenn Steuergerät, Codierung, Programmierung, Anlernung oder Batterieabklemmen mit relevanten Speicherwerten betroffen ist.
-- "Batterie abklemmen" nur nennen, wenn technisch noetig: Airbag, Starter, Generator, Hochstromleitung, Steuergerätetausch oder Kurzschlussgefahr.
+- "Batterie abklemmen" nur nennen, wenn technisch nötig: Airbag, Starter, Generator, Hochstromleitung, Steuergerätetausch oder Kurzschlussgefahr.
 - Kritische Hinweise direkt am passenden Schritt nennen.
 
 Der Nutzer kann Folgefragen stellen.
 Kurze Folgefragen wie "Wo messen?", "Was als nächstes?", "Welche Schraube?", "Linksgewinde?", "Wie ausbauen?" beziehen sich auf den bisherigen Verlauf.
 Nutze den bisherigen Fall als Kontext.
+
+${buildAudienceModeInstructions(audienceMode)}
 
 Erkannter Motortyp:
 ${engineContext.engineType}
@@ -592,13 +663,13 @@ ${retryWarning ?? ""}
 Motortyp-Regeln:
 
 Diesel:
-- Keine Zuendkerzen, Zuendspulen, Zuendfunken oder Zuendanlage nennen.
-- Bei Kaltstart nur Gluehkerzen/Gluehsteuergerät nennen, wenn passend.
+- Keine Zündkerzen, Zündspulen, Zündfunken oder Zündanlage nennen.
+- Bei Kaltstart nur Glühkerzen/Glühsteuergerät nennen, wenn passend.
 - Bei Laufproblemen bevorzugt prüfen: Injektoren, Raildruck, Kraftstoffversorgung, Luftmasse, Ladedruck, AGR, DPF-Differenzdruck, Ladeluftstrecke.
 
 Benziner:
-- Zuendkerzen und Zuendspulen dürfen genannt werden.
-- Keine Gluehkerzen oder Gluehsteuergerät nennen.
+- Zündkerzen und Zündspulen dürfen genannt werden.
+- Keine Glühkerzen oder Glühsteuergerät nennen.
 - Bei TSI/TFSI/FSI auch Falschluft, KGE, Injektoren, Hochdruckpumpe, Verkokung, Ladedruck und Steuerzeiten berücksichtigen.
 
 Unbekannter Motortyp:
@@ -609,10 +680,12 @@ Fehlercode-Regel:
 - Erkannte Fehlercodes aus der internen Datenbank vorrangig nutzen.
 - Unbekannte Fehlercodes nicht sicher erklären. Dann Testertext anfordern.
 
-Antwortformat bei normaler Diagnose:
+Antwortformat-Fallback bei normaler Diagnose:
+Verwende zwingend das Antwortformat des aktiven Ausgabemodus.
+Wenn ein Pflichtabschnitt im Einzelfall nicht sinnvoll ist, kurz "nicht relevant" oder "fahrzeugabhängig" schreiben.
 
 # Kurzdiagnose
-2 bis 4 Saetze. Direkt sagen, was am wahrscheinlichsten ist.
+2 bis 4 Sätze. Direkt sagen, was am wahrscheinlichsten ist.
 
 # Sofort prüfen
 3 bis 6 konkrete Prüfpunkte.
@@ -633,7 +706,7 @@ Nur wenn relevant:
 - Schrauben nicht lösen
 - Einstellpunkte nicht verstellen
 - Clips/Verriegelungen
-- Dichtflaechen
+- Dichtflächen
 - Steuerzeiten
 - Hochdruck/Klima/Bremse/Airbag
 
@@ -671,6 +744,7 @@ async function createDiagnosisAnswer(
   faultCodeContext: FaultCodeContext,
   messages: ChatMessage[],
   input: string,
+  audienceMode: DiagnosisAudienceMode,
   retryWarning?: string,
   modelOverride?: string
 ) {
@@ -694,6 +768,7 @@ async function createDiagnosisAnswer(
         content: buildSystemPrompt(
           engineContext,
           faultCodeContext,
+          audienceMode,
           retryWarning
         ),
       },
@@ -719,7 +794,7 @@ ${input}
   } catch (error) {
     if (shouldRetryWithFallbackModel(error, model)) {
       console.error(
-        `Diagnosemodell ${model} nicht verfuegbar, Fallback ${FALLBACK_DIAGNOSIS_MODEL} aktiv:`,
+        `Diagnosemodell ${model} nicht verfügbar, Fallback ${FALLBACK_DIAGNOSIS_MODEL} aktiv:`,
         error
       );
 
@@ -728,6 +803,7 @@ ${input}
         faultCodeContext,
         messages,
         input,
+        audienceMode,
         retryWarning,
         FALLBACK_DIAGNOSIS_MODEL
       );
@@ -761,6 +837,7 @@ export async function POST(request: Request) {
 
     const input = sanitizeText(body.input, 2500);
     const messages = normalizeMessages(body.messages);
+    const audienceMode = normalizeAudienceMode(body.audienceMode);
     const accessToken =
       typeof body.accessToken === "string" ? body.accessToken : "";
 
@@ -806,7 +883,8 @@ export async function POST(request: Request) {
       engineContext,
       faultCodeContext,
       messages,
-      input
+      input,
+      audienceMode
     );
 
     let qualityCheck = "Antwort ohne technischen Konflikt erstellt.";
@@ -821,11 +899,12 @@ export async function POST(request: Request) {
           faultCodeContext,
           messages,
           input,
+          audienceMode,
           `
 ACHTUNG: Die vorherige Antwort enthielt ein Bauteil, das zum erkannten Motortyp nicht passt.
 Erzeuge die Antwort neu und beachte den Motortyp zwingend.
-Bei Diesel keine Zuendkerzen, Zuendspulen, Zuendfunken oder Zuendanlage als Ursache oder Prüfpunkt nennen.
-Bei Benziner keine Gluehkerzen oder Gluehsteuergerät als Ursache oder Prüfpunkt nennen.
+Bei Diesel keine Zündkerzen, Zündspulen, Zündfunken oder Zündanlage als Ursache oder Prüfpunkt nennen.
+Bei Benziner keine Glühkerzen oder Glühsteuergerät als Ursache oder Prüfpunkt nennen.
           `
         );
       } else {
@@ -867,6 +946,7 @@ Bei Benziner keine Gluehkerzen oder Gluehsteuergerät als Ursache oder Prüfpunk
           : "not_used",
         maxOutputTokens: getDiagnosisMaxOutputTokens(),
         autoRetry: shouldAutoRetryDiagnosis(),
+        audienceMode,
       },
       usageLimit: buildUsageLimitPayload(
         usageControl,

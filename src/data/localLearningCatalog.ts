@@ -40,6 +40,7 @@ type LessonSeed = {
   relatedFaultCodes?: string[];
   relatedParts?: string[];
   relatedSystems?: string[];
+  contentBlocks?: LearningContentBlock[];
   warning?: string;
 };
 
@@ -169,6 +170,20 @@ const MODULE_SEEDS: ModuleSeed[] = [
     relatedSystems: ["Motormanagement", "Bordnetz"],
   },
   {
+    categoryId: "local-cat-elektrik",
+    slug: "bauteile-verstehen-sensoren-relais-generator",
+    title: "Bauteile verstehen: Sensor, Relais, Generator",
+    subtitle: "NTC, Wechslerrelais und Drehstromgenerator konkret erklärt",
+    description:
+      "Kurze Bauteil-Lektionen für Azubis: Funktion, Klemmen, typische Messwerte, Fehlerbilder und Prüfweg.",
+    difficulty: "basic",
+    estimatedMinutes: 58,
+    sortOrder: 45,
+    tags: ["bauteilwissen", "ntc", "relais", "generator", "elektrik"],
+    relatedParts: ["NTC-Sensor", "Wechslerrelais", "Drehstromgenerator"],
+    relatedSystems: ["Bordnetz", "Sensorik", "Ladesystem"],
+  },
+  {
     categoryId: "local-cat-motor",
     slug: "diesel-ladedruck-agr-dpf-systemdiagnose",
     title: "Diesel-Systemdiagnose: Ladedruck, AGR und DPF",
@@ -272,6 +287,7 @@ function blockLessonContent(seed: LessonSeed): LearningContentBlock[] {
       title: "Werkstattziel",
       content: seed.focus,
     },
+    ...(seed.contentBlocks || []),
     {
       type: "list",
       title: "Prüflogik",
@@ -352,7 +368,7 @@ const LESSON_SEEDS: LessonSeed[] = [
       "Symptom mit Kundenwortlaut notieren.",
       "Bedingungen klären: kalt, warm, Last, Standzeit, Geschwindigkeit, Wetter.",
       "Fehler reproduzieren oder Nicht-Reproduzierbarkeit dokumentieren.",
-      "Prüfziel als Frage formulieren: Was muss ich beweisen oder ausschliessen?",
+      "Prüfziel als Frage formulieren: Was muss ich beweisen oder ausschließen?",
     ],
     quiz: {
       question: "Welche Formulierung ist als Prüfziel am besten?",
@@ -604,7 +620,7 @@ const LESSON_SEEDS: LessonSeed[] = [
       "Stromkreis bei zu hohem Ruhestrom eingrenzen.",
     ],
     quiz: {
-      question: "Wie wird Ruhestrom grundsaetzlich gemessen?",
+      question: "Wie wird Ruhestrom grundsätzlich gemessen?",
       answers: [
         "In Reihe zur Batterie nach Beachtung der Einschlafzeit.",
         "Parallel zur Batterie wie Spannung.",
@@ -653,7 +669,7 @@ const LESSON_SEEDS: LessonSeed[] = [
     title: "PWM & Stellglieder verstehen",
     subtitle: "Warum ein Aktor nicht einfach nur Ein/Aus ist",
     summary:
-      "Du lernst Tastverhaeltnis, Ansteuerung, mechanische Reaktion und Rückmeldung zu unterscheiden.",
+      "Du lernst Tastverhältnis, Ansteuerung, mechanische Reaktion und Rückmeldung zu unterscheiden.",
     difficulty: "intermediate",
     estimatedMinutes: 25,
     sortOrder: 20,
@@ -668,7 +684,7 @@ const LESSON_SEEDS: LessonSeed[] = [
     quiz: {
       question: "Was beschreibt PWM?",
       answers: [
-        "Eine Ansteuerung über ein Tastverhaeltnis.",
+        "Eine Ansteuerung über ein Tastverhältnis.",
         "Eine Reifengröße.",
         "Immer eine konstante Gleichspannung von 12 V.",
         "Einen Kühlmitteltyp.",
@@ -694,7 +710,7 @@ const LESSON_SEEDS: LessonSeed[] = [
       "Steckverriegelung und Zugentlastung prüfen.",
       "Korrosion, Feuchtigkeit und Pinrückstand suchen.",
       "Wackeltest mit Live-Istwerten durchführen.",
-      "Keine Pins mit ungeeigneten Spitzen beschaedigen.",
+      "Keine Pins mit ungeeigneten Spitzen beschädigen.",
     ],
     quiz: {
       question: "Was ist bei Pin-Prüfungen wichtig?",
@@ -708,6 +724,201 @@ const LESSON_SEEDS: LessonSeed[] = [
       explanation:
         "Ungeeignete Prüfung kann den Fehler verschlimmern oder neue Kontaktprobleme erzeugen.",
     },
+  },
+  {
+    moduleSlug: "bauteile-verstehen-sensoren-relais-generator",
+    slug: "ntc-temperatursensor-verstehen",
+    title: "NTC-Temperatursensor verstehen",
+    subtitle: "Warum der Widerstand bei Wärme sinkt",
+    summary:
+      "Du lernst, was ein NTC ist, wie das Steuergerät daraus Temperatur macht und wie du Sensor, Leitung und Plausibilität prüfst.",
+    difficulty: "basic",
+    estimatedMinutes: 18,
+    sortOrder: 10,
+    focus:
+      "Nach dieser Lektion kannst du einen NTC normal erklären: kalt hoher Widerstand, warm niedriger Widerstand, Steuergerät bewertet daraus eine Spannung.",
+    contentBlocks: [
+      {
+        type: "text",
+        title: "Was bedeutet NTC?",
+        content:
+          "NTC steht für Negative Temperature Coefficient. Das heißt: Wenn die Temperatur steigt, sinkt der Widerstand. Bei Kälte ist der Widerstand hoch, bei Wärme niedrig.",
+      },
+      {
+        type: "text",
+        title: "Wie liest das Steuergerät den Sensor?",
+        content:
+          "Typisch arbeitet der NTC in einem Spannungsteiler. Das Steuergerät legt eine Referenzspannung an und misst die Signalspannung. Bei vielen Schaltungen bedeutet kalt: hohe Signalspannung. Warm bedeutet: niedrigere Signalspannung. Die genaue Kennlinie ist herstellerabhängig.",
+      },
+      {
+        type: "list",
+        title: "Typische Fehlerbilder",
+        items: [
+          "Leitungsunterbrechung oder Stecker ab: Istwert oft sehr kalt, zum Beispiel etwa -40 Grad Celsius.",
+          "Kurzschluss gegen Masse: Istwert oft sehr heiß oder unplausibel hoch.",
+          "Sensor driftet: Wert ist nicht komplett falsch, aber passt nicht zu Motorzustand oder Umgebung.",
+          "Kontaktproblem: Wert springt bei Wackeltest oder Temperaturänderung.",
+        ],
+      },
+      {
+        type: "list",
+        title: "Konkrete Prüfung",
+        items: [
+          "Istwert kalt mit Außentemperatur vergleichen.",
+          "Istwert bei Erwärmung beobachten: Der Wert muss gleichmäßig steigen.",
+          "Widerstand bei zwei Temperaturen messen und mit Herstellerkennlinie vergleichen.",
+          "Stecker, Pins, Masse und Signalleitung prüfen, bevor der Sensor ersetzt wird.",
+        ],
+      },
+    ],
+    checklist: [
+      "Sensorfunktion in einem Satz erklären.",
+      "Istwert kalt und warm plausibilisieren.",
+      "Unterbrechung und Kurzschluss als Fehlerbild unterscheiden.",
+      "Sensor nicht ohne Leitungs- und Steckprüfung ersetzen.",
+    ],
+    quiz: {
+      question: "Was passiert beim NTC, wenn die Temperatur steigt?",
+      answers: [
+        "Der Widerstand sinkt.",
+        "Der Widerstand steigt immer stark an.",
+        "Der Sensor wird zu einem Relais.",
+        "Die Versorgungsspannung der Batterie verschwindet.",
+      ],
+      correctIndex: 0,
+      explanation:
+        "NTC bedeutet negativer Temperaturkoeffizient: mehr Temperatur, weniger Widerstand.",
+    },
+    tags: ["ntc", "temperatursensor", "widerstand", "spannungsteiler"],
+    relatedParts: ["NTC-Sensor", "Kühlmitteltemperatursensor", "Ansauglufttemperatursensor"],
+    relatedSystems: ["Sensorik", "Motormanagement", "Thermomanagement"],
+  },
+  {
+    moduleSlug: "bauteile-verstehen-sensoren-relais-generator",
+    slug: "wechslerrelais-klemmen-und-funktion",
+    title: "Wechslerrelais: Klemmen und Funktion",
+    subtitle: "30, 85, 86, 87 und 87a sicher zuordnen",
+    summary:
+      "Du lernst die Klemmen eines Wechslerrelais, den Unterschied zwischen Ruhe- und Arbeitskontakt und die einfache Prüfung mit Multimeter.",
+    difficulty: "basic",
+    estimatedMinutes: 18,
+    sortOrder: 20,
+    focus:
+      "Du kannst ein Wechslerrelais erklären: Die Spule schaltet einen gemeinsamen Kontakt zwischen 87a und 87 um.",
+    contentBlocks: [
+      {
+        type: "list",
+        title: "Klemmen am Wechslerrelais",
+        items: [
+          "85 und 86: Relaisspule. Hier wird das Relais angesteuert.",
+          "30: gemeinsamer Eingang oder gemeinsamer Kontakt.",
+          "87a: Ruhekontakt. Mit 30 verbunden, solange die Spule nicht bestromt ist.",
+          "87: Arbeitskontakt. Mit 30 verbunden, wenn die Spule bestromt ist.",
+          "87b, falls vorhanden: zweiter Arbeitsausgang. Nicht mit 87a verwechseln.",
+        ],
+      },
+      {
+        type: "text",
+        title: "Was passiert beim Schalten?",
+        content:
+          "Ohne Ansteuerung liegt 30 auf 87a. Sobald an 85/86 die Spule bestromt wird, zieht der Anker an. Dann trennt 30 von 87a und verbindet 30 mit 87.",
+      },
+      {
+        type: "list",
+        title: "Prüfung in der Werkstatt",
+        items: [
+          "Widerstand der Spule zwischen 85 und 86 messen.",
+          "Mit Durchgangsprüfung kontrollieren: 30 zu 87a in Ruhe, 30 zu 87 bei Ansteuerung.",
+          "Ansteuerung und Lastkreis getrennt prüfen: Spule kann klicken, obwohl Kontakt verbrannt ist.",
+          "Bei Relais mit Diode oder Elektronik Polung beachten.",
+        ],
+      },
+    ],
+    checklist: [
+      "Spule und Lastkontakt nicht verwechseln.",
+      "Ruhekontakt 87a und Arbeitskontakt 87 erklären.",
+      "Durchgang in Ruhe und bei Ansteuerung prüfen.",
+      "Relais mit Diode nur korrekt gepolt bestromen.",
+    ],
+    quiz: {
+      question: "Welche Klemme ist beim Wechslerrelais der Ruhekontakt?",
+      answers: ["87a", "85", "86", "Klemme 31"],
+      correctIndex: 0,
+      explanation:
+        "87a ist mit 30 verbunden, solange die Spule nicht bestromt wird.",
+    },
+    tags: ["relais", "wechslerrelais", "klemme 30", "klemme 87", "klemme 87a"],
+    relatedParts: ["Wechslerrelais", "Sicherung", "Schalter"],
+    relatedSystems: ["Bordnetz", "Beleuchtung", "Lüftersteuerung"],
+  },
+  {
+    moduleSlug: "bauteile-verstehen-sensoren-relais-generator",
+    slug: "drehstromgenerator-ladesystem-konkret",
+    title: "Drehstromgenerator konkret erklärt",
+    subtitle: "Erregerfeld, Stator, Dioden und Regler verstehen",
+    summary:
+      "Du lernst, wie der Generator aus Bewegung elektrische Energie macht, warum Gleichrichtung nötig ist und welche Prüfungen bei Ladeproblemen zuerst kommen.",
+    difficulty: "basic",
+    estimatedMinutes: 22,
+    sortOrder: 30,
+    focus:
+      "Du kannst den Drehstromgenerator als System erklären: Rotor erzeugt ein Magnetfeld, Stator erzeugt Drehstrom, Dioden machen Gleichstrom, Regler steuert die Spannung.",
+    contentBlocks: [
+      {
+        type: "list",
+        title: "Bauteile und Aufgabe",
+        items: [
+          "Rotor: erzeugt mit Erregerstrom ein drehendes Magnetfeld.",
+          "Stator: in den Wicklungen entsteht dreiphasiger Wechselstrom.",
+          "Gleichrichterdioden: wandeln den Wechselstrom in Gleichstrom für das Bordnetz.",
+          "Regler: steuert den Erregerstrom und hält die Ladespannung passend.",
+          "Riemenantrieb und Freilauf: übertragen die mechanische Leistung vom Motor.",
+        ],
+      },
+      {
+        type: "list",
+        title: "Typische Anschlüsse",
+        items: [
+          "B+: Ladeleitung zur Batterie und zum Bordnetz.",
+          "Masse: über Gehäuse oder separate Masseverbindung.",
+          "D+ oder L: Ladekontrollleuchte beziehungsweise Erregung, je nach System.",
+          "LIN, COM oder BSD: digitale Generatoransteuerung bei modernen Fahrzeugen.",
+          "W, falls vorhanden: Drehzahlsignal bei bestimmten Anwendungen.",
+        ],
+      },
+      {
+        type: "list",
+        title: "Prüfung bei Ladeproblemen",
+        items: [
+          "Batteriezustand zuerst bewerten, sonst wirkt der Generator schnell falsch.",
+          "Ladespannung im Leerlauf und unter Last messen.",
+          "Spannungsfall auf Plusleitung und Massepfad prüfen.",
+          "Riemen, Freilauf, Stecker und Generatoransteuerung prüfen.",
+          "Bei Wechselspannungsanteil oder Flackern Gleichrichterdioden mitdenken.",
+        ],
+      },
+    ],
+    checklist: [
+      "Mechanik, Batterie und Leitungen vor Generatortausch prüfen.",
+      "B+ und Masse unter Last messen.",
+      "Ladespannung nicht ohne Betriebszustand bewerten.",
+      "Bei modernem Generator Kommunikationsleitung und Steuergerätedaten beachten.",
+    ],
+    quiz: {
+      question: "Welche Aufgabe haben die Dioden im Drehstromgenerator?",
+      answers: [
+        "Sie richten den erzeugten Wechselstrom zu Gleichstrom für das Bordnetz gleich.",
+        "Sie speichern Kraftstoffdruck.",
+        "Sie messen Raddrehzahl.",
+        "Sie ersetzen den Keilrippenriemen.",
+      ],
+      correctIndex: 0,
+      explanation:
+        "Der Stator erzeugt Wechselstrom. Das Fahrzeugbordnetz braucht Gleichstrom, deshalb übernimmt der Gleichrichter diese Aufgabe.",
+    },
+    tags: ["generator", "drehstromgenerator", "ladesystem", "regler", "dioden"],
+    relatedParts: ["Drehstromgenerator", "Batterie", "Regler", "Keilrippenriemen"],
+    relatedSystems: ["Bordnetz", "Ladesystem"],
   },
   {
     moduleSlug: "diesel-ladedruck-agr-dpf-systemdiagnose",
@@ -840,7 +1051,7 @@ const LESSON_SEEDS: LessonSeed[] = [
     title: "Zündaussetzer P0300 eingrenzen",
     subtitle: "Zündung, Einspritzung, Kompression und Gemisch trennen",
     summary:
-      "Du lernst, wie du zufaellige und zylinderbezogene Aussetzer sinnvoll prüfst.",
+      "Du lernst, wie du zufällige und zylinderbezogene Aussetzer sinnvoll prüfst.",
     difficulty: "advanced",
     estimatedMinutes: 28,
     sortOrder: 20,
@@ -909,7 +1120,7 @@ const LESSON_SEEDS: LessonSeed[] = [
     focus:
       "Verschleißbilder sind Diagnosehinweise. Sie zeigen, wo du messen und prüfen musst.",
     checklist: [
-      "Reifenbild innen/aussen/mittig bewerten.",
+      "Reifenbild innen/außen/mittig bewerten.",
       "Luftdruck und Achsgeometrie beachten.",
       "Gelenke, Lager und Daempfer sichtprüfen.",
       "Bremse auf Schleifen oder ungleiche Wirkung prüfen.",
@@ -972,7 +1183,7 @@ const LESSON_SEEDS: LessonSeed[] = [
       "Bremsarbeiten brauchen Sauberkeit, Sichtprüfung, richtige Montage und Funktionskontrolle.",
     checklist: [
       "Scheiben, Beläge, Führungen, Manschetten und Leitungen prüfen.",
-      "Auflageflaechen reinigen und passende Montagehinweise beachten.",
+      "Auflageflächen reinigen und passende Montagehinweise beachten.",
       "Bremsflüssigkeit und Pedalgefühl bewerten.",
       "Probefahrt und Einbrems-/Kundenhinweise dokumentieren.",
     ],
@@ -1000,7 +1211,7 @@ const LESSON_SEEDS: LessonSeed[] = [
     estimatedMinutes: 25,
     sortOrder: 10,
     focus:
-      "Klimadiagnose braucht Umgebungsbedingungen: Aussentemperatur, Motordrehzahl, Lüfterstatus und Luftaustritt.",
+      "Klimadiagnose braucht Umgebungsbedingungen: Außentemperatur, Motordrehzahl, Lüfterstatus und Luftaustritt.",
     checklist: [
       "Kundenbeanstandung und Bedingungen klären.",
       "Austrittstemperatur und Lüfterfunktion prüfen.",
@@ -1048,7 +1259,7 @@ const LESSON_SEEDS: LessonSeed[] = [
       ],
       correctIndex: 0,
       explanation:
-        "Ein offen hängendes Thermostat kann den grossen Kreislauf zu früh freigeben.",
+        "Ein offen hängendes Thermostat kann den großen Kreislauf zu früh freigeben.",
     },
   },
   {
@@ -1096,7 +1307,7 @@ const LESSON_SEEDS: LessonSeed[] = [
       "Eine gute Prüfungsantwort zeigt nicht nur Fachwissen, sondern Reihenfolge, Begruendung und Sicherheit.",
     checklist: [
       "Auftrag und Symptom kurz wiederholen.",
-      "Sicherheitsmassnahmen nennen.",
+      "Sicherheitsmaßnahmen nennen.",
       "Prüfreihenfolge begründen.",
       "Messwerte und Entscheidung erklären.",
       "Abschlussprüfung nennen.",
@@ -1106,7 +1317,7 @@ const LESSON_SEEDS: LessonSeed[] = [
       answers: [
         "Ich tausche das Teil, weil es oft kaputt ist.",
         "Ich prüfe erst Sicht, Versorgung, Signal und Funktion, damit ich die Ursache belegen kann.",
-        "Ich weiss nicht.",
+        "Ich weiß nicht.",
         "Ich lösche den Fehler.",
       ],
       correctIndex: 1,

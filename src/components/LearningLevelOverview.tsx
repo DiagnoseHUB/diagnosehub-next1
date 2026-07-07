@@ -161,6 +161,7 @@ export default function LearningLevelOverview({
     const stats = new Map<
       string,
       {
+        id: string;
         label: string;
         description: string;
         order: number;
@@ -171,6 +172,7 @@ export default function LearningLevelOverview({
     modules.forEach((module) => {
       const meta = getCategoryMeta(module);
       const current = stats.get(module.categoryId) || {
+        id: module.categoryId,
         ...meta,
         count: 0,
       };
@@ -179,7 +181,12 @@ export default function LearningLevelOverview({
       stats.set(module.categoryId, current);
     });
 
-    return Array.from(stats.values()).sort((a, b) => a.order - b.order);
+    return Array.from(stats.values()).sort(
+      (a, b) =>
+        a.order - b.order ||
+        a.label.localeCompare(b.label) ||
+        a.id.localeCompare(b.id),
+    );
   }, [modules]);
 
   function getModuleProgress(module: LearningModule) {
@@ -369,7 +376,7 @@ export default function LearningLevelOverview({
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {categoryStats.map((category) => (
             <div
-              key={category.label}
+              key={category.id}
               className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/70"
             >
               <div className="flex items-start justify-between gap-3">

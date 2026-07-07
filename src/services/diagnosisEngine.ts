@@ -34,18 +34,18 @@ export function getDiagnosis(input: string): DiagnosisResult {
   if (text.includes("cdhb") || text.includes("ruckelt")) {
     return {
       title: "Audi/VW 1.8 TFSI CDHB – Ruckeln im Leerlauf",
-      description: "Unruhiger Motorlauf oder Ruckeln hauptsaechlich im Leerlauf.",
+      description: "Unruhiger Motorlauf oder Ruckeln hauptsächlich im Leerlauf.",
       priority: "Mittel",
       probability: "75%",
       causes: [
-        "Kurbelgehaeuseentlueftung/Falschluft prüfen",
-        "Zuendaussetzerzähller prüfen",
+        "Kurbelgehäuseentlüftung/Falschluft prüfen",
+        "Zündaussetzerzähler prüfen",
         "Einspritzventile prüfen",
         "Verkokung der Einlassventile möglich",
       ],
       checks: [
         "Fehlerspeicher auslesen",
-        "Zuendaussetzer pro Zylinder prüfen",
+        "Zündaussetzer pro Zylinder prüfen",
         "Kraftstoffdruck Soll/Ist vergleichen",
         "Ansaugsystem auf Falschluft prüfen",
       ],
@@ -61,7 +61,7 @@ export function getDiagnosis(input: string): DiagnosisResult {
       "Fehlerspeicher vollständig auslesen",
       "Live-Daten prüfen",
       "Kraftstoffversorgung prüfen",
-      "Zuendung und Ansaugsystem prüfen",
+      "Zündung und Ansaugsystem prüfen",
     ],
     checks: [
       "Fehlerspeicher lesen",

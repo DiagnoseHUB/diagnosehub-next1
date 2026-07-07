@@ -12,6 +12,15 @@ export type FaultCodeContext = {
   summary: string;
 };
 
+export type FaultCodeRiskLevel = "niedrig" | "mittel" | "hoch";
+
+export type FaultCodeQuickInfo = FaultCodeInfo & {
+  symptomHints: string[];
+  riskLevel: FaultCodeRiskLevel;
+  riskNote: string;
+  nextSteps: string[];
+};
+
 const FAULT_CODE_DATABASE: Record<string, FaultCodeInfo> = {
   P0299: {
     code: "P0299",
@@ -22,7 +31,7 @@ const FAULT_CODE_DATABASE: Record<string, FaultCodeInfo> = {
     typicalCauses: [
       "Undichtigkeit in der Ladeluftstrecke",
       "Unterdruck-/Druckwandlerproblem",
-      "VTG-Verstellung schwergaengig oder fehlerhaft",
+      "VTG-Verstellung schwergängig oder fehlerhaft",
       "Wastegate undicht oder ausgeschlagen",
       "Ladedrucksensor fehlerhaft",
       "Luftmassenmesser unplausibel",
@@ -42,13 +51,13 @@ const FAULT_CODE_DATABASE: Record<string, FaultCodeInfo> = {
 
   P0234: {
     code: "P0234",
-    title: "Ladedruckregelgrenze ueberschritten",
+    title: "Ladedruckregelgrenze überschritten",
     system: "Ladedruck / Aufladung",
     description:
-      "Der gemessene Ladedruck ist hoeher als erwartet. Häufig bei klemmender VTG, fehlerhafter Regelung oder falscher Druckrückmeldung.",
+      "Der gemessene Ladedruck ist höher als erwartet. Häufig bei klemmender VTG, fehlerhafter Regelung oder falscher Druckrückmeldung.",
     typicalCauses: [
       "VTG-Verstellung klemmt",
-      "Wastegate oeffnet nicht korrekt",
+      "Wastegate öffnet nicht korrekt",
       "Druckwandler / Ladedruckregelventil fehlerhaft",
       "Unterdrucksystem falsch angesteuert",
       "Ladedrucksensor fehlerhaft",
@@ -90,7 +99,7 @@ const FAULT_CODE_DATABASE: Record<string, FaultCodeInfo> = {
     title: "AGR-Durchsatz zu hoch",
     system: "Abgasrückführung",
     description:
-      "Das Motorsteuergerät erkennt zu viel AGR-Durchsatz. Möglich sind ein offen haengendes AGR-Ventil oder unplausible Luftmassenwerte.",
+      "Das Motorsteuergerät erkennt zu viel AGR-Durchsatz. Möglich sind ein offen hängendes AGR-Ventil oder unplausible Luftmassenwerte.",
     typicalCauses: [
       "AGR-Ventil hängt offen",
       "AGR-Ansteuerung fehlerhaft",
@@ -118,7 +127,7 @@ const FAULT_CODE_DATABASE: Record<string, FaultCodeInfo> = {
       "Druckregelventil / Mengenregelventil fehlerhaft",
       "Injektor Rücklaufmenge zu hoch",
       "Kraftstoffsystem undicht",
-      "Tankpumpe / Vorfoerderpumpe fehlerhaft",
+      "Tankpumpe / Vorförderpumpe fehlerhaft",
     ],
     suggestedChecks: [
       "Raildruck Soll/Ist beim Starten und unter Last prüfen",
@@ -157,7 +166,7 @@ const FAULT_CODE_DATABASE: Record<string, FaultCodeInfo> = {
     title: "Luftmassenmesser Bereich/Leistung unplausibel",
     system: "Luftmasse / Ansaugsystem",
     description:
-      "Das Signal des Luftmassenmessers ist unplausibel im Verhaeltnis zu Betriebszustand, Ladedruck, AGR oder Drosselklappe.",
+      "Das Signal des Luftmassenmessers ist unplausibel im Verhältnis zu Betriebszustand, Ladedruck, AGR oder Drosselklappe.",
     typicalCauses: [
       "Luftmassenmesser verschmutzt oder fehlerhaft",
       "Falschluft / Undichtigkeit nach LMM",
@@ -183,7 +192,7 @@ const FAULT_CODE_DATABASE: Record<string, FaultCodeInfo> = {
       "Das Motorsteuergerät regelt stark in Richtung Anfettung. Häufig bei Falschluft, Kraftstoffdruckproblemen oder unplausibler Luftmessung.",
     typicalCauses: [
       "Falschluft im Ansaugsystem",
-      "Kurbelgehaeuseentlueftung defekt",
+      "Kurbelgehäuseentlüftung defekt",
       "Kraftstoffdruck zu niedrig",
       "Luftmassenmesser unplausibel",
       "Lambdasonde unplausibel",
@@ -192,7 +201,7 @@ const FAULT_CODE_DATABASE: Record<string, FaultCodeInfo> = {
     suggestedChecks: [
       "Fuel Trims / Gemischadaption prüfen",
       "Ansaugsystem abnebeln",
-      "Kurbelgehaeuseentlueftung prüfen",
+      "Kurbelgehäuseentlüftung prüfen",
       "Kraftstoffdruck prüfen",
       "Lambdasondenwerte plausibilisieren",
     ],
@@ -209,25 +218,25 @@ const FAULT_CODE_DATABASE: Record<string, FaultCodeInfo> = {
       "Kraftstoffdruck zu hoch",
       "Luftmassenmesser unplausibel",
       "Lambdasonde unplausibel",
-      "Tankentlueftungsventil hängt offen",
+      "Tankentlüftungsventil hängt offen",
     ],
     suggestedChecks: [
       "Fuel Trims prüfen",
       "Kraftstoffdruck prüfen",
       "Injektoren auf Nachtropfen prüfen",
-      "Tankentlueftungsventil prüfen",
+      "Tankentlüftungsventil prüfen",
       "LMM- und Lambdawerte plausibilisieren",
     ],
   },
 
   P0300: {
     code: "P0300",
-    title: "Zufaellige/mehrere Zylinder Fehlzuendungen erkannt",
+    title: "Zufällige/mehrere Zylinder Fehlzündungen erkannt",
     system: "Verbrennung / Laufunruhe",
     description:
-      "Das Steuergerät erkennt Verbrennungsaussetzer auf mehreren oder wechselnden Zylindern. Beim Benziner oft Zuendung/Falschluft/Kraftstoff, beim Diesel eher Injektoren/Raildruck/Kompression.",
+      "Das Steuergerät erkennt Verbrennungsaussetzer auf mehreren oder wechselnden Zylindern. Beim Benziner oft Zündung/Falschluft/Kraftstoff, beim Diesel eher Injektoren/Raildruck/Kompression.",
     typicalCauses: [
-      "Benziner: Zuendkerzen / Zuendspulen",
+      "Benziner: Zündkerzen / Zündspulen",
       "Benziner: Falschluft / PCV",
       "Diesel: Injektoren / Rücklaufmenge",
       "Raildruckschwankungen",
@@ -235,8 +244,8 @@ const FAULT_CODE_DATABASE: Record<string, FaultCodeInfo> = {
       "Kraftstoffversorgung",
     ],
     suggestedChecks: [
-      "Aussetzerzähller je Zylinder prüfen",
-      "Motortyp beachten: Benziner Zuendung prüfen, Diesel Injektoren/Raildruck prüfen",
+      "Aussetzerzähler je Zylinder prüfen",
+      "Motortyp beachten: Benziner Zündung prüfen, Diesel Injektoren/Raildruck prüfen",
       "Kraftstoffdruck / Raildruck prüfen",
       "Falschluft / Ansaugsystem prüfen",
       "Kompression prüfen",
@@ -245,20 +254,20 @@ const FAULT_CODE_DATABASE: Record<string, FaultCodeInfo> = {
 
   P0301: {
     code: "P0301",
-    title: "Zylinder 1 Fehlzuendung erkannt",
+    title: "Zylinder 1 Fehlzündung erkannt",
     system: "Verbrennung / Laufunruhe",
     description:
-      "Das Steuergerät erkennt Aussetzer auf Zylinder 1. Ursache abhaengig vom Motortyp.",
+      "Das Steuergerät erkennt Aussetzer auf Zylinder 1. Ursache abhängig vom Motortyp.",
     typicalCauses: [
-      "Benziner: Zuendkerze / Zuendspule Zylinder 1",
+      "Benziner: Zündkerze / Zündspule Zylinder 1",
       "Benziner: Injektor Zylinder 1",
       "Diesel: Injektor Zylinder 1",
       "Kompression Zylinder 1",
       "Falschluft / mechanisches Problem",
     ],
     suggestedChecks: [
-      "Aussetzerzähller prüfen",
-      "Benziner: Zuendspule/Zuendkerze quer tauschen",
+      "Aussetzerzähler prüfen",
+      "Benziner: Zündspule/Zündkerze quer tauschen",
       "Diesel: Injektor-Korrekturwerte/Rücklaufmenge prüfen",
       "Kompression prüfen",
       "Injektor-Ansteuerung prüfen",
@@ -267,20 +276,20 @@ const FAULT_CODE_DATABASE: Record<string, FaultCodeInfo> = {
 
   P0302: {
     code: "P0302",
-    title: "Zylinder 2 Fehlzuendung erkannt",
+    title: "Zylinder 2 Fehlzündung erkannt",
     system: "Verbrennung / Laufunruhe",
     description:
-      "Das Steuergerät erkennt Aussetzer auf Zylinder 2. Ursache abhaengig vom Motortyp.",
+      "Das Steuergerät erkennt Aussetzer auf Zylinder 2. Ursache abhängig vom Motortyp.",
     typicalCauses: [
-      "Benziner: Zuendkerze / Zuendspule Zylinder 2",
+      "Benziner: Zündkerze / Zündspule Zylinder 2",
       "Benziner: Injektor Zylinder 2",
       "Diesel: Injektor Zylinder 2",
       "Kompression Zylinder 2",
       "Falschluft / mechanisches Problem",
     ],
     suggestedChecks: [
-      "Aussetzerzähller prüfen",
-      "Benziner: Zuendspule/Zuendkerze quer tauschen",
+      "Aussetzerzähler prüfen",
+      "Benziner: Zündspule/Zündkerze quer tauschen",
       "Diesel: Injektor-Korrekturwerte/Rücklaufmenge prüfen",
       "Kompression prüfen",
       "Injektor-Ansteuerung prüfen",
@@ -289,20 +298,20 @@ const FAULT_CODE_DATABASE: Record<string, FaultCodeInfo> = {
 
   P0303: {
     code: "P0303",
-    title: "Zylinder 3 Fehlzuendung erkannt",
+    title: "Zylinder 3 Fehlzündung erkannt",
     system: "Verbrennung / Laufunruhe",
     description:
-      "Das Steuergerät erkennt Aussetzer auf Zylinder 3. Ursache abhaengig vom Motortyp.",
+      "Das Steuergerät erkennt Aussetzer auf Zylinder 3. Ursache abhängig vom Motortyp.",
     typicalCauses: [
-      "Benziner: Zuendkerze / Zuendspule Zylinder 3",
+      "Benziner: Zündkerze / Zündspule Zylinder 3",
       "Benziner: Injektor Zylinder 3",
       "Diesel: Injektor Zylinder 3",
       "Kompression Zylinder 3",
       "Falschluft / mechanisches Problem",
     ],
     suggestedChecks: [
-      "Aussetzerzähller prüfen",
-      "Benziner: Zuendspule/Zuendkerze quer tauschen",
+      "Aussetzerzähler prüfen",
+      "Benziner: Zündspule/Zündkerze quer tauschen",
       "Diesel: Injektor-Korrekturwerte/Rücklaufmenge prüfen",
       "Kompression prüfen",
       "Injektor-Ansteuerung prüfen",
@@ -311,20 +320,20 @@ const FAULT_CODE_DATABASE: Record<string, FaultCodeInfo> = {
 
   P0304: {
     code: "P0304",
-    title: "Zylinder 4 Fehlzuendung erkannt",
+    title: "Zylinder 4 Fehlzündung erkannt",
     system: "Verbrennung / Laufunruhe",
     description:
-      "Das Steuergerät erkennt Aussetzer auf Zylinder 4. Ursache abhaengig vom Motortyp.",
+      "Das Steuergerät erkennt Aussetzer auf Zylinder 4. Ursache abhängig vom Motortyp.",
     typicalCauses: [
-      "Benziner: Zuendkerze / Zuendspule Zylinder 4",
+      "Benziner: Zündkerze / Zündspule Zylinder 4",
       "Benziner: Injektor Zylinder 4",
       "Diesel: Injektor Zylinder 4",
       "Kompression Zylinder 4",
       "Falschluft / mechanisches Problem",
     ],
     suggestedChecks: [
-      "Aussetzerzähller prüfen",
-      "Benziner: Zuendspule/Zuendkerze quer tauschen",
+      "Aussetzerzähler prüfen",
+      "Benziner: Zündspule/Zündkerze quer tauschen",
       "Diesel: Injektor-Korrekturwerte/Rücklaufmenge prüfen",
       "Kompression prüfen",
       "Injektor-Ansteuerung prüfen",
@@ -363,14 +372,14 @@ const FAULT_CODE_DATABASE: Record<string, FaultCodeInfo> = {
       "Das Signal des Differenzdrucksensors ist unplausibel oder außerhalb des erwarteten Bereichs.",
     typicalCauses: [
       "Differenzdrucksensor fehlerhaft",
-      "Schlaeuche verstopft, vertauscht oder undicht",
+      "Schläuche verstopft, vertauscht oder undicht",
       "Kabel-/Steckerproblem",
       "DPF stark beladen",
     ],
     suggestedChecks: [
       "Differenzdruck bei Motor aus prüfen",
       "Differenzdruck im Leerlauf prüfen",
-      "Schlaeuche prüfen",
+      "Schläuche prüfen",
       "Sensorversorgung und Signal prüfen",
       "DPF-Beladung prüfen",
     ],
@@ -379,6 +388,164 @@ const FAULT_CODE_DATABASE: Record<string, FaultCodeInfo> = {
 
 function normalizeFaultCode(code: string) {
   return code.trim().toUpperCase();
+}
+
+function getRiskLevelForFaultCode(faultCode: FaultCodeInfo): FaultCodeRiskLevel {
+  const searchableText = `${faultCode.code} ${faultCode.title} ${faultCode.system} ${faultCode.description}`.toLowerCase();
+
+  if (
+    searchableText.includes("bremse") ||
+    searchableText.includes("airbag") ||
+    searchableText.includes("lenkung") ||
+    searchableText.includes("hochvolt") ||
+    searchableText.includes("fehlzündung") ||
+    searchableText.includes("rail") ||
+    searchableText.includes("kraftstoffdruck")
+  ) {
+    return "hoch";
+  }
+
+  if (
+    searchableText.includes("ladedruck") ||
+    searchableText.includes("dpf") ||
+    searchableText.includes("partikelfilter") ||
+    searchableText.includes("agr") ||
+    searchableText.includes("gemisch")
+  ) {
+    return "mittel";
+  }
+
+  return "niedrig";
+}
+
+function getRiskNoteForFaultCode(
+  faultCode: FaultCodeInfo,
+  riskLevel: FaultCodeRiskLevel
+) {
+  const searchableText = `${faultCode.system} ${faultCode.description}`.toLowerCase();
+
+  if (searchableText.includes("kraftstoffdruck") || searchableText.includes("rail")) {
+    return "Nicht lange weiterfahren, wenn Startprobleme, Aussetzer, Notlauf oder Kraftstoffgeruch auftreten. Erst Druckversorgung und Undichtigkeiten prüfen.";
+  }
+
+  if (searchableText.includes("fehlzündung") || searchableText.includes("laufunruhe")) {
+    return "Bei starkem Ruckeln oder blinkender Motorkontrollleuchte nicht weiter belasten. Kat-Schäden und Folgeschäden vermeiden.";
+  }
+
+  if (searchableText.includes("ladedruck")) {
+    return "Mittleres Risiko: Notlauf und Folgeschäden sind möglich. Unter Last nur zur Prüfung fahren und zuerst Undichtigkeiten ausschließen.";
+  }
+
+  if (searchableText.includes("dpf") || searchableText.includes("partikelfilter")) {
+    return "Mittleres Risiko: Regeneration und Abgasgegendruck bewerten. Bei Warnmeldungen oder Leistungsverlust zeitnah prüfen.";
+  }
+
+  if (searchableText.includes("gemisch")) {
+    return "Mittleres Risiko: Mager-/Fettlauf kann Verbrauch, Abgaswerte und Kat belasten. Ursache vor Teiletausch eingrenzen.";
+  }
+
+  if (riskLevel === "hoch") {
+    return "Hohes Risiko: Ursache vor Weiterfahrt eingrenzen und sicherheits- oder folgeschadenrelevante Punkte zuerst prüfen.";
+  }
+
+  if (riskLevel === "mittel") {
+    return "Mittleres Risiko: Fehler zeitnah prüfen, Messwerte sichern und Belastungsfahrten vermeiden.";
+  }
+
+  return "Niedriges Risiko, solange keine starken Symptome auftreten. Fehler trotzdem dokumentieren und Ursache prüfen.";
+}
+
+function getSymptomHintsForFaultCode(faultCode: FaultCodeInfo) {
+  const searchableText = `${faultCode.system} ${faultCode.description}`.toLowerCase();
+
+  if (searchableText.includes("ladedruck")) {
+    return [
+      "Leistungsverlust oder Notlauf unter Last",
+      "Pfeifen, Zischen oder Rauchspuren an der Ladeluftstrecke",
+      "Soll-/Ist-Ladedruck weicht bei Beschleunigung ab",
+    ];
+  }
+
+  if (searchableText.includes("agr")) {
+    return [
+      "Ruckeln, Rauchentwicklung oder unruhiger Leerlauf",
+      "Luftmasse verändert sich beim AGR-Stellgliedtest nicht plausibel",
+      "Fehler tritt häufig bei Teillast oder warmem Motor auf",
+    ];
+  }
+
+  if (searchableText.includes("dpf") || searchableText.includes("partikelfilter")) {
+    return [
+      "DPF-Warnung, Notlauf oder häufige Regeneration",
+      "Differenzdruck im Leerlauf oder unter Last unplausibel",
+      "Erhöhter Verbrauch oder Abgasgeruch",
+    ];
+  }
+
+  if (searchableText.includes("kraftstoffdruck") || searchableText.includes("rail")) {
+    return [
+      "Schlechter Start, Aussetzer oder Absterben",
+      "Raildruck Soll/Ist passt beim Starten oder unter Last nicht",
+      "Luftblasen, Kraftstoffgeruch oder Niederdruckproblem möglich",
+    ];
+  }
+
+  if (searchableText.includes("gemisch")) {
+    return [
+      "Unruhiger Leerlauf oder Ruckeln",
+      "Fuel Trims stark positiv oder negativ",
+      "Falschluft, Kraftstoffdruck oder Lambdasignal unplausibel",
+    ];
+  }
+
+  if (searchableText.includes("fehlzündung") || searchableText.includes("laufunruhe")) {
+    return [
+      "Ruckeln, Schütteln oder blinkende Motorkontrollleuchte",
+      "Aussetzerzähler zeigt betroffene Zylinder",
+      "Ursache kann Zündung, Einspritzung, Kompression oder Gemisch sein",
+    ];
+  }
+
+  return [
+    "Motorkontrollleuchte oder gespeicherter OBD-Code",
+    "Symptom und Randbedingungen notieren",
+    "Freeze-Frame und Istwerte zur Eingrenzung sichern",
+  ];
+}
+
+function getNextStepsForFaultCode(faultCode: FaultCodeInfo) {
+  return [
+    "Fehlerspeicher, Fehlertext und Freeze-Frame sichern.",
+    ...faultCode.suggestedChecks.slice(0, 4),
+    "Nach jedem Befund Fehler löschen, Probefahrt unter passenden Bedingungen durchführen und erneut auslesen.",
+  ];
+}
+
+export function getFaultCodeQuickInfo(code: string): FaultCodeQuickInfo | null {
+  const faultCode = FAULT_CODE_DATABASE[normalizeFaultCode(code)];
+
+  if (!faultCode) {
+    return null;
+  }
+
+  const riskLevel = getRiskLevelForFaultCode(faultCode);
+
+  return {
+    ...faultCode,
+    symptomHints: getSymptomHintsForFaultCode(faultCode),
+    riskLevel,
+    riskNote: getRiskNoteForFaultCode(faultCode, riskLevel),
+    nextSteps: getNextStepsForFaultCode(faultCode),
+  };
+}
+
+export function listFaultCodeQuickInfos() {
+  return Object.values(FAULT_CODE_DATABASE)
+    .sort((a, b) => a.code.localeCompare(b.code))
+    .map((faultCode) => getFaultCodeQuickInfo(faultCode.code))
+    .filter((faultCode): faultCode is FaultCodeQuickInfo =>
+      Boolean(faultCode)
+    );
 }
 
 export function detectFaultCodeContext(input: string): FaultCodeContext {

@@ -11,6 +11,7 @@ import {
 import { useSearchParams } from "next/navigation";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
+import InstructionStepVisual from "@/components/InstructionStepVisual";
 import InstructionCard from "../../components/InstructionCard";
 import { instructions } from "../../data/instructions";
 import type {
@@ -139,7 +140,7 @@ async function pollGeneratedInstruction(
   }
 
   throw new Error(
-    "Die KI-Anleitung dauert laenger als 10 Minuten. Bitte die Anfrage etwas kuerzer formulieren oder später erneut versuchen."
+    "Die KI-Anleitung dauert länger als 10 Minuten. Bitte die Anfrage etwas kürzer formulieren oder später erneut versuchen."
   );
 }
 
@@ -470,7 +471,7 @@ function InstructionsPageContent() {
                   setSearchTerm(event.target.value);
                   resetGeneratedInstruction();
                 }}
-                placeholder="z. B. Golf VII GTI Oelservice..."
+                placeholder="z. B. Golf VII GTI Ölservice..."
                 className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-950 outline-none ring-blue-500 transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500"
               />
             </div>
@@ -734,7 +735,10 @@ function GeneratedInstructionPanel({
               key={`${step.title}-${index}`}
               className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-900"
             >
-              <div className="flex gap-4">
+              <div className="grid gap-4 lg:grid-cols-[16rem_1fr]">
+                <InstructionStepVisual step={step} stepNumber={index + 1} />
+
+                <div className="flex gap-4">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-black text-white">
                   {index + 1}
                 </div>
@@ -767,6 +771,7 @@ function GeneratedInstructionPanel({
                   )}
                 </div>
               </div>
+            </div>
             </div>
           ))}
         </div>

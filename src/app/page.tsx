@@ -1,7 +1,9 @@
 import Link from "next/link";
 import Footer from "@/components/Footer";
+import FaultCodeQuickSearch from "@/components/FaultCodeQuickSearch";
 import Header from "@/components/Header";
 import SearchBar from "@/components/SearchBar";
+import { listFaultCodeQuickInfos } from "@/services/faultCodeDatabase";
 
 const heroStats = [
   { label: "Start", value: "Diagnose" },
@@ -133,6 +135,8 @@ function DiagnosticBoardPreview() {
 }
 
 export default function HomePage() {
+  const faultCodeQuickInfos = listFaultCodeQuickInfos();
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-950 transition-colors dark:bg-slate-950 dark:text-slate-100">
       <Header />
@@ -252,7 +256,11 @@ export default function HomePage() {
               </div>
             </div>
 
-            <SearchBar />
+            <FaultCodeQuickSearch codes={faultCodeQuickInfos} />
+
+            <div className="mt-6">
+              <SearchBar />
+            </div>
           </div>
         </section>
 

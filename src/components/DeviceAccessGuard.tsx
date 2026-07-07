@@ -60,7 +60,7 @@ export default function DeviceAccessGuard() {
       }
 
       if (access.code !== "DEVICE_LIMIT_REACHED") {
-        console.error("Gerätezugriff konnte nicht geprüft werden:", access.error);
+        console.warn("Gerätezugriff wurde übersprungen:", access.error);
         setGuardState({ status: "allowed", access });
         return;
       }
@@ -73,7 +73,7 @@ export default function DeviceAccessGuard() {
           "Das Gerätelimit für dieses Konto ist erreicht.",
       });
     } catch (error) {
-      console.error("Gerätezugriff konnte nicht geprüft werden:", error);
+      console.warn("Gerätezugriff wurde übersprungen:", error);
       setGuardState({ status: "allowed" });
     }
   }

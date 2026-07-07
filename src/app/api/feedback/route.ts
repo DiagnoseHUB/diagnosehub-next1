@@ -9,6 +9,11 @@ type FeedbackRequestBody = {
   message?: string;
   page?: string;
   company?: string;
+  feedbackType?: string;
+  rating?: string;
+  missingInfo?: boolean;
+  caseTitle?: string;
+  caseContext?: string;
 };
 
 type ResendEmailResponse = {
@@ -40,16 +45,28 @@ function buildFeedbackText(input: {
   email: string;
   page: string;
   message: string;
+  feedbackType: string;
+  rating: string;
+  missingInfo: boolean;
+  caseTitle: string;
+  caseContext: string;
 }) {
   return [
     "Neues DiagnoseHUB Feedback",
     "",
+    `Typ: ${input.feedbackType}`,
+    `Bewertung: ${input.rating || "Nicht angegeben"}`,
+    `Fehlende Info gemeldet: ${input.missingInfo ? "Ja" : "Nein"}`,
+    `Fall: ${input.caseTitle || "Nicht angegeben"}`,
     `Name: ${input.name || "Nicht angegeben"}`,
     `E-Mail: ${input.email || "Nicht angegeben"}`,
     `Seite: ${input.page || "Nicht angegeben"}`,
     "",
     "Feedback:",
     input.message,
+    "",
+    "Fallkontext:",
+    input.caseContext || "Nicht angegeben",
   ].join("\n");
 }
 
@@ -58,6 +75,11 @@ function buildFeedbackHtml(input: {
   email: string;
   page: string;
   message: string;
+  feedbackType: string;
+  rating: string;
+  missingInfo: boolean;
+  caseTitle: string;
+  caseContext: string;
 }) {
   const escapeHtml = (value: string) =>
     value
@@ -69,11 +91,18 @@ function buildFeedbackHtml(input: {
   return `
     <div style="font-family:Arial,sans-serif;line-height:1.6;color:#0f172a">
       <h1>Neues DiagnoseHUB Feedback</h1>
+      <p><strong>Typ:</strong> ${escapeHtml(input.feedbackType)}</p>
+      <p><strong>Bewertung:</strong> ${escapeHtml(input.rating || "Nicht angegeben")}</p>
+      <p><strong>Fehlende Info gemeldet:</strong> ${input.missingInfo ? "Ja" : "Nein"}</p>
+      <p><strong>Fall:</strong> ${escapeHtml(input.caseTitle || "Nicht angegeben")}</p>
       <p><strong>Name:</strong> ${escapeHtml(input.name || "Nicht angegeben")}</p>
       <p><strong>E-Mail:</strong> ${escapeHtml(input.email || "Nicht angegeben")}</p>
       <p><strong>Seite:</strong> ${escapeHtml(input.page || "Nicht angegeben")}</p>
       <hr />
       <p style="white-space:pre-wrap">${escapeHtml(input.message)}</p>
+      <hr />
+      <h2>Fallkontext</h2>
+      <p style="white-space:pre-wrap">${escapeHtml(input.caseContext || "Nicht angegeben")}</p>
     </div>
   `;
 }
@@ -89,7 +118,22 @@ export async function POST(request: Request) {
     const name = sanitizeText(body.name, 120);
     const email = sanitizeText(body.email, 180).toLowerCase();
     const page = sanitizeText(body.page, 300);
-    const message = sanitizeText(body.message, 4000);
+    const rawMessage = sanitizeText(body.message, 4000);
+    const feedbackType = body.feedbackType === "case" ? "Fallfeedback" : "Allgemein";
+    const rating =
+      body.rating === "up"
+        ? "Daumen hoch"
+        : body.rating === "down"
+          ? "Daumen runter"
+          : "";
+    const missingInfo = Boolean(body.missingInfo);
+    const caseTitle = sanitizeText(body.caseTitle, 240);
+    const caseContext = sanitizeText(body.caseContext, 3500);
+    const message =
+      rawMessage ||
+      (rating || missingInfo
+        ? "Fallfeedback ohne weiteren Kommentar."
+        : "");
 
     if (message.length < 5) {
       return NextResponse.json(
@@ -110,7 +154,17 @@ export async function POST(request: Request) {
       process.env.FEEDBACK_EMAIL_FROM?.trim() ||
       getRequiredEnv("SERVICE_REMINDER_EMAIL_FROM");
     const to = process.env.FEEDBACK_EMAIL_TO?.trim() || "info@diagnosehub.de";
-    const payload = { name, email, page, message };
+    const payload = {
+      name,
+      email,
+      page,
+      message,
+      feedbackType,
+      rating,
+      missingInfo,
+      caseTitle,
+      caseContext,
+    };
 
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -121,7 +175,10 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         from,
         to: [to],
-        subject: "DiagnoseHUB Feedback",
+        subject:
+          feedbackType === "Fallfeedback"
+            ? "DiagnoseHUB Fallfeedback"
+            : "DiagnoseHUB Feedback",
         html: buildFeedbackHtml(payload),
         text: buildFeedbackText(payload),
       }),

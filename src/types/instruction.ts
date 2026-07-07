@@ -13,6 +13,9 @@ export type InstructionStep = {
   description: string;
   check?: string;
   warning?: string;
+  imageHint?: string;
+  imageAlt?: string;
+  imageUrl?: string;
 };
 
 export type InstructionGuide = {

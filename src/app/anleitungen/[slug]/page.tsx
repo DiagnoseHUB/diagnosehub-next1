@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
+import InstructionStepVisual from "@/components/InstructionStepVisual";
 import PrintButton from "../../../components/PrintButton";
 import TrainingMode from "@/components/TrainingMode";
 import { getInstructionBySlug, instructions } from "../../../data/instructions";
@@ -152,7 +153,13 @@ export default async function InstructionDetailPage({
                   key={`${step.title}-${index}`}
                   className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-950"
                 >
-                  <div className="flex gap-4">
+                  <div className="grid gap-4 lg:grid-cols-[16rem_1fr]">
+                    <InstructionStepVisual
+                      step={step}
+                      stepNumber={index + 1}
+                    />
+
+                    <div className="flex gap-4">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-black text-white">
                       {index + 1}
                     </div>
@@ -183,6 +190,7 @@ export default async function InstructionDetailPage({
                           {step.warning}
                         </div>
                       )}
+                    </div>
                     </div>
                   </div>
                 </div>

@@ -29,6 +29,10 @@ type GuideStep = {
   description: string;
   check?: string;
   warning?: string;
+  measurement?: string;
+  expectedResult?: string;
+  decision?: string;
+  qualityCheck?: string;
   imageHint?: string;
   imageAlt?: string;
 };
@@ -43,13 +47,20 @@ type Guide = {
   estimatedTime: string;
   vehicleApplicability: string;
   tags: string[];
+  diagnosisGoal?: string;
+  missingVehicleData?: string[];
+  requiredSkill?: string;
+  escalationCriteria?: string[];
   symptoms: string[];
   tools: string[];
+  partsAndMaterials?: string[];
   safetyNotes: string[];
   initialChecks: string[];
+  measurementPlan?: string[];
   steps: GuideStep[];
   commonCauses: string[];
   nextActions: string[];
+  finalChecks?: string[];
   proHint?: string;
   lastUpdated: string;
 };
@@ -108,6 +119,24 @@ const instructionGuideTextFormat = {
           type: "string",
         },
       },
+      diagnosisGoal: {
+        type: "string",
+      },
+      missingVehicleData: {
+        type: "array",
+        items: {
+          type: "string",
+        },
+      },
+      requiredSkill: {
+        type: "string",
+      },
+      escalationCriteria: {
+        type: "array",
+        items: {
+          type: "string",
+        },
+      },
       symptoms: {
         type: "array",
         items: {
@@ -120,6 +149,12 @@ const instructionGuideTextFormat = {
           type: "string",
         },
       },
+      partsAndMaterials: {
+        type: "array",
+        items: {
+          type: "string",
+        },
+      },
       safetyNotes: {
         type: "array",
         items: {
@@ -127,6 +162,12 @@ const instructionGuideTextFormat = {
         },
       },
       initialChecks: {
+        type: "array",
+        items: {
+          type: "string",
+        },
+      },
+      measurementPlan: {
         type: "array",
         items: {
           type: "string",
@@ -150,6 +191,18 @@ const instructionGuideTextFormat = {
             warning: {
               type: "string",
             },
+            measurement: {
+              type: "string",
+            },
+            expectedResult: {
+              type: "string",
+            },
+            decision: {
+              type: "string",
+            },
+            qualityCheck: {
+              type: "string",
+            },
             imageHint: {
               type: "string",
             },
@@ -162,6 +215,10 @@ const instructionGuideTextFormat = {
             "description",
             "check",
             "warning",
+            "measurement",
+            "expectedResult",
+            "decision",
+            "qualityCheck",
             "imageHint",
             "imageAlt",
           ],
@@ -179,6 +236,12 @@ const instructionGuideTextFormat = {
           type: "string",
         },
       },
+      finalChecks: {
+        type: "array",
+        items: {
+          type: "string",
+        },
+      },
       proHint: {
         type: "string",
       },
@@ -191,13 +254,20 @@ const instructionGuideTextFormat = {
       "estimatedTime",
       "vehicleApplicability",
       "tags",
+      "diagnosisGoal",
+      "missingVehicleData",
+      "requiredSkill",
+      "escalationCriteria",
       "symptoms",
       "tools",
+      "partsAndMaterials",
       "safetyNotes",
       "initialChecks",
+      "measurementPlan",
       "steps",
       "commonCauses",
       "nextActions",
+      "finalChecks",
       "proHint",
     ],
   },
@@ -344,6 +414,22 @@ function normalizeSteps(value: unknown): GuideStep[] {
           typeof rawStep.warning === "string"
             ? truncate(rawStep.warning, 140)
             : "",
+        measurement:
+          typeof rawStep.measurement === "string"
+            ? truncate(rawStep.measurement, 180)
+            : "",
+        expectedResult:
+          typeof rawStep.expectedResult === "string"
+            ? truncate(rawStep.expectedResult, 180)
+            : "",
+        decision:
+          typeof rawStep.decision === "string"
+            ? truncate(rawStep.decision, 180)
+            : "",
+        qualityCheck:
+          typeof rawStep.qualityCheck === "string"
+            ? truncate(rawStep.qualityCheck, 180)
+            : "",
         imageHint:
           typeof rawStep.imageHint === "string"
             ? truncate(rawStep.imageHint, 180)
@@ -393,6 +479,29 @@ function normalizeGuide(rawGuide: unknown, query: string): Guide {
         ? truncate(raw.vehicleApplicability, 420)
         : "Nur nach eindeutiger Fahrzeugidentifikation, Motorkennbuchstaben und Reparaturumfang anwenden.",
     tags: normalizeStringArray(raw.tags, [query, "KI-Anleitung"], 8),
+    diagnosisGoal:
+      typeof raw.diagnosisGoal === "string" && raw.diagnosisGoal.trim()
+        ? truncate(raw.diagnosisGoal, 240)
+        : "Ziel: Fehlerbild eindeutig bestätigen, Ursache beweisen und unnötigen Teiletausch vermeiden.",
+    missingVehicleData: normalizeStringArray(
+      raw.missingVehicleData,
+      [
+        "Hersteller, Modell, Baujahr, Motorcode und Systemvariante prüfen.",
+        "Fehlercode mit vollständigem Testertext dokumentieren, falls vorhanden.",
+      ],
+      6
+    ),
+    requiredSkill:
+      typeof raw.requiredSkill === "string" && raw.requiredSkill.trim()
+        ? truncate(raw.requiredSkill, 120)
+        : "Fachkunde abhängig von System und Reparaturumfang.",
+    escalationCriteria: normalizeStringArray(
+      raw.escalationCriteria,
+      [
+        "Bei sicherheitsrelevanten Systemen, Hochvolt, Airbag, Bremse, Lenkung oder Steuerzeiten nicht ohne passende Qualifikation arbeiten.",
+      ],
+      6
+    ),
     symptoms: normalizeStringArray(
       raw.symptoms,
       ["Fehlerbild anhand Kundenbeanstandung eingrenzen."],
@@ -407,6 +516,11 @@ function normalizeGuide(rawGuide: unknown, query: string): Guide {
         "fahrzeugabhängiges Spezialwerkzeug",
       ],
       10
+    ),
+    partsAndMaterials: normalizeStringArray(
+      raw.partsAndMaterials,
+      ["Ersatzteile, Dichtungen, Schrauben und Betriebsstoffe erst nach Diagnose und Herstellerdaten festlegen."],
+      8
     ),
     safetyNotes: normalizeStringArray(
       raw.safetyNotes,
@@ -425,6 +539,14 @@ function normalizeGuide(rawGuide: unknown, query: string): Guide {
       ],
       5
     ),
+    measurementPlan: normalizeStringArray(
+      raw.measurementPlan,
+      [
+        "Messwerte nur unter definiertem Betriebszustand bewerten.",
+        "Soll-/Istwerte dokumentieren und Abweichung vor Teiletausch bestätigen.",
+      ],
+      8
+    ),
     steps: normalizeSteps(raw.steps),
     commonCauses: normalizeStringArray(
       raw.commonCauses,
@@ -437,6 +559,14 @@ function normalizeGuide(rawGuide: unknown, query: string): Guide {
         "Nach Montage Fehlerspeicher prüfen, Probefahrt durchführen und Dichtheit kontrollieren.",
       ],
       6
+    ),
+    finalChecks: normalizeStringArray(
+      raw.finalChecks,
+      [
+        "Fehlerspeicher löschen und nach Probefahrt erneut auslesen.",
+        "Funktion, Dichtheit, Geräusche und Live-Daten prüfen.",
+      ],
+      8
     ),
     proHint:
       typeof raw.proHint === "string" && raw.proHint.trim()
@@ -580,20 +710,42 @@ Du musst ausschließlich gültiges JSON im vorgegebenen Schema ausgeben.
 Die Antwort muss vollständig abgeschlossen werden.
 Lieber kompakter schreiben als wegen Tokenlimit unvollständig abbrechen.
 
+STRUKTUR:
+- Die Anleitung soll beim Lesen von oben nach unten wie ein Arbeitsauftrag funktionieren.
+- Erst Ziel und Voraussetzungen, dann Prüfung, dann Arbeitsschritte, dann Endkontrolle.
+- Jedes Feld hat eine klare Aufgabe. Keine Inhalte doppelt in safetyNotes, initialChecks, steps und finalChecks wiederholen.
+- In steps immer nur eine konkrete Handlung pro Schritt.
+- Messung, Sollzustand, Entscheidung und Qualitätskontrolle nur dann füllen, wenn sie den Schritt wirklich klarer machen.
+- Warnungen nur dort setzen, wo im konkreten Schritt ein echtes Risiko besteht.
+- Keine langen Textblöcke in einzelnen Feldern. Lieber mehrere kurze Einträge.
+
 KOMPAKTHEIT:
 - safetyNotes maximal 2–4 kurze Punkte.
 - initialChecks maximal 3–5 kurze Punkte.
 - tools maximal 6–10 Einträge.
+- partsAndMaterials maximal 4–8 Einträge.
 - symptoms maximal 3–6 Einträge.
-- commonCauses maximal 3–6 Einträge.
+- commonCauses maximal 3–6 Einträge und dort typische Fehler, mögliche Ursachen, bekannte Schwachstellen und Fehldiagnosen gemeinsam nennen.
+- commonCauses bevorzugt mit Priorität beginnen: [hoch], [mittel] oder [niedrig].
 - nextActions maximal 3–6 Einträge.
+- measurementPlan maximal 3–8 Einträge.
+- finalChecks maximal 3–8 Einträge.
+- diagnosisGoal: ein klarer Satz, welches Problem bewiesen oder gelöst wird.
+- missingVehicleData: fehlende Fahrzeug-/Systemdaten nennen, die die Anleitung genauer machen.
+- requiredSkill: klar sagen, ob Hobby, fortgeschritten, Werkstatt oder Profi.
+- escalationCriteria: wann abbrechen, nicht weiterfahren oder Fachbetrieb/Herstellerdaten nötig sind.
 - proHint maximal 1–2 kurze Sätze.
 - check nur ausfüllen, wenn wirklich etwas geprüft, gemessen oder kontrolliert wird.
 - warning nur ausfüllen, wenn im konkreten Schritt ein echtes Risiko besteht.
+- measurement pro Schritt ausfüllen, wenn ein Messwert, Testerwert, Spannungswert, Druckwert oder Sichtprüfkriterium entscheidet.
+- expectedResult pro Schritt ausfüllen, wenn ein Sollzustand oder erwartetes Ergebnis sinnvoll ist.
+- decision pro Schritt ausfüllen: was folgt aus gut/schlecht/abweichend?
+- qualityCheck pro Schritt ausfüllen, wenn der Schritt nach Montage/Prüfung abgesichert werden muss.
 - imageHint für jeden Schritt ausfüllen: knapp beschreiben, welches Bild oder welche Skizze den Schritt verständlich macht.
 - imageAlt für jeden Schritt ausfüllen: kurzer Alternativtext für das Bild.
 - Wenn kein konkreter Check nötig ist, check als leeren String ausgeben.
 - Wenn keine konkrete Warnung nötig ist, warning als leeren String ausgeben.
+- Wenn measurement/expectedResult/decision/qualityCheck nicht sinnvoll sind, jeweils leeren String ausgeben.
 - Keine langen Absätze.
 - Keine doppelten Hinweise.
 - Keine Disclaimer-Wiederholungen.

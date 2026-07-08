@@ -3,6 +3,7 @@ import type { SupabaseClient, User } from "@supabase/supabase-js";
 export type ChatMessage = {
   role: "user" | "assistant";
   content: string;
+  audienceMode?: "workshop" | "hobby";
 };
 
 export type EngineContext = {

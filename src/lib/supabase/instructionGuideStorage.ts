@@ -13,13 +13,20 @@ type InstructionGuideDatabaseRow = {
   estimated_time: string;
   vehicle_applicability: string;
   tags: string[];
+  diagnosis_goal?: string | null;
+  missing_vehicle_data?: string[] | null;
+  required_skill?: string | null;
+  escalation_criteria?: string[] | null;
   symptoms: string[];
   tools: string[];
+  parts_and_materials?: string[] | null;
   safety_notes: string[];
   initial_checks: string[];
+  measurement_plan?: string[] | null;
   steps: InstructionGuide["steps"];
   common_causes: string[];
   next_actions: string[];
+  final_checks?: string[] | null;
   pro_hint: string | null;
   last_updated: string;
   created_at: string;
@@ -45,13 +52,28 @@ function mapDatabaseRowToInstructionGuide(
     estimatedTime: row.estimated_time,
     vehicleApplicability: row.vehicle_applicability,
     tags: Array.isArray(row.tags) ? row.tags : [],
+    diagnosisGoal: row.diagnosis_goal || undefined,
+    missingVehicleData: Array.isArray(row.missing_vehicle_data)
+      ? row.missing_vehicle_data
+      : [],
+    requiredSkill: row.required_skill || undefined,
+    escalationCriteria: Array.isArray(row.escalation_criteria)
+      ? row.escalation_criteria
+      : [],
     symptoms: Array.isArray(row.symptoms) ? row.symptoms : [],
     tools: Array.isArray(row.tools) ? row.tools : [],
+    partsAndMaterials: Array.isArray(row.parts_and_materials)
+      ? row.parts_and_materials
+      : [],
     safetyNotes: Array.isArray(row.safety_notes) ? row.safety_notes : [],
     initialChecks: Array.isArray(row.initial_checks) ? row.initial_checks : [],
+    measurementPlan: Array.isArray(row.measurement_plan)
+      ? row.measurement_plan
+      : [],
     steps: Array.isArray(row.steps) ? row.steps : [],
     commonCauses: Array.isArray(row.common_causes) ? row.common_causes : [],
     nextActions: Array.isArray(row.next_actions) ? row.next_actions : [],
+    finalChecks: Array.isArray(row.final_checks) ? row.final_checks : [],
     proHint: row.pro_hint || undefined,
     lastUpdated: row.last_updated,
   };
@@ -121,13 +143,20 @@ export async function saveInstructionGuideToDatabase(
     vehicle_applicability: guide.vehicleApplicability,
 
     tags: guide.tags || [],
+    diagnosis_goal: guide.diagnosisGoal || "",
+    missing_vehicle_data: guide.missingVehicleData || [],
+    required_skill: guide.requiredSkill || "",
+    escalation_criteria: guide.escalationCriteria || [],
     symptoms: guide.symptoms || [],
     tools: guide.tools || [],
+    parts_and_materials: guide.partsAndMaterials || [],
     safety_notes: guide.safetyNotes || [],
     initial_checks: guide.initialChecks || [],
+    measurement_plan: guide.measurementPlan || [],
     steps: guide.steps || [],
     common_causes: guide.commonCauses || [],
     next_actions: guide.nextActions || [],
+    final_checks: guide.finalChecks || [],
 
     pro_hint: guide.proHint || null,
     last_updated: guide.lastUpdated || now.slice(0, 10),
@@ -370,20 +399,31 @@ function buildGuideSearchText(guide: InstructionGuide) {
     guide.difficulty,
     guide.estimatedTime,
     guide.vehicleApplicability,
+    guide.diagnosisGoal || "",
+    guide.requiredSkill || "",
     ...(guide.tags || []),
+    ...(guide.missingVehicleData || []),
+    ...(guide.escalationCriteria || []),
     ...(guide.symptoms || []),
     ...(guide.tools || []),
+    ...(guide.partsAndMaterials || []),
     ...(guide.initialChecks || []),
+    ...(guide.measurementPlan || []),
     ...(guide.steps || []).flatMap((step) => [
       step.title,
       step.description,
       step.check || "",
       step.warning || "",
+      step.measurement || "",
+      step.expectedResult || "",
+      step.decision || "",
+      step.qualityCheck || "",
       step.imageHint || "",
       step.imageAlt || "",
     ]),
     ...(guide.commonCauses || []),
     ...(guide.nextActions || []),
+    ...(guide.finalChecks || []),
     guide.proHint || "",
   ].join(" ");
 }

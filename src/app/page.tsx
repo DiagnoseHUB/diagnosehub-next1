@@ -313,7 +313,7 @@ export default function HomePage() {
             <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
               {audienceCards.map((group) => (
                 <Link
-                  key={group.href}
+                  key={`${group.title}-${group.href}`}
                   href={group.href}
                   className="group rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-950"
                 >

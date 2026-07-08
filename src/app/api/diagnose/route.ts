@@ -101,6 +101,20 @@ type UsageLimitPayload = {
   warning?: string;
 };
 
+type DiagnosisInputQualityProfile = {
+  score: number;
+  level: "niedrig" | "mittel" | "hoch" | "sehr hoch";
+  found: string[];
+  missing: string[];
+  nextBestQuestions: string[];
+  hasVehicleIdentity: boolean;
+  hasFaultCode: boolean;
+  hasSymptom: boolean;
+  hasOperatingCondition: boolean;
+  hasMeasurements: boolean;
+  hasPreviousChecks: boolean;
+};
+
 function getTodayKeyGermany() {
   const currentDateGermany = new Intl.DateTimeFormat("sv-SE", {
     timeZone: "Europe/Berlin",
@@ -129,6 +143,237 @@ function normalizeTechnicalSearchText(value: string) {
     .replace(/\u00f6/g, "oe")
     .replace(/\u00fc/g, "ue")
     .replace(/\u00df/g, "ss");
+}
+
+function includesAnyNormalized(text: string, terms: string[]) {
+  const normalizedText = normalizeTechnicalSearchText(text);
+
+  return terms.some((term) =>
+    normalizedText.includes(normalizeTechnicalSearchText(term))
+  );
+}
+
+function hasMeasurementContext(text: string) {
+  return (
+    /\b\d+([,.]\d+)?\s?(v|volt|a|ampere|ohm|kpa|bar|mbar|psi|grad|°c|celsius|rpm|u\/min|g\/s|mg\/hub|%|hz)\b/i.test(
+      text
+    ) ||
+    includesAnyNormalized(text, [
+      "live daten",
+      "livedaten",
+      "messwert",
+      "messwerte",
+      "soll ist",
+      "istwert",
+      "spannung",
+      "widerstand",
+      "druck",
+      "temperatur",
+      "raildruck",
+      "ladedruck",
+      "luftmasse",
+      "fuel trim",
+      "lambda",
+      "differenzdruck",
+    ])
+  );
+}
+
+function hasVehicleIdentityContext(text: string) {
+  return (
+    includesAnyNormalized(text, [
+      "audi",
+      "bmw",
+      "mercedes",
+      "vw",
+      "volkswagen",
+      "skoda",
+      "seat",
+      "cupra",
+      "opel",
+      "ford",
+      "renault",
+      "peugeot",
+      "citroen",
+      "toyota",
+      "nissan",
+      "hyundai",
+      "kia",
+      "mazda",
+      "fiat",
+      "volvo",
+      "porsche",
+      "tesla",
+      "golf",
+      "passat",
+      "a3",
+      "a4",
+      "a6",
+      "octavia",
+      "qashqai",
+      "focus",
+      "astra",
+      "corsa",
+      "sprinter",
+    ]) ||
+    /\b(19|20)\d{2}\b/.test(text) ||
+    /\b(mkb|motorcode|motorkennbuchstabe|vin|fahrgestellnummer)\b/i.test(text)
+  );
+}
+
+function hasSymptomContext(text: string) {
+  return (
+    text.trim().length >= 30 ||
+    includesAnyNormalized(text, [
+      "ruckelt",
+      "springt nicht an",
+      "geht aus",
+      "leistungsverlust",
+      "notlauf",
+      "warnlampe",
+      "motorkontrollleuchte",
+      "geräusch",
+      "vibration",
+      "qualmt",
+      "rauch",
+      "stinkt",
+      "undicht",
+      "zieht nicht",
+      "startet schlecht",
+      "kaltstart",
+      "heißstart",
+      "sporadisch",
+    ])
+  );
+}
+
+function hasOperatingConditionContext(text: string) {
+  return includesAnyNormalized(text, [
+    "kalt",
+    "warm",
+    "heiß",
+    "leerlauf",
+    "teillast",
+    "vollast",
+    "beim starten",
+    "beim beschleunigen",
+    "beim bremsen",
+    "unter last",
+    "nach regen",
+    "sporadisch",
+    "dauerhaft",
+    "nur morgens",
+    "nur warm",
+    "nur kalt",
+    "autobahn",
+    "stadtverkehr",
+    "nach reparatur",
+  ]);
+}
+
+function hasPreviousChecksContext(text: string) {
+  return includesAnyNormalized(text, [
+    "geprüft",
+    "prüft",
+    "gemessen",
+    "getauscht",
+    "erneuert",
+    "ersetzt",
+    "gereinigt",
+    "abgedrückt",
+    "abgenebelt",
+    "ausgelesen",
+    "fehler gelöscht",
+    "stellgliedtest",
+    "sichtprüfung",
+  ]);
+}
+
+function buildDiagnosisInputQualityProfile(
+  input: string,
+  messages: ChatMessage[]
+): DiagnosisInputQualityProfile {
+  const combinedText = `${formatHistory(messages)}\n${input}`;
+  const hasVehicleIdentity = hasVehicleIdentityContext(combinedText);
+  const hasFaultCode = /\b[PCBU][0-3][0-9A-F]{3}\b/i.test(combinedText);
+  const hasSymptom = hasSymptomContext(combinedText);
+  const hasOperatingCondition = hasOperatingConditionContext(combinedText);
+  const hasMeasurements = hasMeasurementContext(combinedText);
+  const hasPreviousChecks = hasPreviousChecksContext(combinedText);
+
+  const checks = [
+    {
+      ok: hasVehicleIdentity,
+      found: "Fahrzeugdaten vorhanden",
+      missing: "Fahrzeug: Hersteller, Modell, Baujahr, Motorcode",
+      question: "Welches Fahrzeug genau? Hersteller, Modell, Baujahr, Motorcode?",
+      points: 20,
+    },
+    {
+      ok: hasFaultCode,
+      found: "Fehlercode vorhanden",
+      missing: "Fehlercode oder Testertext",
+      question: "Welche Fehlercodes mit vollständigem Testertext sind gespeichert?",
+      points: 16,
+    },
+    {
+      ok: hasSymptom,
+      found: "Symptom beschrieben",
+      missing: "konkretes Symptom",
+      question: "Was passiert genau und wie äußert sich der Fehler?",
+      points: 18,
+    },
+    {
+      ok: hasOperatingCondition,
+      found: "Betriebszustand beschrieben",
+      missing: "Betriebszustand: kalt/warm, Last, Drehzahl, Fahrzustand",
+      question: "Tritt der Fehler kalt, warm, im Leerlauf, unter Last oder sporadisch auf?",
+      points: 14,
+    },
+    {
+      ok: hasMeasurements,
+      found: "Messwerte oder Live-Daten vorhanden",
+      missing: "Messwerte oder Live-Daten",
+      question: "Welche Istwerte liegen vor: Spannung, Druck, Temperatur, Soll/Ist, Live-Daten?",
+      points: 18,
+    },
+    {
+      ok: hasPreviousChecks,
+      found: "bisherige Prüfungen vorhanden",
+      missing: "bereits geprüfte oder getauschte Teile",
+      question: "Was wurde bereits geprüft, gemessen, gereinigt oder ersetzt?",
+      points: 14,
+    },
+  ];
+
+  const score = checks.reduce((sum, check) => sum + (check.ok ? check.points : 0), 0);
+  const level =
+    score >= 86 ? "sehr hoch" : score >= 66 ? "hoch" : score >= 38 ? "mittel" : "niedrig";
+
+  return {
+    score,
+    level,
+    found: checks.filter((check) => check.ok).map((check) => check.found),
+    missing: checks.filter((check) => !check.ok).map((check) => check.missing),
+    nextBestQuestions: checks
+      .filter((check) => !check.ok)
+      .map((check) => check.question)
+      .slice(0, 4),
+    hasVehicleIdentity,
+    hasFaultCode,
+    hasSymptom,
+    hasOperatingCondition,
+    hasMeasurements,
+    hasPreviousChecks,
+  };
+}
+
+function formatInputQualityPrompt(profile: DiagnosisInputQualityProfile) {
+  return `Diagnose-Datenqualität:
+- Genauigkeit: ${profile.score}/100 (${profile.level})
+- Vorhanden: ${profile.found.length > 0 ? profile.found.join("; ") : "noch keine belastbaren Eckdaten"}
+- Fehlend: ${profile.missing.length > 0 ? profile.missing.join("; ") : "keine wesentlichen Pflichtdaten fehlen"}
+- Beste Rückfragen: ${profile.nextBestQuestions.length > 0 ? profile.nextBestQuestions.join(" | ") : "keine Rückfrage nötig"}`;
 }
 
 function formatHistory(messages: ChatMessage[]) {
@@ -570,17 +815,40 @@ function getDiagnosisReasoningEffort(): "minimal" | "low" | "medium" | "high" {
 }
 
 function getDiagnosisMaxOutputTokens() {
-  const value = Number(process.env.OPENAI_DIAGNOSIS_MAX_OUTPUT_TOKENS || 1900);
+  const value = Number(process.env.OPENAI_DIAGNOSIS_MAX_OUTPUT_TOKENS || 4200);
 
   if (Number.isNaN(value)) {
-    return 1900;
+    return 4200;
   }
 
-  return Math.min(Math.max(value, 900), 3000);
+  return Math.min(Math.max(value, 1200), 6000);
 }
 
 function shouldAutoRetryDiagnosis() {
   return process.env.DIAGNOSIS_AUTO_RETRY === "true";
+}
+
+function getAudienceModeLabel(audienceMode: DiagnosisAudienceMode) {
+  return audienceMode === "hobby" ? "Hobby-Modus" : "Werkstatt-Modus";
+}
+
+function buildDiagnosisToneInstructions(audienceMode: DiagnosisAudienceMode) {
+  if (audienceMode === "hobby") {
+    return `
+Antworte in normaler Sprache für private Fahrzeughalter und Hobbyschrauber.
+Der technische Inhalt bleibt korrekt, aber Ton, Risiko und Detailtiefe sind auf Nicht-Profis angepasst.
+Erkläre Fachbegriffe kurz in Klammern oder mit einem einfachen Satz.
+Keine Werkstatt-Abkürzungen ohne Erklärung.
+Keine Werkstatt-Abschnitte wie "# Diagnosepfad", "# Ursachen / typische Fehler" oder "# Speicherung / Notizen" verwenden.
+Wenn eine Arbeit für Laien riskant ist, klar "nicht selbst machen" oder "nur eingeschränkt" schreiben.
+`;
+  }
+
+  return `
+Antworte kurz, direkt und werkstattnah.
+Keine Textwand, aber auch keine groben Allgemeinplätze.
+Die Antwort soll so sein, dass ein Kfz-Mechatroniker daraus direkt den nächsten Arbeitsschritt ableiten kann.
+`;
 }
 
 function buildAudienceModeInstructions(audienceMode: DiagnosisAudienceMode) {
@@ -621,22 +889,149 @@ Gleicher technischer Inhalt wie im Hobby-Modus, aber knapp, fachlich und entsche
 Fokus: Diagnosepfad, Messlogik, Plausibilität und nächster Arbeitsschritt.
 
 Pflichtinhalt Werkstatt-Modus:
-- Diagnosepfad: Symptom -> mögliche Ursachen -> Prüfungen -> Messwerte -> Entscheidung.
+- Diagnosepfad: Symptom -> Ursachen/typische Fehler -> Prüfungen -> Messwerte -> Entscheidung.
 - Soll-/Richtwerte: erkannte Werte immer nennen und in die Messwertlogik einbauen.
 - Arbeitswerte/Teile: nur wenn sicher; sonst "als interne Daten/Herstellerdaten ergänzen" schreiben.
 - Spezialwerkzeug: klar benennen, wenn nötig; keine erfundenen Werkzeugnummern.
-- Typische Fehler: Fehldiagnosen, bekannte Schwachstellen, Plausibilitätschecks.
+- Ursachen / typische Fehler: mögliche Ursachen, Fehldiagnosen, bekannte Schwachstellen und Plausibilitätschecks zusammen bewerten.
+- Format für Ursachen / typische Fehler: je Bullet mit Priorität und Feldern schreiben:
+  - [hoch] Ursache: ... | Typischer Fehler: ... | Prüfbeweis: ...
+  - [mittel] Ursache: ... | Typischer Fehler: ... | Prüfbeweis: ...
 - Speicherung: Fall speichern, später wiederfinden, interne Notizen/Schadteil dokumentieren.
 
 Antwortformat Werkstatt-Modus:
 # Diagnosepfad
-# Mögliche Ursachen
+# Ursachen / typische Fehler
 # Soll-/Richtwerte
 # Prüfungen und Messwerte
 # Entscheidung
 # Spezialwerkzeug / Teile
-# Typische Fehler
 # Speicherung / Notizen
+`;
+}
+
+function buildFallbackResponseFormatInstructions(audienceMode: DiagnosisAudienceMode) {
+  if (audienceMode === "hobby") {
+    return `
+Antwortformat-Fallback bei normaler Diagnose im Hobby-Modus:
+Verwende zwingend die Hobby-Abschnitte. Keine Werkstatt-Abschnitte ausgeben.
+Wenn ein Pflichtabschnitt im Einzelfall nicht sinnvoll ist, kurz "nicht relevant" oder "fahrzeugabhängig" schreiben.
+
+# Fehlercode
+Falls ein Fehlercode vorhanden ist: Bedeutung in normaler Sprache, betroffene Systeme und was der Code nicht sicher beweist.
+Falls kein Fehlercode vorhanden ist: "Kein Fehlercode genannt" und mit Symptomdiagnose fortfahren.
+
+# Soll-/Richtwerte
+Passende interne Werte nennen. Wenn keine Werte vorhanden sind: "Keine passenden Sollwerte hinterlegt."
+
+# Selbst machbar?
+Ja, nein oder eingeschränkt. Kurz begründen und klare Grenze nennen.
+
+# Schwierigkeit
+Einfach, mittel, schwer oder Profi.
+
+# Werkzeug
+Grundwerkzeug, Spezialwerkzeug, Diagnosegerät oder Hebebühne nennen, nur wenn relevant.
+
+# Risiko
+Nur relevante Risiken nennen: Bremse, Airbag, Hochvolt, Kraftstoff, Steuerzeiten, Lenkung, Klima-Kältemittel oder Fahrzeug bleibt liegen.
+
+# Prüfreihenfolge
+Erst einfache Sicht- und Steckverbindungschecks, dann Messungen, dann Teiletausch.
+
+# Werkstattkosten grob
+Nur wenn sinnvoll. Immer als grobe Schätzung kennzeichnen.
+
+# Nächste Schritte
+Konkrete, verständliche Reihenfolge. Bei riskanten Arbeiten an Werkstatt verweisen.
+
+Antwortformat bei ausdrücklicher Anleitung im Hobby-Modus:
+# Werkzeug
+# Vorbereitung
+# Schritte
+# Prüfpunkte
+# Risiken
+# Abschlussprüfung
+
+Antwortformat bei kurzer Folgefrage:
+- Direkt antworten.
+- Normale Sprache.
+- Maximal 5 bis 8 Bulletpoints.
+`;
+  }
+
+  return `
+Antwortformat-Fallback bei normaler Diagnose im Werkstatt-Modus:
+Verwende zwingend das Werkstatt-Format.
+Wenn ein Pflichtabschnitt im Einzelfall nicht sinnvoll ist, kurz "nicht relevant" oder "fahrzeugabhängig" schreiben.
+
+# Datenqualität
+Genauigkeit der Antwort anhand der vorhandenen Angaben.
+Kurz nennen, welche Daten fehlen und welche 2 bis 4 Rückfragen die Diagnose am meisten verbessern.
+
+# Kurzdiagnose
+2 bis 4 Sätze. Direkt sagen, was am wahrscheinlichsten ist.
+
+# Wahrscheinlichkeiten
+3 bis 5 Ursachen priorisieren.
+Jeweils mit "Warum plausibel", "typischer Fehler/Fehldiagnose" und "Wie beweisen/ausschließen".
+Bevorzugtes Format: [hoch] Ursache: ... | Typischer Fehler: ... | Prüfbeweis: ...
+
+# Sofort prüfen
+3 bis 6 konkrete Prüfpunkte.
+Nicht nur Bauteile nennen, sondern kurz sagen, wie geprüft wird.
+
+# Messplan
+Konkrete Messpunkte mit Messort, Betriebszustand, Soll-/Richtwert falls vorhanden und Entscheidung.
+
+# Nächste Schritte
+Konkrete Arbeitsfolge.
+Bei Ausbau/Reparatur typische Demontage nennen:
+- welche Abdeckung
+- welche Verkleidung
+- welcher Stecker
+- welche Befestigung
+- welche Richtung / Lage, wenn sinnvoll
+
+# Kritische Punkte
+Nur wenn relevant:
+- Linksgewinde
+- Schrauben nicht lösen
+- Einstellpunkte nicht verstellen
+- Clips/Verriegelungen
+- Dichtflächen
+- Steuerzeiten
+- Hochdruck/Klima/Bremse/Airbag
+
+# Abschluss
+Kurz nennen, was danach geprüft werden muss.
+
+Antwortformat bei ausdrücklicher Anleitung:
+Wenn der Nutzer schreibt "genaue Anleitung", "Schritt für Schritt", "Ausbauanleitung", "Einbauanleitung" oder "druckbar", dann ausführlicher, aber weiterhin kompakt:
+
+# Werkzeug
+Nur relevante Werkzeuge.
+
+# Zugang
+Konkrete Demontage bis zum Bauteil.
+Keine groben Formulierungen wie "Zugang schaffen".
+
+# Arbeitsschritte
+Nummerierte Schritte mit konkreter Reihenfolge.
+
+# Mess-/Entscheidungspunkte
+Welche Messung entscheidet, ob repariert, weitergesucht oder nicht weitergefahren wird.
+
+# Kritische Punkte
+Nur relevante Hinweise direkt und knapp.
+
+# Abschlussprüfung
+Funktionstest, Fehlerspeicher, Live-Daten, Dichtheit, Probefahrt oder Anlernung nur wenn relevant.
+
+Antwortformat bei kurzer Folgefrage:
+- Direkt antworten.
+- Keine komplette neue Diagnose.
+- Maximal 5 bis 8 Bulletpoints.
 `;
 }
 
@@ -645,16 +1040,32 @@ function buildSystemPrompt(
   faultCodeContext: FaultCodeContext,
   technicalSpecContext: TechnicalSpecContext,
   torqueSpecContext: TorqueSpecContext,
+  inputQualityProfile: DiagnosisInputQualityProfile,
   audienceMode: DiagnosisAudienceMode,
   retryWarning?: string
 ) {
   return `
-Du bist DiagnoseHUB, ein technischer KI-Diagnoseassistent für freie Kfz-Werkstätten.
+Du bist DiagnoseHUB, ein technischer KI-Diagnoseassistent für ${
+    audienceMode === "hobby"
+      ? "private Fahrzeughalter und Hobbyschrauber"
+      : "freie Kfz-Werkstätten"
+  }.
 
 Antworte immer auf Deutsch.
-Antworte kurz, direkt und werkstattnah.
-Keine Textwand, aber auch keine groben Allgemeinplätze.
-Die Antwort soll so sein, dass ein Kfz-Mechatroniker daraus direkt den nächsten Arbeitsschritt ableiten kann.
+Aktiver Ausgabemodus: ${getAudienceModeLabel(audienceMode)}.
+Der aktive Ausgabemodus ist verbindlich und hat Vorrang vor allgemeinen Diagnose-Regeln.
+
+${buildDiagnosisToneInstructions(audienceMode)}
+
+Maximaler Diagnoseanspruch:
+- Arbeite wie ein Diagnosetechniker, nicht wie ein Teileberater.
+- Trenne Beobachtung, Ursache, Prüfung, Messwert und Entscheidung klar.
+- Jede Hauptursache braucht einen Prüfbeweis oder einen Ausschlussweg.
+- Beginne mit den billigsten, schnellsten und plausibelsten Prüfungen.
+- Nenne Abbruchkriterien: wann nicht weiterfahren, wann nicht weiter zerlegen, wann Herstellerdaten nötig sind.
+- Wenn Daten fehlen, trotzdem helfen, aber die Unsicherheit sichtbar machen.
+- Je mehr Fahrzeugdaten vorhanden sind, desto konkreter werden Sollwerte, Zugang, Messpunkte und nächste Schritte.
+- Keine falsche Sicherheit: Wenn Fahrzeugvariante, Motorcode oder Systemvariante fehlt, klar als Annahme kennzeichnen.
 
 Grundregeln:
 - Keine langen Einleitungen.
@@ -674,6 +1085,14 @@ Wichtig zur Antwortlänge:
 - Nicht schreiben: "Zugang schaffen", sondern genauer beschreiben, welche Verkleidung, Abdeckung, Stecker, Halter oder Baugruppe typischerweise entfernt wird.
 - Wenn der genaue Aufbau fahrzeugabhängig ist, schreibe: "typischer Zugang" und nenne die wahrscheinlichste Demontagefolge.
 
+Strukturregeln:
+- Jeder Abschnitt beginnt mit der wichtigsten Aussage, danach erst Details.
+- Pro Bullet nur eine Aussage oder eine Prüfung.
+- Keine verschachtelten Listen.
+- Ursachen, Prüfung und Entscheidung nicht in einen langen Absatz mischen.
+- Wenn möglich: Ursache -> Prüfbeweis -> Entscheidung immer in gleicher Reihenfolge.
+- Warnungen nur im Abschnitt Risiko/Kritische Punkte oder direkt am betroffenen Schritt nennen.
+
 Werkstatt-Präzision:
 - Bei Aus-/Einbau immer konkrete Demontagereihenfolge nennen.
 - Beispiel: nicht "Verkleidung ausbauen", sondern "Handschuhfach ausbauen, untere Fußraumverkleidung lösen, seitliche Mittelkonsole-Verkleidung entfernen".
@@ -689,11 +1108,23 @@ Werkstatt-Präzision:
 - "Batterie abklemmen" nur nennen, wenn technisch nötig: Airbag, Starter, Generator, Hochstromleitung, Steuergerätetausch oder Kurzschlussgefahr.
 - Kritische Hinweise direkt am passenden Schritt nennen.
 
+Diagnose-Architektur:
+- Bewerte die Datenqualität am Anfang kurz.
+- Nenne zuerst die wahrscheinlichste Richtung, aber markiere Unsicherheit.
+- Baue einen Prüfpfad: Symptom -> Hypothese -> Prüfung -> Soll/Ist -> Entscheidung.
+- Verwende eine kleine Priorisierung: "hoch", "mittel", "niedrig" oder "erst später".
+- Messungen immer mit Messort, Betriebszustand und erwarteter Aussage nennen.
+- Teiletausch erst nennen, wenn ein Prüfergebnis ihn stützt.
+- Nach jeder Reparatur: Verifikation nennen, z. B. Fehlerspeicher, Live-Daten, Dichtheit, Probefahrt, Adaptions-/Anlernwerte.
+- Wenn der Nutzer eine Anleitung möchte, liefere keine reine Diagnose, sondern einen arbeitsfähigen Ablauf mit Prüfschritten.
+
 Der Nutzer kann Folgefragen stellen.
 Kurze Folgefragen wie "Wo messen?", "Was als nächstes?", "Welche Schraube?", "Linksgewinde?", "Wie ausbauen?" beziehen sich auf den bisherigen Verlauf.
 Nutze den bisherigen Fall als Kontext.
 
 ${buildAudienceModeInstructions(audienceMode)}
+
+${formatInputQualityPrompt(inputQualityProfile)}
 
 Erkannter Motortyp:
 ${engineContext.engineType}
@@ -756,62 +1187,7 @@ Drehmoment-Regel:
 - Bei sicherheitsrelevanten Verschraubungen den hinterlegten Fahrzeugbezug, die Schraubstelle und eine Neuteilpflicht mit nennen.
 - Je genauer Hersteller, Modell, Baujahr, Motorcode, System und Schraubstelle angegeben sind, desto genauer kann der passende Wert gefunden werden.
 
-Antwortformat-Fallback bei normaler Diagnose:
-Verwende zwingend das Antwortformat des aktiven Ausgabemodus.
-Wenn ein Pflichtabschnitt im Einzelfall nicht sinnvoll ist, kurz "nicht relevant" oder "fahrzeugabhängig" schreiben.
-
-# Kurzdiagnose
-2 bis 4 Sätze. Direkt sagen, was am wahrscheinlichsten ist.
-
-# Sofort prüfen
-3 bis 6 konkrete Prüfpunkte.
-Nicht nur Bauteile nennen, sondern kurz sagen, wie geprüft wird.
-
-# Nächste Schritte
-Konkrete Arbeitsfolge.
-Bei Ausbau/Reparatur typische Demontage nennen:
-- welche Abdeckung
-- welche Verkleidung
-- welcher Stecker
-- welche Befestigung
-- welche Richtung / Lage, wenn sinnvoll
-
-# Kritische Punkte
-Nur wenn relevant:
-- Linksgewinde
-- Schrauben nicht lösen
-- Einstellpunkte nicht verstellen
-- Clips/Verriegelungen
-- Dichtflächen
-- Steuerzeiten
-- Hochdruck/Klima/Bremse/Airbag
-
-# Abschluss
-Kurz nennen, was danach geprüft werden muss.
-
-Antwortformat bei ausdrücklicher Anleitung:
-Wenn der Nutzer schreibt "genaue Anleitung", "Schritt für Schritt", "Ausbauanleitung", "Einbauanleitung" oder "druckbar", dann ausführlicher, aber weiterhin kompakt:
-
-# Werkzeug
-Nur relevante Werkzeuge.
-
-# Zugang
-Konkrete Demontage bis zum Bauteil.
-Keine groben Formulierungen wie "Zugang schaffen".
-
-# Arbeitsschritte
-Nummerierte Schritte mit konkreter Reihenfolge.
-
-# Kritische Punkte
-Nur relevante Hinweise direkt und knapp.
-
-# Abschlussprüfung
-Funktionstest, Fehlerspeicher, Live-Daten, Dichtheit, Probefahrt oder Anlernung nur wenn relevant.
-
-Antwortformat bei kurzer Folgefrage:
-- Direkt antworten.
-- Keine komplette neue Diagnose.
-- Maximal 5 bis 8 Bulletpoints.
+${buildFallbackResponseFormatInstructions(audienceMode)}
 `;
 }
 
@@ -912,11 +1288,133 @@ function appendAutomaticTorqueSpecBlock(
 ${torqueSpecBlock}`;
 }
 
+function buildAutomaticInputQualityBlock(
+  profile: DiagnosisInputQualityProfile
+) {
+  const missing =
+    profile.missing.length > 0
+      ? profile.missing.map((item) => `- ${item}`).join("\n")
+      : "- keine wesentlichen Pflichtdaten fehlen";
+  const questions =
+    profile.nextBestQuestions.length > 0
+      ? profile.nextBestQuestions.map((item) => `- ${item}`).join("\n")
+      : "- keine Rückfrage nötig";
+
+  return `# Datenqualität
+Genauigkeit: ${profile.score}/100 (${profile.level}).
+
+Fehlende Daten:
+${missing}
+
+Beste Rückfragen:
+${questions}`;
+}
+
+function appendAutomaticInputQualityBlock(
+  answer: string,
+  profile: DiagnosisInputQualityProfile
+) {
+  if (answer.toLowerCase().includes("# datenqualität")) {
+    return answer;
+  }
+
+  return `${buildAutomaticInputQualityBlock(profile)}
+
+${answer}`;
+}
+
+function normalizeAnswerForModeCheck(answer: string) {
+  return answer
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function answerMatchesAudienceMode(
+  answer: string,
+  audienceMode: DiagnosisAudienceMode
+) {
+  const normalizedAnswer = normalizeAnswerForModeCheck(answer);
+
+  if (audienceMode === "hobby") {
+    const hobbyHeadings = [
+      "# selbst machbar",
+      "# schwierigkeit",
+      "# werkzeug",
+      "# risiko",
+      "# prüfreihenfolge",
+      "# nächste schritte",
+    ];
+
+    return hobbyHeadings.every((heading) => normalizedAnswer.includes(heading));
+  }
+
+  const workshopHeadings = [
+    "# diagnosepfad",
+    "# ursachen / typische fehler",
+    "# prüfungen und messwerte",
+    "# entscheidung",
+  ];
+
+  return workshopHeadings.every((heading) => normalizedAnswer.includes(heading));
+}
+
+function buildAudienceModeRetryWarning(audienceMode: DiagnosisAudienceMode) {
+  if (audienceMode === "hobby") {
+    return `
+ACHTUNG: Die vorherige Antwort hat den Hobby-Modus nicht eingehalten.
+Erzeuge die Antwort neu.
+Verwende zwingend die Hobby-Abschnitte:
+# Fehlercode
+# Soll-/Richtwerte
+# Selbst machbar?
+# Schwierigkeit
+# Werkzeug
+# Risiko
+# Prüfreihenfolge
+# Werkstattkosten grob
+# Nächste Schritte
+Keine Werkstatt-Abschnitte wie "# Diagnosepfad" oder "# Ursachen / typische Fehler" verwenden.
+    `;
+  }
+
+  return `
+ACHTUNG: Die vorherige Antwort hat den Werkstatt-Modus nicht eingehalten.
+Erzeuge die Antwort neu.
+Verwende zwingend die Werkstatt-Abschnitte:
+# Diagnosepfad
+# Ursachen / typische Fehler
+# Soll-/Richtwerte
+# Prüfungen und Messwerte
+# Entscheidung
+# Spezialwerkzeug / Teile
+# Speicherung / Notizen
+  `;
+}
+
+function shouldEnforceAudienceModeFormat(input: string, messages: ChatMessage[]) {
+  if (messages.length === 0) {
+    return true;
+  }
+
+  const normalizedInput = input.toLowerCase();
+
+  return (
+    input.length > 80 ||
+    /\bp[0-9a-f]{4}\b/i.test(input) ||
+    normalizedInput.includes("diagnose") ||
+    normalizedInput.includes("anleitung") ||
+    normalizedInput.includes("messplan") ||
+    normalizedInput.includes("fehlercode")
+  );
+}
+
 async function createDiagnosisAnswer(
   engineContext: EngineContext,
   faultCodeContext: FaultCodeContext,
   technicalSpecContext: TechnicalSpecContext,
   torqueSpecContext: TorqueSpecContext,
+  inputQualityProfile: DiagnosisInputQualityProfile,
   messages: ChatMessage[],
   input: string,
   audienceMode: DiagnosisAudienceMode,
@@ -945,6 +1443,7 @@ async function createDiagnosisAnswer(
           faultCodeContext,
           technicalSpecContext,
           torqueSpecContext,
+          inputQualityProfile,
           audienceMode,
           retryWarning
         ),
@@ -952,6 +1451,12 @@ async function createDiagnosisAnswer(
       {
         role: "user",
         content: `
+Aktiver Ausgabemodus:
+${getAudienceModeLabel(audienceMode)}
+
+Wichtig:
+Halte dich an genau diesen Ausgabemodus und das dazugehörige Antwortformat.
+
 Bisheriger Diagnoseverlauf:
 ${formatHistory(messages) || "Noch kein Verlauf vorhanden."}
 
@@ -980,6 +1485,7 @@ ${input}
         faultCodeContext,
         technicalSpecContext,
         torqueSpecContext,
+        inputQualityProfile,
         messages,
         input,
         audienceMode,
@@ -1062,29 +1568,57 @@ export async function POST(request: Request) {
       usageControl.supabase,
       combinedContext
     );
+    const inputQualityProfile = buildDiagnosisInputQualityProfile(
+      input,
+      messages
+    );
 
     let result = await createDiagnosisAnswer(
       engineContext,
       faultCodeContext,
       technicalSpecContext,
       torqueSpecContext,
+      inputQualityProfile,
       messages,
       input,
       audienceMode
     );
+    let audienceModeRetryApplied = false;
 
-    let qualityCheck = "Antwort ohne technischen Konflikt erstellt.";
+    if (
+      shouldEnforceAudienceModeFormat(input, messages) &&
+      !answerMatchesAudienceMode(result, audienceMode)
+    ) {
+      audienceModeRetryApplied = true;
+      result = await createDiagnosisAnswer(
+        engineContext,
+        faultCodeContext,
+        technicalSpecContext,
+        torqueSpecContext,
+        inputQualityProfile,
+        messages,
+        input,
+        audienceMode,
+        buildAudienceModeRetryWarning(audienceMode)
+      );
+    }
+
+    const inputQualityNote = `Datenqualität: ${inputQualityProfile.score}/100 (${inputQualityProfile.level}).`;
+    let qualityCheck = audienceModeRetryApplied
+      ? `Ausgabemodus korrigiert und Antwort neu erstellt. ${inputQualityNote}`
+      : `Antwort ohne technischen Konflikt erstellt. ${inputQualityNote}`;
 
     if (hasTechnicalConflict(engineContext.engineType, result)) {
       if (shouldAutoRetryDiagnosis()) {
         qualityCheck =
-          "Technischer Konflikt erkannt. Antwort wurde automatisch neu generiert.";
+          `Technischer Konflikt erkannt. Antwort wurde automatisch neu generiert. ${inputQualityNote}`;
 
         result = await createDiagnosisAnswer(
           engineContext,
           faultCodeContext,
           technicalSpecContext,
           torqueSpecContext,
+          inputQualityProfile,
           messages,
           input,
           audienceMode,
@@ -1097,10 +1631,11 @@ Bei Benziner keine Glühkerzen oder Glühsteuergerät als Ursache oder Prüfpunk
         );
       } else {
         qualityCheck =
-          "Technischer Konflikt erkannt. Automatische Neugenerierung ist deaktiviert, um Kosten zu sparen.";
+          `Technischer Konflikt erkannt. Automatische Neugenerierung ist deaktiviert, um Kosten zu sparen. ${inputQualityNote}`;
       }
     }
 
+    result = appendAutomaticInputQualityBlock(result, inputQualityProfile);
     result = appendAutomaticTechnicalSpecBlock(result, technicalSpecContext);
     result = appendAutomaticTorqueSpecBlock(result, torqueSpecContext);
 
@@ -1141,6 +1676,7 @@ Bei Benziner keine Glühkerzen oder Glühsteuergerät als Ursache oder Prüfpunk
         autoRetry: shouldAutoRetryDiagnosis(),
         audienceMode,
       },
+      inputQuality: inputQualityProfile,
       usageLimit: buildUsageLimitPayload(
         usageControl,
         countAfter,

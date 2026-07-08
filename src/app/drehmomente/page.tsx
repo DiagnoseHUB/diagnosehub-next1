@@ -5,7 +5,7 @@ import TorqueSpecManager from "@/components/TorqueSpecManager";
 export const metadata = {
   title: "Drehmomente | DiagnoseHUB",
   description:
-    "Drehmomentwerte erfassen, manuell prüfen und nach Freigabe automatisch in Diagnosen verwenden.",
+    "Gemeinsame Drehmoment-Datenbank mit Entwürfen, manueller Freigabe und automatischer Nutzung in Diagnosen.",
 };
 
 export default function DrehmomentePage() {

@@ -673,11 +673,45 @@ function GeneratedInstructionPanel({
   reusedExisting,
   matchScore,
 }: GeneratedInstructionPanelProps) {
+  const overviewBoxes = [
+    {
+      title: "Diagnoseziel",
+      items: instruction.diagnosisGoal ? [instruction.diagnosisGoal] : [],
+    },
+    {
+      title: "Benötigte Erfahrung",
+      items: instruction.requiredSkill ? [instruction.requiredSkill] : [],
+    },
+    {
+      title: "Fehlende Fahrzeugdaten",
+      items: instruction.missingVehicleData ?? [],
+    },
+    {
+      title: "Teile / Material",
+      items: instruction.partsAndMaterials ?? [],
+    },
+  ].filter((box) => box.items.length > 0);
+
+  const qualityBoxes = [
+    {
+      title: "Messplan",
+      items: instruction.measurementPlan ?? [],
+    },
+    {
+      title: "Eskalation",
+      items: instruction.escalationCriteria ?? [],
+    },
+    {
+      title: "Endkontrolle",
+      items: instruction.finalChecks ?? [],
+    },
+  ].filter((box) => box.items.length > 0);
+
   return (
     <article className="mb-8 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-xl transition-colors dark:border-slate-800 dark:bg-slate-900">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-sm font-black uppercase tracking-[0.25em] text-blue-700 dark:text-blue-400">
+          <p className="text-sm font-black uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400">
             {reusedExisting
               ? "Gespeicherte Anleitung gefunden"
               : "KI-generierte Anleitung"}
@@ -702,7 +736,7 @@ function GeneratedInstructionPanel({
       </div>
 
       <div className="mb-6 flex flex-wrap gap-2">
-        <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-800 dark:bg-blue-950 dark:text-blue-200">
+        <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">
           {instruction.category}
         </span>
 
@@ -715,13 +749,13 @@ function GeneratedInstructionPanel({
         </span>
 
         {reusedExisting && typeof matchScore === "number" && (
-          <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-bold text-green-800 dark:bg-green-950 dark:text-green-200">
+          <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">
             Treffer: {matchScore} %
           </span>
         )}
       </div>
 
-      <div className="mb-6 rounded-2xl border border-green-300 bg-green-50 p-4 text-sm leading-6 text-green-950 dark:border-green-700/60 dark:bg-green-950/40 dark:text-green-100">
+      <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
         {reusedExisting ? (
           <>
             <strong>Vorhandene Anleitung verwendet:</strong> DiagnoseHUB hat
@@ -737,12 +771,28 @@ function GeneratedInstructionPanel({
         )}
       </div>
 
+      {overviewBoxes.length > 0 && (
+        <div className="mb-6 grid gap-5 lg:grid-cols-2">
+          {overviewBoxes.map((box) => (
+            <GeneratedBox key={box.title} title={box.title} items={box.items} />
+          ))}
+        </div>
+      )}
+
       <div className="grid gap-5 lg:grid-cols-2">
         <GeneratedBox title="Symptome" items={instruction.symptoms} />
         <GeneratedBox title="Werkzeuge" items={instruction.tools} />
         <GeneratedBox title="Sicherheit" items={instruction.safetyNotes} />
         <GeneratedBox title="Erstprüfung" items={instruction.initialChecks} />
       </div>
+
+      {qualityBoxes.length > 0 && (
+        <div className="mt-6 grid gap-5 lg:grid-cols-3">
+          {qualityBoxes.map((box) => (
+            <GeneratedBox key={box.title} title={box.title} items={box.items} />
+          ))}
+        </div>
+      )}
 
       <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-950">
         <h3 className="text-2xl font-black text-slate-950 dark:text-slate-100">
@@ -759,7 +809,7 @@ function GeneratedInstructionPanel({
                 <InstructionStepVisual step={step} stepNumber={index + 1} />
 
                 <div className="flex gap-4">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-black text-white">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-slate-50 text-sm font-black text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
                   {index + 1}
                 </div>
 
@@ -773,17 +823,38 @@ function GeneratedInstructionPanel({
                   </p>
 
                   {step.check && (
-                    <div className="mt-4 rounded-xl border border-blue-300 bg-blue-50 p-4 text-sm leading-6 text-blue-950 dark:border-blue-700/60 dark:bg-blue-950/40 dark:text-blue-100">
-                      <strong className="font-black text-blue-900 dark:text-blue-200">
+                    <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700 dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-300">
+                      <strong className="font-black text-slate-950 dark:text-slate-100">
                         Prüfpunkt:
                       </strong>{" "}
                       {step.check}
                     </div>
                   )}
 
+                  <GeneratedStepNote
+                    title="Messung"
+                    value={step.measurement}
+                    tone="green"
+                  />
+                  <GeneratedStepNote
+                    title="Sollzustand"
+                    value={step.expectedResult}
+                    tone="blue"
+                  />
+                  <GeneratedStepNote
+                    title="Entscheidung"
+                    value={step.decision}
+                    tone="slate"
+                  />
+                  <GeneratedStepNote
+                    title="Qualitätskontrolle"
+                    value={step.qualityCheck}
+                    tone="yellow"
+                  />
+
                   {step.warning && (
-                    <div className="mt-4 rounded-xl border border-red-300 bg-red-50 p-4 text-sm leading-6 text-red-950 dark:border-red-700/60 dark:bg-red-950/40 dark:text-red-100">
-                      <strong className="font-black text-red-900 dark:text-red-200">
+                    <div className="mt-4 rounded-xl border border-red-200 bg-red-50/70 p-4 text-sm leading-6 text-slate-800 dark:border-red-900/70 dark:bg-red-950/15 dark:text-slate-200">
+                      <strong className="font-black text-red-800 dark:text-red-200">
                         Achtung:
                       </strong>{" "}
                       {step.warning}
@@ -799,7 +870,7 @@ function GeneratedInstructionPanel({
 
       <div className="mt-6 grid gap-5 lg:grid-cols-2">
         <GeneratedBox
-          title="Häufige Ursachen"
+          title="Typische Fehler / mögliche Ursachen"
           items={instruction.commonCauses}
         />
 
@@ -810,12 +881,12 @@ function GeneratedInstructionPanel({
       </div>
 
       {instruction.proHint && (
-        <section className="mt-6 rounded-3xl border border-blue-300 bg-blue-50 p-5 transition-colors dark:border-blue-700/60 dark:bg-blue-950/40">
-          <p className="text-sm font-black uppercase tracking-wide text-blue-800 dark:text-blue-300">
+        <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-5 transition-colors dark:border-slate-800 dark:bg-slate-950">
+          <p className="text-sm font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
             DiagnoseHUB Hinweis
           </p>
 
-          <p className="mt-3 text-sm leading-7 text-blue-950 dark:text-blue-100">
+          <p className="mt-3 text-sm leading-7 text-slate-700 dark:text-slate-300">
             {instruction.proHint}
           </p>
         </section>
@@ -829,24 +900,80 @@ type GeneratedBoxProps = {
   items: string[];
 };
 
+function parseGeneratedCauseItem(item: string) {
+  const match = item.match(/^\[(hoch|mittel|niedrig|später|spaeter)\]\s*(.+)$/i);
+
+  if (!match) {
+    return {
+      priority: "",
+      text: item,
+    };
+  }
+
+  return {
+    priority: match[1].toLowerCase() === "spaeter" ? "später" : match[1],
+    text: match[2],
+  };
+}
+
+function getGeneratedCauseBadgeClass(priority: string) {
+  const normalizedPriority = priority.toLowerCase();
+
+  if (normalizedPriority.includes("hoch")) {
+    return "border-red-300 bg-red-50 text-red-800 dark:border-red-800/70 dark:bg-red-950/20 dark:text-red-200";
+  }
+
+  if (normalizedPriority.includes("mittel")) {
+    return "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800/70 dark:bg-amber-950/20 dark:text-amber-200";
+  }
+
+  return "border-slate-300 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200";
+}
+
 function GeneratedBox({ title, items }: GeneratedBoxProps) {
+  const isCauseBox =
+    title.toLowerCase().includes("typische fehler") ||
+    title.toLowerCase().includes("ursachen");
+  const wrapperClass = isCauseBox
+    ? "rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-950"
+    : "rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-950";
+  const titleClass = "text-xl font-black text-slate-950 dark:text-slate-100";
+  const itemClass = isCauseBox
+    ? "flex gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-700 dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-300"
+    : "flex gap-3 text-sm leading-6 text-slate-700 dark:text-slate-300";
+  const dotClass = isCauseBox
+    ? "mt-2 h-2 w-2 shrink-0 rounded-full bg-slate-500 dark:bg-slate-400"
+    : "mt-2 h-2 w-2 shrink-0 rounded-full bg-slate-400 dark:bg-slate-500";
+
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-950">
-      <h3 className="text-xl font-black text-slate-950 dark:text-slate-100">
-        {title}
-      </h3>
+    <section className={wrapperClass}>
+      <h3 className={titleClass}>{title}</h3>
 
       {items.length > 0 ? (
         <ul className="mt-4 space-y-3">
-          {items.map((item) => (
-            <li
-              key={item}
-              className="flex gap-3 text-sm leading-6 text-slate-700 dark:text-slate-300"
-            >
-              <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-blue-600 dark:bg-blue-400" />
-              <span>{item}</span>
-            </li>
-          ))}
+          {items.map((item) => {
+            const causeItem = isCauseBox
+              ? parseGeneratedCauseItem(item)
+              : { priority: "", text: item };
+
+            return (
+              <li key={item} className={itemClass}>
+                <span className={dotClass} />
+                <span className="min-w-0 flex-1">
+                  {causeItem.priority && (
+                    <span
+                      className={`mb-2 inline-flex rounded-full border px-2.5 py-1 text-xs font-black uppercase tracking-wide ${getGeneratedCauseBadgeClass(
+                        causeItem.priority,
+                      )}`}
+                    >
+                      {causeItem.priority}
+                    </span>
+                  )}
+                  <span className="block">{causeItem.text}</span>
+                </span>
+              </li>
+            );
+          })}
         </ul>
       ) : (
         <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
@@ -854,5 +981,28 @@ function GeneratedBox({ title, items }: GeneratedBoxProps) {
         </p>
       )}
     </section>
+  );
+}
+
+type GeneratedStepNoteProps = {
+  title: string;
+  value?: string;
+  tone: "blue" | "green" | "yellow" | "slate";
+};
+
+function GeneratedStepNote({ title, value, tone }: GeneratedStepNoteProps) {
+  if (!value) {
+    return null;
+  }
+
+  const toneClass =
+    tone === "yellow"
+      ? "border-amber-200 bg-amber-50/70 text-slate-800 dark:border-amber-900/70 dark:bg-amber-950/15 dark:text-slate-200"
+      : "border-slate-200 bg-slate-50 text-slate-800 dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-200";
+
+  return (
+    <div className={`mt-4 rounded-xl border p-4 text-sm leading-6 ${toneClass}`}>
+      <strong className="font-black">{title}:</strong> {value}
+    </div>
   );
 }

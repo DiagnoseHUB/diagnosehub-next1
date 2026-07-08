@@ -555,7 +555,7 @@ export function formatTorqueSpecContextForPrompt(context: TorqueSpecContext) {
     return "";
   }
 
-  return `Manuell geprüfte und freigegebene Drehmomentwerte:
+  return `Manuell geprüfte und freigegebene Drehmomentwerte aus der gemeinsamen DiagnoseHUB-Datenbank:
 ${formatTorqueSpecContext(context)}
 
 Wichtig: Diese Drehmomentwerte dürfen sichtbar genannt werden, weil sie manuell freigegeben wurden. Nicht passende oder nicht hinterlegte Drehmomente nicht raten. Wenn Fahrzeugdaten fehlen, den Wert nur mit dem hinterlegten Fahrzeugbezug nennen.`;

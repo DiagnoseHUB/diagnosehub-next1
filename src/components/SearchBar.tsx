@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -82,11 +83,22 @@ type UsageLimitPayload = {
   warning?: string;
 };
 
+type DiagnosisInputQualityLevel = "niedrig" | "mittel" | "hoch" | "sehr hoch";
+
+type DiagnosisInputQualityProfile = {
+  score: number;
+  level: DiagnosisInputQualityLevel;
+  found: string[];
+  missing: string[];
+  nextBestQuestions: string[];
+};
+
 type DiagnosisApiResponse = {
   result?: string;
   engineContext?: EngineContext;
   faultCodeContext?: FaultCodeContext | null;
   technicalSpecContext?: TechnicalSpecContext | null;
+  inputQuality?: DiagnosisInputQualityProfile;
   qualityCheck?: string;
   usageLimit?: UsageLimitPayload;
   error?: string;
@@ -117,31 +129,237 @@ const audienceModeOptions: Array<{
   },
 ];
 
-function getInitialAudienceMode(): DiagnosisAudienceMode {
-  if (typeof window === "undefined") {
-    return "workshop";
-  }
-
-  try {
-    const storedMode = window.localStorage.getItem(AUDIENCE_MODE_STORAGE_KEY);
-
-    if (storedMode === "workshop" || storedMode === "hobby") {
-      return storedMode;
-    }
-  } catch {
-    return "workshop";
-  }
-
-  return "workshop";
+function getUserMessageLabel(mode?: DiagnosisAudienceMode) {
+  return mode === "hobby" ? "Hobby" : "Werkstatt";
 }
 
 const baseQuickQuestions = [
   "Kurze Ausbauanleitung erstellen",
-  "Welche Messwerte prüfen?",
+  "Welche Daten fehlen noch?",
+  "Messplan mit Soll/Ist erstellen",
   "Was prüfe ich als erstes?",
-  "Häufigste Ursache eingrenzen",
-  "Welche Live-Daten sind wichtig?",
+  "Wahrscheinlichkeiten priorisieren",
+  "Entscheidung: weiterfahren oder stoppen?",
 ];
+
+function normalizeQualityText(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/\u00e4/g, "ae")
+    .replace(/\u00f6/g, "oe")
+    .replace(/\u00fc/g, "ue")
+    .replace(/\u00df/g, "ss");
+}
+
+function includesAnyQualityTerm(value: string, terms: string[]) {
+  const normalizedValue = normalizeQualityText(value);
+
+  return terms.some((term) =>
+    normalizedValue.includes(normalizeQualityText(term)),
+  );
+}
+
+function hasVehicleIdentityContext(value: string) {
+  const normalizedValue = normalizeQualityText(value);
+
+  return (
+    /\b(19|20)\d{2}\b/.test(normalizedValue) ||
+    /\b[A-Z]{2,5}\d{0,2}\b/.test(value) ||
+    includesAnyQualityTerm(normalizedValue, [
+      "motorcode",
+      "modell",
+      "baujahr",
+      "kilometer",
+      "km",
+      "vin",
+      "fahrgestellnummer",
+      "vw",
+      "volkswagen",
+      "audi",
+      "bmw",
+      "mercedes",
+      "opel",
+      "ford",
+      "skoda",
+      "seat",
+      "cupra",
+      "renault",
+      "peugeot",
+      "citroen",
+      "fiat",
+      "toyota",
+      "hyundai",
+      "kia",
+      "nissan",
+      "passat",
+      "golf",
+      "touran",
+      "transporter",
+      "qashqai",
+      "focus",
+      "astra",
+      "corsa",
+      "sprinter",
+      "ducato",
+    ])
+  );
+}
+
+function hasSymptomContext(value: string) {
+  return includesAnyQualityTerm(value, [
+    "ruckelt",
+    "ruckeln",
+    "springt nicht an",
+    "startet nicht",
+    "geht aus",
+    "leistungsverlust",
+    "leuchtet",
+    "klackert",
+    "schleift",
+    "zieht",
+    "vibriert",
+    "geraeusch",
+    "geräusch",
+    "warm",
+    "kalt",
+  ]);
+}
+
+function hasOperatingConditionContext(value: string) {
+  return includesAnyQualityTerm(value, [
+    "warm",
+    "kalt",
+    "leerlauf",
+    "volllast",
+    "teillast",
+    "beim starten",
+    "beim bremsen",
+    "beim beschleunigen",
+    "regen",
+    "nach",
+    "nur wenn",
+  ]);
+}
+
+function hasMeasurementContext(value: string) {
+  return (
+    /\b\d+([,.]\d+)?\s?(v|volt|bar|mbar|ohm|a|ampere|grad|c|nm|%)\b/i.test(
+      value,
+    ) ||
+    includesAnyQualityTerm(value, [
+      "messwert",
+      "istwert",
+      "sollwert",
+      "live daten",
+      "livedaten",
+      "druck",
+      "spannung",
+      "widerstand",
+      "temperatur",
+      "adaptionswert",
+      "fuel trim",
+      "trim",
+    ])
+  );
+}
+
+function hasPreviousChecksContext(value: string) {
+  return includesAnyQualityTerm(value, [
+    "geprüft",
+    "gemessen",
+    "getauscht",
+    "ersetzt",
+    "neu",
+    "ausgelesen",
+    "abgedrückt",
+    "sichtprüfung",
+    "stellgliedtest",
+  ]);
+}
+
+function buildClientInputQualityProfile(
+  value: string,
+): DiagnosisInputQualityProfile {
+  const cleanValue = value.trim();
+  const found: string[] = [];
+  const missing: string[] = [];
+  const nextBestQuestions: string[] = [];
+
+  const checks = [
+    {
+      ok: hasVehicleIdentityContext(cleanValue),
+      found: "Fahrzeugdaten",
+      missing: "Fahrzeugdaten",
+      question: "Fahrzeug, Baujahr, Motorcode und Kilometerstand ergänzen.",
+      points: 20,
+    },
+    {
+      ok: Boolean(detectFirstFaultCodeInput(cleanValue)),
+      found: "Fehlercode",
+      missing: "Fehlercode",
+      question: "Fehlercodes mit Status nennen: aktiv, sporadisch oder historisch.",
+      points: 15,
+    },
+    {
+      ok: hasSymptomContext(cleanValue),
+      found: "Symptom",
+      missing: "Symptom",
+      question: "Symptom genauer beschreiben: wann, wie stark, dauerhaft oder sporadisch.",
+      points: 20,
+    },
+    {
+      ok: hasOperatingConditionContext(cleanValue),
+      found: "Bedingung",
+      missing: "Bedingung",
+      question: "Betriebszustand ergänzen: kalt/warm, Last, Drehzahl, Gang, Geschwindigkeit.",
+      points: 15,
+    },
+    {
+      ok: hasMeasurementContext(cleanValue),
+      found: "Messwerte",
+      missing: "Messwerte",
+      question: "Soll-/Istwerte oder Live-Daten ergänzen, falls vorhanden.",
+      points: 20,
+    },
+    {
+      ok: hasPreviousChecksContext(cleanValue),
+      found: "Vorprüfung",
+      missing: "Vorprüfung",
+      question: "Bereits geprüfte oder getauschte Teile nennen.",
+      points: 10,
+    },
+  ];
+
+  let score = cleanValue.length >= 12 ? 10 : 0;
+
+  for (const check of checks) {
+    if (check.ok) {
+      score += check.points;
+      found.push(check.found);
+    } else {
+      missing.push(check.missing);
+      nextBestQuestions.push(check.question);
+    }
+  }
+
+  const clampedScore = Math.min(100, score);
+  const level: DiagnosisInputQualityLevel =
+    clampedScore >= 85
+      ? "sehr hoch"
+      : clampedScore >= 65
+        ? "hoch"
+        : clampedScore >= 40
+          ? "mittel"
+          : "niedrig";
+
+  return {
+    score: clampedScore,
+    level,
+    found,
+    missing,
+    nextBestQuestions: nextBestQuestions.slice(0, 3),
+  };
+}
 
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) {
@@ -300,6 +518,99 @@ function TechnicalSpecBulletList({
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+function getInputQualityPreviewClasses(level: DiagnosisInputQualityLevel) {
+  if (level === "sehr hoch" || level === "hoch") {
+    return {
+      wrapper: "border-emerald-500/30 bg-emerald-500/10 text-emerald-50",
+      badge: "border-emerald-400/40 bg-emerald-950/40 text-emerald-100",
+      dot: "bg-emerald-300",
+    };
+  }
+
+  if (level === "mittel") {
+    return {
+      wrapper: "border-blue-500/30 bg-blue-500/10 text-blue-50",
+      badge: "border-blue-400/40 bg-blue-950/40 text-blue-100",
+      dot: "bg-blue-300",
+    };
+  }
+
+  return {
+    wrapper: "border-amber-500/30 bg-amber-500/10 text-amber-50",
+    badge: "border-amber-400/40 bg-amber-950/40 text-amber-100",
+    dot: "bg-amber-300",
+  };
+}
+
+function InputQualityPreview({
+  profile,
+}: {
+  profile: DiagnosisInputQualityProfile;
+}) {
+  const classes = getInputQualityPreviewClasses(profile.level);
+
+  return (
+    <div className={`mt-3 rounded-2xl border p-4 text-sm ${classes.wrapper}`}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase tracking-wide opacity-80">
+            Antwortgenauigkeit
+          </p>
+          <h3 className="mt-1 text-lg font-black text-white">
+            {profile.score}/100 · {profile.level}
+          </h3>
+          <p className="mt-2 max-w-3xl leading-6 opacity-90">
+            Je mehr konkrete Fahrzeugdaten, Messwerte und Vorprüfungen
+            vorhanden sind, desto genauer werden Diagnosepfad und Anleitung.
+          </p>
+        </div>
+
+        <span className={`rounded-full border px-3 py-1 text-xs font-black ${classes.badge}`}>
+          Live-Einschätzung
+        </span>
+      </div>
+
+      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+        <div className="rounded-xl border border-white/10 bg-black/10 p-3">
+          <p className="text-xs font-black uppercase tracking-wide opacity-80">
+            Erkannt
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {(profile.found.length > 0 ? profile.found : ["Noch wenig Kontext"]).map(
+              (item) => (
+                <span
+                  key={item}
+                  className="rounded-full border border-white/10 bg-white/10 px-2.5 py-1 text-xs font-bold"
+                >
+                  {item}
+                </span>
+              ),
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-white/10 bg-black/10 p-3">
+          <p className="text-xs font-black uppercase tracking-wide opacity-80">
+            Besser wird es mit
+          </p>
+          <ul className="mt-2 space-y-2">
+            {profile.nextBestQuestions.length > 0 ? (
+              profile.nextBestQuestions.map((question) => (
+                <li key={question} className="flex gap-2 leading-5">
+                  <span className={`mt-2 h-1.5 w-1.5 shrink-0 rounded-full ${classes.dot}`} />
+                  <span>{question}</span>
+                </li>
+              ))
+            ) : (
+              <li className="leading-5">Die Eingabe enthält bereits viel verwertbaren Kontext.</li>
+            )}
+          </ul>
+        </div>
+      </div>
     </div>
   );
 }
@@ -465,60 +776,254 @@ function parseAssistantSections(content: string): AssistantSection[] {
 
 function getAssistantSectionClasses(title: string) {
   const normalizedTitle = title.toLowerCase();
+  const baseWrapper =
+    "rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/70";
+  const neutral = {
+    wrapper: baseWrapper,
+    title: "text-slate-950 dark:text-slate-100",
+    badge:
+      "border border-slate-300 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300",
+    dot: "bg-slate-400 dark:bg-slate-500",
+  };
 
   if (
     normalizedTitle.includes("kritisch") ||
     normalizedTitle.includes("achtung") ||
-    normalizedTitle.includes("hinweis")
+    normalizedTitle.includes("risiko")
   ) {
     return {
-      wrapper: "rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-4",
-      title: "text-yellow-200",
-      badge: "bg-yellow-500/20 text-yellow-200",
-      dot: "bg-yellow-300",
+      wrapper:
+        "rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-sm dark:border-amber-800/70 dark:bg-amber-950/20",
+      title: "text-slate-950 dark:text-slate-100",
+      badge:
+        "border border-amber-300 bg-white text-amber-900 dark:border-amber-800 dark:bg-slate-950 dark:text-amber-200",
+      dot: "bg-amber-500 dark:bg-amber-300",
     };
   }
 
   if (
-    normalizedTitle.includes("sofort") ||
-    normalizedTitle.includes("prüfen") ||
-    normalizedTitle.includes("diagnose")
+    normalizedTitle.includes("ursachen") ||
+    normalizedTitle.includes("typische fehler") ||
+    normalizedTitle.includes("wahrscheinlichkeit")
   ) {
     return {
-      wrapper: "rounded-2xl border border-blue-500/30 bg-blue-500/10 p-4",
-      title: "text-blue-100",
-      badge: "bg-blue-500/20 text-blue-200",
-      dot: "bg-blue-300",
+      ...neutral,
+      wrapper:
+        "rounded-2xl border border-slate-300 bg-slate-50 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-950/70",
+    };
+  }
+
+  return neutral;
+}
+
+function isCauseSectionTitle(title: string) {
+  const normalizedTitle = title.toLowerCase();
+
+  return (
+    normalizedTitle.includes("ursachen") ||
+    normalizedTitle.includes("typische fehler") ||
+    normalizedTitle.includes("wahrscheinlichkeit")
+  );
+}
+
+function getCausePriorityClasses(priority: string) {
+  const normalizedPriority = priority.toLowerCase();
+
+  if (normalizedPriority.includes("hoch")) {
+    return {
+      wrapper:
+        "border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-950/70",
+      badge:
+        "border-red-300 bg-red-50 text-red-800 dark:border-red-800/70 dark:bg-red-950/20 dark:text-red-200",
+      accent: "bg-red-500 dark:bg-red-300",
+    };
+  }
+
+  if (normalizedPriority.includes("mittel")) {
+    return {
+      wrapper:
+        "border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-950/70",
+      badge:
+        "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800/70 dark:bg-amber-950/20 dark:text-amber-200",
+      accent: "bg-amber-500 dark:bg-amber-300",
     };
   }
 
   if (
-    normalizedTitle.includes("nächste") ||
-    normalizedTitle.includes("schritt") ||
-    normalizedTitle.includes("arbeit") ||
-    normalizedTitle.includes("zugang") ||
-    normalizedTitle.includes("werkzeug")
+    normalizedPriority.includes("niedrig") ||
+    normalizedPriority.includes("später") ||
+    normalizedPriority.includes("spaeter")
   ) {
     return {
-      wrapper: "rounded-2xl border border-green-500/30 bg-green-500/10 p-4",
-      title: "text-green-100",
-      badge: "bg-green-500/20 text-green-200",
-      dot: "bg-green-300",
+      wrapper:
+        "border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-950/70",
+      badge:
+        "border-slate-300 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300",
+      accent: "bg-slate-400",
     };
   }
 
   return {
-    wrapper: "rounded-2xl border border-slate-800 bg-slate-950/70 p-4",
-    title: "text-slate-100",
-    badge: "bg-slate-800 text-slate-300",
-    dot: "bg-slate-500",
+    wrapper:
+      "border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-950/70",
+    badge:
+      "border-slate-300 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300",
+    accent: "bg-slate-400",
   };
+}
+
+function getCauseSegmentClasses() {
+  return "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-300";
+}
+
+function getCauseSegmentLabel(label: string) {
+  const normalizedLabel = label.toLowerCase();
+
+  if (
+    normalizedLabel.includes("fehler") ||
+    normalizedLabel.includes("schwachstelle") ||
+    normalizedLabel.includes("fehldiagnose")
+  ) {
+    return "Fehlerbild";
+  }
+
+  if (
+    normalizedLabel.includes("prüf") ||
+    normalizedLabel.includes("beweis") ||
+    normalizedLabel.includes("ausschluss")
+  ) {
+    return "Prüfbeweis";
+  }
+
+  if (
+    normalizedLabel.includes("entscheidung") ||
+    normalizedLabel.includes("folge")
+  ) {
+    return "Entscheidung";
+  }
+
+  return label;
+}
+
+function parseCauseLine(value: string) {
+  let content = value.trim();
+  let priority = "offen";
+
+  const bracketPriority = content.match(
+    /^\[(hoch|mittel|niedrig|erst später|später|spaeter|offen)\]\s*(.+)$/i,
+  );
+
+  if (bracketPriority) {
+    priority = bracketPriority[1];
+    content = bracketPriority[2].trim();
+  } else {
+    const inlinePriority = content.match(
+      /^(hoch|mittel|niedrig|erst später|später|spaeter|offen)\s*[:|-]\s*(.+)$/i,
+    );
+
+    if (inlinePriority) {
+      priority = inlinePriority[1];
+      content = inlinePriority[2].trim();
+    }
+  }
+
+  const segments = content
+    .split("|")
+    .map((segment) => segment.trim())
+    .filter(Boolean)
+    .map((segment) => {
+      const labelMatch = segment.match(/^([^:]{2,32}):\s*(.+)$/);
+
+      if (!labelMatch) {
+        return {
+          label: "Hinweis",
+          text: segment,
+        };
+      }
+
+      return {
+        label: labelMatch[1].trim(),
+        text: labelMatch[2].trim(),
+      };
+    });
+
+  return {
+    priority,
+    segments:
+      segments.length > 0
+        ? segments
+        : [
+            {
+              label: "Hinweis",
+              text: content,
+            },
+          ],
+  };
+}
+
+function renderCauseLine(line: string, lineIndex: number) {
+  const parsedLine = parseCauseLine(line);
+  const priorityClasses = getCausePriorityClasses(parsedLine.priority);
+  const priorityLabel =
+    parsedLine.priority === "offen"
+      ? ""
+      : parsedLine.priority.toLowerCase().includes("spaeter")
+        ? "erst später"
+        : parsedLine.priority;
+  const mainSegment = parsedLine.segments[0];
+  const detailSegments = parsedLine.segments.slice(1);
+
+  return (
+    <div
+      key={`${line}-${lineIndex}`}
+      className={`rounded-xl border p-3 text-sm leading-6 ${priorityClasses.wrapper}`}
+    >
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+        {priorityLabel && (
+          <span
+            className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-black uppercase tracking-wide ${priorityClasses.badge}`}
+          >
+            {priorityLabel}
+          </span>
+        )}
+
+        <div className="min-w-0 flex-1">
+          <div className="flex gap-2 text-slate-800 dark:text-slate-100">
+            <span
+              className={`mt-2 h-1.5 w-1.5 shrink-0 rounded-full ${priorityClasses.accent}`}
+            />
+            <p>
+              <span className="font-black">{mainSegment.label}:</span>{" "}
+              {mainSegment.text}
+            </p>
+          </div>
+
+          {detailSegments.length > 0 && (
+            <div className="mt-3 grid gap-2 md:grid-cols-2">
+              {detailSegments.map((segment) => (
+                <div
+                  key={`${segment.label}-${segment.text}`}
+                  className={`rounded-lg border px-3 py-2 ${getCauseSegmentClasses()}`}
+                >
+                  <span className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    {getCauseSegmentLabel(segment.label)}
+                  </span>
+                  <p className="mt-1 leading-6">{segment.text}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function renderAssistantLine(
   line: string,
   lineIndex: number,
   dotClassName: string,
+  sectionTitle: string,
 ) {
   const trimmedLine = cleanMarkdownMarkers(line);
 
@@ -530,10 +1035,14 @@ function renderAssistantLine(
   const numberMatch = trimmedLine.match(/^(\d+)[.)]\s+(.+)$/);
 
   if (bulletMatch) {
+    if (isCauseSectionTitle(sectionTitle)) {
+      return renderCauseLine(bulletMatch[1], lineIndex);
+    }
+
     return (
       <div
         key={`${trimmedLine}-${lineIndex}`}
-        className="flex gap-3 text-sm leading-6 text-slate-300"
+        className="flex gap-3 text-sm leading-6 text-slate-700 dark:text-slate-300"
       >
         <span
           className={`mt-2.5 h-1.5 w-1.5 shrink-0 rounded-full ${dotClassName}`}
@@ -544,12 +1053,16 @@ function renderAssistantLine(
   }
 
   if (numberMatch) {
+    if (isCauseSectionTitle(sectionTitle)) {
+      return renderCauseLine(numberMatch[2], lineIndex);
+    }
+
     return (
       <div
         key={`${trimmedLine}-${lineIndex}`}
-        className="flex gap-3 text-sm leading-6 text-slate-300"
+        className="flex gap-3 text-sm leading-6 text-slate-700 dark:text-slate-300"
       >
-        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-800 text-xs font-black text-slate-300">
+        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-slate-50 text-xs font-black text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
           {numberMatch[1]}
         </span>
         <span>{numberMatch[2]}</span>
@@ -560,7 +1073,7 @@ function renderAssistantLine(
   return (
     <p
       key={`${trimmedLine}-${lineIndex}`}
-      className="text-sm leading-7 text-slate-300"
+      className="text-sm leading-7 text-slate-700 dark:text-slate-300"
     >
       {trimmedLine}
     </p>
@@ -602,7 +1115,7 @@ function AssistantAnswer({ content }: { content: string }) {
 
             <div className="space-y-2">
               {section.lines.map((line, lineIndex) =>
-                renderAssistantLine(line, lineIndex, classes.dot),
+                renderAssistantLine(line, lineIndex, classes.dot, section.title),
               )}
             </div>
           </section>
@@ -703,7 +1216,8 @@ export default function SearchBar() {
   const [savedCases, setSavedCases] = useState<SavedDiagnosisCase[]>([]);
   const [userPlan, setUserPlan] = useState<UserPlan>("free");
   const [audienceMode, setAudienceMode] =
-    useState<DiagnosisAudienceMode>(getInitialAudienceMode);
+    useState<DiagnosisAudienceMode>("workshop");
+  const [audienceModeHydrated, setAudienceModeHydrated] = useState(false);
   const [diagnosisUsage, setDiagnosisUsage] = useState<DiagnosisUsage>(
     getInitialDiagnosisUsage(),
   );
@@ -720,9 +1234,14 @@ export default function SearchBar() {
   const loadingMessageRef = useRef<HTMLDivElement | null>(null);
   const hasLoadedCaseRef = useRef(false);
   const shouldAutoScrollRef = useRef(false);
+  const audienceModeRef = useRef<DiagnosisAudienceMode>("workshop");
 
   const typedFaultCodeValue = useMemo(
     () => detectFirstFaultCodeInput(search),
+    [search],
+  );
+  const typedInputQualityProfile = useMemo(
+    () => buildClientInputQualityProfile(search),
     [search],
   );
   const typedFaultCodeInfo = useMemo(
@@ -800,6 +1319,11 @@ export default function SearchBar() {
     savingDisabledForPlan ||
     (savedCases.length >= currentPlan.savedCaseLimit && !openedCaseStillExists);
 
+  const changeAudienceMode = useCallback((nextMode: DiagnosisAudienceMode) => {
+    audienceModeRef.current = nextMode;
+    setAudienceMode(nextMode);
+  }, []);
+
   useEffect(() => {
     if (!shouldAutoScrollRef.current) {
       return;
@@ -865,12 +1389,36 @@ export default function SearchBar() {
   }, [supabase]);
 
   useEffect(() => {
+    const audienceModeTimer = window.setTimeout(() => {
+      try {
+        const storedMode = window.localStorage.getItem(
+          AUDIENCE_MODE_STORAGE_KEY,
+        );
+
+        if (storedMode === "workshop" || storedMode === "hobby") {
+          changeAudienceMode(storedMode);
+        }
+      } catch {
+        // Lokale Einstellungen sind Komfort, die Diagnose funktioniert auch ohne.
+      } finally {
+        setAudienceModeHydrated(true);
+      }
+    }, 0);
+
+    return () => window.clearTimeout(audienceModeTimer);
+  }, [changeAudienceMode]);
+
+  useEffect(() => {
+    if (!audienceModeHydrated) {
+      return;
+    }
+
     try {
       window.localStorage.setItem(AUDIENCE_MODE_STORAGE_KEY, audienceMode);
     } catch {
       // Lokale Einstellungen sind Komfort, die Diagnose funktioniert auch ohne.
     }
-  }, [audienceMode]);
+  }, [audienceMode, audienceModeHydrated]);
 
   useEffect(() => {
     function handlePrefillDiagnosis(event: Event) {
@@ -1295,29 +1843,48 @@ export default function SearchBar() {
     const detectedTechnicalSpecContext = detectTechnicalSpecContext(cleanInput);
 
     if (isInstructionRequest(cleanInput)) {
+      const instructionMode =
+        audienceModeRef.current === "hobby"
+          ? "verständliche Hobby-Anleitung"
+          : "präzise Werkstatt-Anleitung";
+      const instructionToneRule =
+        audienceModeRef.current === "hobby"
+          ? "- In normaler Sprache schreiben und Fachbegriffe kurz erklären."
+          : "- Fachlich knapp und entscheidungsorientiert schreiben.";
+
       return appendTechnicalSpecPrompt(
-        `Erstelle direkt im aktuellen Diagnosefall eine kompakte Werkstatt-Anleitung.
+        `Erstelle direkt im aktuellen Diagnosefall eine ${instructionMode}.
 
 Aktuelle Eingabe:
 ${cleanInput}
 
-Regeln für diese Antwort:
-- Keine neue allgemeine Diagnose, sondern eine konkrete Anleitung aus der Eingabe und dem bisherigen Verlauf erstellen.
-- Kompakt bleiben, aber arbeitstechnisch brauchbar.
-- Nicht schreiben "Zugang schaffen", sondern konkrete typische Demontage nennen.
-- Konkrete Verkleidungen, Abdeckungen, Stecker, Halter, Befestigungen und Richtung/Lage nennen, wenn sinnvoll.
+Regeln für diese Anleitung:
+${instructionToneRule}
+- Keine allgemeine Diagnose wiederholen, sondern eine konkrete Anleitung aus Eingabe und Fallverlauf erstellen.
+- Erst klären, welches Ziel bewiesen oder repariert werden soll.
+- Fehlende Fahrzeugdaten nennen, wenn sie die Genauigkeit der Anleitung begrenzen.
+- Arbeitsschritte so schreiben, dass ein echter Zugang, eine echte Prüfung oder eine echte Montage daraus möglich wird.
+- Nicht pauschal "Zugang schaffen" schreiben, sondern typische Verkleidungen, Abdeckungen, Stecker, Halter, Befestigungen, Lage und Richtung nennen, wenn sinnvoll.
+- Messpunkte, Sollzustand und Entscheidung nennen, wenn ein Prüfschritt davon abhängt.
+- Sollwerte nur nennen, wenn sie im Kontext vorhanden oder allgemein sicher sind. Unsichere Herstellerwerte klar als fehlend kennzeichnen.
 - Linksgewinde nennen, wenn möglich oder typisch.
 - Schrauben, Exzenter, Einstellpunkte oder Markierungen nennen, die nicht gelöst oder nicht verstellt werden dürfen.
-- Keine erfundenen Drehmomente, Füllmengen oder Herstellersollwerte.
-- Daten sichern nur nennen, wenn Steuergerät/Codierung/Programmierung/Anlernung betroffen ist.
+- Daten sichern nur nennen, wenn Steuergerät, Codierung, Programmierung oder Anlernung betroffen ist.
 - Batterie abklemmen nur nennen, wenn technisch notwendig.
+- Warnhinweise nur dort setzen, wo ein echtes Risiko besteht.
 
 Antwortformat exakt:
+# Datenqualität
+# Diagnoseziel
 # Werkzeug
+# Teile / Material
 # Zugang
 # Arbeitsschritte
+# Mess-/Entscheidungspunkte
 # Kritische Punkte
-# Abschlussprüfung`,
+# Qualitätskontrolle
+# Abschlussprüfung
+# Nächste Schritte`,
         detectedTechnicalSpecContext,
       );
     }
@@ -1372,10 +1939,12 @@ Antwortformat exakt:
     }
 
     const diagnosisInput = buildUnifiedDiagnosisInput(currentInput);
+    const currentAudienceMode = audienceModeRef.current;
 
     const userMessage: ChatMessage = {
       role: "user",
       content: diagnosisInput,
+      audienceMode: currentAudienceMode,
     };
 
     const nextMessages = [...messages, userMessage];
@@ -1407,7 +1976,7 @@ Antwortformat exakt:
               input: diagnosisInput,
               messages,
               accessToken,
-              audienceMode,
+              audienceMode: currentAudienceMode,
             }),
           },
           65000
@@ -1446,7 +2015,6 @@ Antwortformat exakt:
         registerLocalSuccessfulDiagnosis();
       }
     } catch (error) {
-      console.error(error);
       setError(getFriendlyDiagnosisError(error));
       shouldAutoScrollRef.current = false;
     } finally {
@@ -1685,7 +2253,10 @@ ${faultCode.suggestedChecks.map((check) => `- ${check}`).join("\n")}`;
 
     const chatText = messages
       .map((message) => {
-        const sender = message.role === "user" ? "Werkstatt" : "DiagnoseHUB";
+        const sender =
+          message.role === "user"
+            ? getUserMessageLabel(message.audienceMode ?? audienceMode)
+            : "DiagnoseHUB";
         return `${sender}:\n${message.content}`;
       })
       .join("\n\n---\n\n");
@@ -1786,7 +2357,7 @@ ${chatText}
                 <button
                   key={option.value}
                   type="button"
-                  onClick={() => setAudienceMode(option.value)}
+                  onClick={() => changeAudienceMode(option.value)}
                   className={
                     audienceMode === option.value
                       ? "rounded-2xl border border-blue-500 bg-blue-600 px-4 py-3 text-left text-white shadow-lg shadow-blue-950/30"
@@ -1823,6 +2394,10 @@ ${chatText}
           Modell, Baujahr, Motorcode, Kilometerstand, Fehlercode, Symptome,
           Messwerte und was bereits geprüft wurde.
         </p>
+
+        {search.trim() ? (
+          <InputQualityPreview profile={typedInputQualityProfile} />
+        ) : null}
 
         {typedTechnicalSpecContext.foundSpecs.length > 0 ? (
           <div className="mt-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-50">
@@ -2189,10 +2764,12 @@ ${chatText}
       {loading && (
         <div
           ref={loadingMessageRef}
-          className="mt-6 rounded-3xl border border-blue-500/30 bg-blue-500/10 p-6 text-blue-100"
+          className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 text-slate-700 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
         >
-          <p className="font-black">DiagnoseHUB analysiert den Fall...</p>
-          <p className="mt-2 text-sm text-blue-200">
+          <p className="font-black text-slate-950 dark:text-slate-100">
+            DiagnoseHUB analysiert den Fall...
+          </p>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
             Fehlercode, Motorkontext und bisherigen Verlauf werden verarbeitet.
           </p>
         </div>
@@ -2210,19 +2787,21 @@ ${chatText}
               }
               className={
                 message.role === "user"
-                  ? "rounded-3xl border border-blue-300 bg-blue-50 p-6 text-slate-950 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-50"
-                  : "rounded-3xl border border-slate-200 bg-white p-6 text-slate-950 shadow-lg shadow-blue-950/10 dark:border-slate-800 dark:bg-slate-900/90 dark:text-slate-100 dark:shadow-blue-950/20"
+                  ? "rounded-3xl border border-slate-200 bg-slate-50 p-6 text-slate-950 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
+                  : "rounded-3xl border border-slate-200 bg-white p-6 text-slate-950 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 dark:text-slate-100"
               }
             >
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <p
                   className={
                     message.role === "user"
-                      ? "text-sm font-black uppercase tracking-wide text-blue-700 dark:text-blue-200"
+                      ? "text-sm font-black uppercase tracking-wide text-slate-500 dark:text-slate-400"
                       : "text-sm font-black uppercase tracking-wide text-slate-600 dark:text-slate-400"
                   }
                 >
-                  {message.role === "user" ? "Werkstatt" : "DiagnoseHUB"}
+                  {message.role === "user"
+                    ? getUserMessageLabel(message.audienceMode ?? audienceMode)
+                    : "DiagnoseHUB"}
                 </p>
 
                 {message.role === "assistant" && (

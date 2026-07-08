@@ -17,6 +17,13 @@ type RelatedLearningResponse = {
   error?: string;
 };
 
+type RelatedLearningRequestPayload = {
+  faultCodes: string[];
+  parts: string[];
+  systems: string[];
+  limit: number;
+};
+
 type RelatedLearningPanelProps = {
   faultCodes: string[];
   parts: string[];
@@ -45,6 +52,43 @@ function getDifficultyLabel(difficulty: string) {
   return difficulty;
 }
 
+function buildRequestKey(payload: RelatedLearningRequestPayload) {
+  return JSON.stringify(payload);
+}
+
+function parseRequestKey(value: string): RelatedLearningRequestPayload {
+  return JSON.parse(value) as RelatedLearningRequestPayload;
+}
+
+function isQuietRelatedLearningError(message: string) {
+  const normalizedMessage = message.toLowerCase();
+
+  return (
+    normalizedMessage.includes("nicht eingeloggt") ||
+    normalizedMessage.includes("access token fehlt") ||
+    normalizedMessage.includes("session") ||
+    normalizedMessage.includes("tarif nicht enthalten")
+  );
+}
+
+function getFriendlyRelatedLearningError(error: unknown) {
+  const message =
+    error instanceof Error
+      ? error.message
+      : "Passende Lerninhalte konnten nicht geladen werden.";
+  const normalizedMessage = message.toLowerCase();
+
+  if (
+    normalizedMessage.includes("serververbindung") ||
+    normalizedMessage.includes("failed to fetch") ||
+    normalizedMessage.includes("fetch failed")
+  ) {
+    return "Passende Lernmodule sind lokal gerade nicht erreichbar. Die Diagnose selbst kann trotzdem weiter genutzt werden.";
+  }
+
+  return message;
+}
+
 export default function RelatedLearningPanel({
   faultCodes,
   parts,
@@ -55,18 +99,15 @@ export default function RelatedLearningPanel({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const payload = useMemo(() => {
-    return {
+  const requestKey = buildRequestKey({
       faultCodes: normalizeList(faultCodes),
       parts: normalizeList(parts),
       systems: normalizeList(systems),
       limit: 4,
-    };
-  }, [faultCodes, parts, systems]);
-
-  const requestKey = JSON.stringify(payload);
+  });
 
   useEffect(() => {
+    const payload = parseRequestKey(requestKey);
     const hasSearchSignal =
       payload.faultCodes.length > 0 ||
       payload.parts.length > 0 ||
@@ -93,9 +134,9 @@ export default function RelatedLearningPanel({
         } = await supabase.auth.getSession();
 
         if (!session?.access_token) {
-          throw new Error(
-            "Bitte einloggen, um passende Lerninhalte zum Diagnosefall zu laden."
-          );
+          setModules([]);
+          setError("");
+          return;
         }
 
         const { response, data } =
@@ -107,7 +148,7 @@ export default function RelatedLearningPanel({
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${session.access_token}`,
               },
-              body: requestKey,
+              body: JSON.stringify(payload),
             },
             15000
           );
@@ -117,9 +158,16 @@ export default function RelatedLearningPanel({
         }
 
         if (!response.ok) {
-          throw new Error(
-            data.error || "Passende Lerninhalte konnten nicht geladen werden."
-          );
+          const errorMessage =
+            data.error || "Passende Lerninhalte konnten nicht geladen werden.";
+
+          if (isQuietRelatedLearningError(errorMessage)) {
+            setModules([]);
+            setError("");
+            return;
+          }
+
+          throw new Error(errorMessage);
         }
 
         setModules(data.modules || []);
@@ -128,12 +176,15 @@ export default function RelatedLearningPanel({
           return;
         }
 
-        console.error(error);
-        setError(
-          error instanceof Error
-            ? error.message
-            : "Passende Lerninhalte konnten nicht geladen werden."
-        );
+        const friendlyMessage = getFriendlyRelatedLearningError(error);
+
+        if (isQuietRelatedLearningError(friendlyMessage)) {
+          setModules([]);
+          setError("");
+          return;
+        }
+
+        setError(friendlyMessage);
       } finally {
         if (!ignoreResult) {
           setLoading(false);
@@ -146,7 +197,7 @@ export default function RelatedLearningPanel({
     return () => {
       ignoreResult = true;
     };
-  }, [requestKey, payload, supabase.auth]);
+  }, [requestKey, supabase.auth]);
 
   if (!loading && modules.length === 0 && !error) {
     return null;

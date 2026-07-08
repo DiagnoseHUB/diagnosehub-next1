@@ -249,6 +249,7 @@ function TorqueSpecSummary({
 export default function TorqueSpecManager() {
   const supabase = useMemo(() => createClient(), []);
   const [formState, setFormState] = useState<FormState>(initialFormState);
+  const [approvedSpecs, setApprovedSpecs] = useState<TorqueSpec[]>([]);
   const [ownSpecs, setOwnSpecs] = useState<TorqueSpec[]>([]);
   const [reviewSpecs, setReviewSpecs] = useState<TorqueSpec[]>([]);
   const [canApprove, setCanApprove] = useState(false);
@@ -308,9 +309,13 @@ export default function TorqueSpecManager() {
     setErrorMessage("");
 
     try {
-      const ownResponse = await requestTorqueSpecs("/api/torque-specs?scope=mine");
-      const nextCanApprove = Boolean(ownResponse.canApprove);
+      const [approvedResponse, ownResponse] = await Promise.all([
+        requestTorqueSpecs("/api/torque-specs?scope=approved"),
+        requestTorqueSpecs("/api/torque-specs?scope=mine"),
+      ]);
+      const nextCanApprove = Boolean(approvedResponse.canApprove || ownResponse.canApprove);
 
+      setApprovedSpecs(approvedResponse.torqueSpecs || []);
       setOwnSpecs(ownResponse.torqueSpecs || []);
       setCanApprove(nextCanApprove);
 
@@ -346,7 +351,11 @@ export default function TorqueSpecManager() {
       }
 
       setFormState(initialFormState);
-      setNotice(submitForReview ? "Drehmomentwert zur Prüfung eingereicht." : "Entwurf gespeichert.");
+      setNotice(
+        submitForReview
+          ? "Drehmomentwert zur manuellen Freigabe eingereicht. Nach Freigabe wächst die gemeinsame Datenbank."
+          : "Entwurf gespeichert. Er ist nur für dich sichtbar, bis du ihn einreichst."
+      );
       await loadSpecs();
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
@@ -370,7 +379,11 @@ export default function TorqueSpecManager() {
         }),
       });
 
-      setNotice(action === "approve" ? "Drehmomentwert freigegeben." : "Drehmomentwert abgelehnt.");
+      setNotice(
+        action === "approve"
+          ? "Drehmomentwert freigegeben und in die gemeinsame Datenbank übernommen."
+          : "Drehmomentwert abgelehnt."
+      );
       setReviewComments((currentComments) => ({
         ...currentComments,
         [specId]: "",
@@ -413,7 +426,6 @@ export default function TorqueSpecManager() {
     };
   }, [loadSpecs]);
 
-  const approvedCount = ownSpecs.filter((spec) => spec.status === "approved").length;
   const pendingCount = ownSpecs.filter((spec) => spec.status === "pending_review").length;
 
   return (
@@ -425,10 +437,12 @@ export default function TorqueSpecManager() {
               Drehmoment-Freigabe
             </p>
             <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950 dark:text-white md:text-4xl">
-              Drehmomente erfassen, prüfen, freigeben
+              Gemeinsame Drehmoment-Datenbank
             </h1>
             <p className="mt-3 max-w-3xl leading-7 text-slate-600 dark:text-slate-300">
-              Freigegebene Werte werden automatisch in passenden Diagnoseantworten ergänzt.
+              Du erfasst Werte als Entwurf oder Einreichung. Erst nach manueller
+              Betreiber-Freigabe werden sie für alle Nutzer sichtbar und automatisch in passenden
+              Diagnoseantworten ergänzt.
             </p>
           </div>
 
@@ -442,16 +456,16 @@ export default function TorqueSpecManager() {
 
         <div className="grid gap-3 md:grid-cols-3">
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950">
-            <p className="text-sm font-bold text-slate-500 dark:text-slate-400">Eigene Werte</p>
+            <p className="text-sm font-bold text-slate-500 dark:text-slate-400">Gemeinsame Datenbank</p>
+            <p className="mt-2 text-3xl font-black text-slate-950 dark:text-white">{approvedSpecs.length}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950">
+            <p className="text-sm font-bold text-slate-500 dark:text-slate-400">Meine Einreichungen</p>
             <p className="mt-2 text-3xl font-black text-slate-950 dark:text-white">{ownSpecs.length}</p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950">
             <p className="text-sm font-bold text-slate-500 dark:text-slate-400">In Prüfung</p>
             <p className="mt-2 text-3xl font-black text-slate-950 dark:text-white">{pendingCount}</p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950">
-            <p className="text-sm font-bold text-slate-500 dark:text-slate-400">Freigegeben</p>
-            <p className="mt-2 text-3xl font-black text-slate-950 dark:text-white">{approvedCount}</p>
           </div>
         </div>
       </section>
@@ -460,7 +474,9 @@ export default function TorqueSpecManager() {
         <section className="rounded-3xl border border-amber-200 bg-amber-50 p-6 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100">
           <p className="font-black">Bitte einloggen.</p>
           <p className="mt-2 leading-7">
-            Drehmomentwerte werden accountbezogen gespeichert und geprüft.
+            Freigegebene Werte liegen in der gemeinsamen Datenbank. Eigene Entwürfe
+            und Einreichungen sind mit deinem Konto verknüpft, damit Prüfung,
+            Freigabe und Nachvollziehbarkeit sauber funktionieren.
           </p>
         </section>
       )}
@@ -479,8 +495,12 @@ export default function TorqueSpecManager() {
 
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-900">
         <h2 className="text-2xl font-black text-slate-950 dark:text-white">
-          Drehmomentwert eintragen
+          Drehmomentwert für die gemeinsame Datenbank eintragen
         </h2>
+        <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-500 dark:text-slate-400">
+          Entwürfe bleiben privat. Einreichungen landen in der Betreiber-Prüfung.
+          Nach Freigabe werden sie global verwendet, aber nicht automatisch ohne Prüfung übernommen.
+        </p>
 
         <form
           className="mt-6 grid gap-6"
@@ -669,10 +689,53 @@ export default function TorqueSpecManager() {
               onClick={() => void saveSpec(true)}
               className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Zur Prüfung einreichen
+              Zur Freigabe einreichen
             </button>
           </div>
         </form>
+      </section>
+
+      <section className="rounded-3xl border border-emerald-200 bg-emerald-50 p-6 shadow-sm transition-colors dark:border-emerald-500/40 dark:bg-emerald-500/10">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-sm font-black uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+              Freigegebene Werte
+            </p>
+            <h2 className="mt-2 text-2xl font-black text-slate-950 dark:text-white">
+              Gemeinsame Drehmoment-Datenbank
+            </h2>
+            <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">
+              Diese Werte sind manuell freigegeben und werden von DiagnoseHUB
+              automatisch berücksichtigt, wenn Fahrzeug, Baugruppe und Schraubstelle passen.
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={loading}
+            onClick={() => void loadSpecs()}
+            className="w-fit rounded-2xl border border-emerald-300 bg-white px-4 py-2.5 text-sm font-black text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-500/40 dark:bg-slate-950 dark:text-emerald-200 dark:hover:bg-emerald-500/10"
+          >
+            Aktualisieren
+          </button>
+        </div>
+
+        <div className="mt-6 grid gap-4">
+          {loading && (
+            <p className="rounded-2xl border border-emerald-200 bg-white p-4 text-sm font-bold text-slate-600 dark:border-emerald-500/30 dark:bg-slate-950 dark:text-slate-300">
+              Lädt...
+            </p>
+          )}
+
+          {!loading && approvedSpecs.length === 0 && (
+            <p className="rounded-2xl border border-emerald-200 bg-white p-4 text-sm font-bold text-slate-600 dark:border-emerald-500/30 dark:bg-slate-950 dark:text-slate-300">
+              Noch keine freigegebenen Drehmomentwerte in der gemeinsamen Datenbank.
+            </p>
+          )}
+
+          {approvedSpecs.map((spec) => (
+            <TorqueSpecSummary key={spec.id} spec={spec} />
+          ))}
+        </div>
       </section>
 
       {canApprove && (
@@ -680,11 +743,14 @@ export default function TorqueSpecManager() {
           <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
             <div>
               <p className="text-sm font-black uppercase tracking-wide text-blue-700 dark:text-blue-300">
-                Betreiber-Prüfung
+                Betreiber-Freigabe
               </p>
               <h2 className="mt-2 text-2xl font-black text-slate-950 dark:text-white">
-                Manuell freigeben
+                Für die gemeinsame Datenbank freigeben
               </h2>
+              <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">
+                Nur hier bestätigte Werte werden global sichtbar und dürfen in Diagnosen erscheinen.
+              </p>
             </div>
             <p className="text-sm font-bold text-slate-600 dark:text-slate-300">
               {reviewSpecs.length} offene Werte
@@ -742,10 +808,11 @@ export default function TorqueSpecManager() {
         <div className="flex items-end justify-between gap-4">
           <div>
             <h2 className="text-2xl font-black text-slate-950 dark:text-white">
-              Meine Drehmomentwerte
+              Meine Entwürfe und Einreichungen
             </h2>
             <p className="mt-2 text-sm font-semibold text-slate-500 dark:text-slate-400">
-              Freigegebene Werte laufen automatisch in passende Diagnosen.
+              Hier siehst du, was du vorbereitet oder zur Freigabe eingereicht hast.
+              Freigegebene Einträge erscheinen zusätzlich in der gemeinsamen Datenbank.
             </p>
           </div>
           <button
@@ -767,7 +834,7 @@ export default function TorqueSpecManager() {
 
           {!loading && ownSpecs.length === 0 && (
             <p className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-bold text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
-              Noch keine Drehmomentwerte gespeichert.
+              Noch keine Entwürfe oder Einreichungen gespeichert.
             </p>
           )}
 

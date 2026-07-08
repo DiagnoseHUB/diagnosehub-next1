@@ -51,6 +51,15 @@ export async function fetchJsonWithTimeout<T extends JsonErrorPayload = JsonErro
       throw createTimeoutError(timeoutMs);
     }
 
+    if (
+      error instanceof TypeError &&
+      error.message.toLowerCase().includes("failed to fetch")
+    ) {
+      throw new Error(
+        "Die Serververbindung ist gerade nicht erreichbar. Bitte prüfe, ob der lokale Entwicklungsserver läuft, und versuche es erneut."
+      );
+    }
+
     throw error;
   } finally {
     window.clearTimeout(timeoutId);

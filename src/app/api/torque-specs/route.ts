@@ -77,7 +77,7 @@ export async function GET(request: Request) {
   try {
     const { user, supabase } = await loadAuthenticatedUserFromRequest(request);
     const canApprove = canApproveTorqueSpecs(user);
-    const scope = new URL(request.url).searchParams.get("scope") || "mine";
+    const scope = new URL(request.url).searchParams.get("scope") || "approved";
 
     if (scope === "review") {
       if (!canApprove) {
@@ -119,6 +119,10 @@ export async function GET(request: Request) {
         torqueSpecs: ((data || []) as TorqueSpecRow[]).map(toTorqueSpec),
         canApprove,
       });
+    }
+
+    if (scope !== "mine") {
+      return jsonError("Unbekannter Drehmoment-Bereich.", 400);
     }
 
     const { data, error } = await supabase

@@ -3,6 +3,7 @@ import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import LearningLevelOverview from "@/components/LearningLevelOverview";
 import LearningPracticeHub from "@/components/LearningPracticeHub";
+import LearningStudyCockpit from "@/components/LearningStudyCockpit";
 import PlanAccessGate from "@/components/PlanAccessGate";
 import { loadPublishedLearningModules } from "@/lib/supabase/learningStorage";
 
@@ -149,6 +150,8 @@ export default async function LernenPage() {
                 ))}
               </div>
             </section>
+
+            <LearningStudyCockpit modules={modules} />
 
             <LearningPracticeHub />
 

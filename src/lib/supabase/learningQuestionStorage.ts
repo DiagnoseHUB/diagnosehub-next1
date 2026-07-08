@@ -2,8 +2,15 @@ import {
   canAccessRequiredPlan,
   type UserPlan,
 } from "@/config/plans";
+import {
+  LOCAL_LEARNING_CATEGORIES,
+  LOCAL_LEARNING_LESSONS,
+  LOCAL_LEARNING_MODULES,
+} from "@/data/localLearningCatalog";
 import type {
   LearningDifficulty,
+  LearningLesson,
+  LearningModule,
   LearningQuestion,
   LearningQuestionAnswerResult,
   LearningQuestionAttempt,
@@ -115,6 +122,26 @@ function normalizeLimit(value: unknown) {
   return Math.min(Math.max(Math.round(numericValue), 1), 100);
 }
 
+function normalizeSearchToken(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function includesAny(sourceValues: string[], requestedValues?: string[]) {
+  if (!requestedValues || requestedValues.length === 0) {
+    return true;
+  }
+
+  const sourceTokens = new Set(sourceValues.map(normalizeSearchToken));
+
+  return requestedValues
+    .map(normalizeSearchToken)
+    .some((requestedValue) => sourceTokens.has(requestedValue));
+}
+
+function uniqueStrings(values: string[]) {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+}
+
 function arraysEqualAsSet(firstArray: number[], secondArray: number[]) {
   const first = Array.from(new Set(firstArray)).sort((a, b) => a - b);
   const second = Array.from(new Set(secondArray)).sort((a, b) => a - b);
@@ -172,6 +199,139 @@ function convertAttemptRow(
   };
 }
 
+function convertLocalLessonQuestion(
+  lesson: LearningLesson,
+  learningModule: LearningModule,
+  quizIndex: number,
+  userPlan: UserPlan = "free"
+): LearningQuestion | null {
+  const quiz = lesson.quizQuestions[quizIndex];
+
+  if (!quiz || quiz.answers.length === 0) {
+    return null;
+  }
+
+  const category = LOCAL_LEARNING_CATEGORIES.find(
+    (entry) => entry.id === learningModule.categoryId
+  );
+  const requiredPlan = lesson.requiredPlan || learningModule.requiredPlan || "free";
+  const correctIndex = Number(quiz.correctIndex);
+
+  return {
+    id: `local-question-${lesson.slug}-${quizIndex + 1}`,
+    categoryId: learningModule.categoryId,
+    moduleId: learningModule.id,
+    lessonId: lesson.id,
+    slug: lesson.slug,
+    question: quiz.question,
+    questionType: "single_choice",
+    difficulty: lesson.difficulty,
+    requiredPlan,
+    answers: quiz.answers,
+    correctAnswerIndexes: Number.isInteger(correctIndex) ? [correctIndex] : [0],
+    explanation: quiz.explanation || "",
+    examArea: category?.title || "Lernen",
+    competenceArea: learningModule.title,
+    tags: uniqueStrings([...learningModule.tags, ...lesson.tags]),
+    relatedFaultCodes: uniqueStrings([
+      ...learningModule.relatedFaultCodes,
+      ...lesson.relatedFaultCodes,
+    ]),
+    relatedParts: uniqueStrings([
+      ...learningModule.relatedParts,
+      ...lesson.relatedParts,
+    ]),
+    relatedSystems: uniqueStrings([
+      ...learningModule.relatedSystems,
+      ...lesson.relatedSystems,
+    ]),
+    sortOrder: learningModule.sortOrder * 100 + lesson.sortOrder * 10 + quizIndex,
+    isPublished: true,
+    publishedAt: lesson.publishedAt,
+    createdAt: lesson.createdAt,
+    updatedAt: lesson.updatedAt,
+    isLocked: !canAccessPlan(userPlan, requiredPlan),
+  };
+}
+
+function loadLocalLearningQuestions(
+  filter: LearningQuestionFilter = {}
+): LearningQuestion[] {
+  const userPlan = filter.userPlan || "free";
+  const requestedCategory = filter.categorySlug
+    ? LOCAL_LEARNING_CATEGORIES.find(
+        (category) => category.slug === filter.categorySlug
+      )
+    : null;
+  const requestedModule = filter.moduleSlug
+    ? LOCAL_LEARNING_MODULES.find((module) => module.slug === filter.moduleSlug)
+    : null;
+
+  if (filter.questionType && filter.questionType !== "single_choice") {
+    return [];
+  }
+
+  return LOCAL_LEARNING_LESSONS.flatMap((lesson) => {
+    const learningModule = LOCAL_LEARNING_MODULES.find(
+      (module) => module.id === lesson.moduleId
+    );
+
+    if (!learningModule) {
+      return [];
+    }
+
+    if (requestedCategory && learningModule.categoryId !== requestedCategory.id) {
+      return [];
+    }
+
+    if (filter.categorySlug && !requestedCategory) {
+      return [];
+    }
+
+    if (requestedModule && learningModule.id !== requestedModule.id) {
+      return [];
+    }
+
+    if (filter.moduleSlug && !requestedModule) {
+      return [];
+    }
+
+    if (filter.lessonSlug && lesson.slug !== filter.lessonSlug) {
+      return [];
+    }
+
+    return lesson.quizQuestions
+      .map((_, quizIndex) =>
+        convertLocalLessonQuestion(lesson, learningModule, quizIndex, userPlan)
+      )
+      .filter((question): question is LearningQuestion => Boolean(question));
+  })
+    .filter((question) => canAccessPlan(userPlan, question.requiredPlan))
+    .filter((question) =>
+      filter.difficulty ? question.difficulty === filter.difficulty : true
+    )
+    .filter((question) => includesAny(question.tags, filter.tags))
+    .filter((question) =>
+      includesAny(question.relatedFaultCodes, filter.faultCodes)
+    )
+    .filter((question) => includesAny(question.relatedParts, filter.parts))
+    .filter((question) => includesAny(question.relatedSystems, filter.systems))
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.question.localeCompare(b.question))
+    .slice(0, normalizeLimit(filter.limit));
+}
+
+function loadLocalLearningQuestionById(
+  questionId: string,
+  userPlan: UserPlan = "free"
+) {
+  return (
+    loadLocalLearningQuestions({
+      userPlan,
+      limit: 100,
+    }).find((question) => question.id === questionId) || null
+  );
+}
+
 export async function loadPublishedLearningQuestions(
   filter: LearningQuestionFilter = {}
 ): Promise<LearningQuestion[]> {
@@ -179,6 +339,12 @@ export async function loadPublishedLearningQuestions(
 
   const userPlan = filter.userPlan || "free";
   const limit = normalizeLimit(filter.limit);
+  const localQuestions = loadLocalLearningQuestions({
+    ...filter,
+    userPlan,
+    limit,
+  });
+  let skipDatabaseQuery = false;
 
   let query = supabase
     .from("learning_questions")
@@ -227,10 +393,10 @@ export async function loadPublishedLearningQuestions(
     }
 
     if (!categoryData) {
-      return [];
+      skipDatabaseQuery = true;
+    } else {
+      query = query.eq("category_id", categoryData.id);
     }
-
-    query = query.eq("category_id", categoryData.id);
   }
 
   if (filter.moduleSlug) {
@@ -247,10 +413,10 @@ export async function loadPublishedLearningQuestions(
     }
 
     if (!moduleData) {
-      return [];
+      skipDatabaseQuery = true;
+    } else {
+      query = query.eq("module_id", moduleData.id);
     }
-
-    query = query.eq("module_id", moduleData.id);
   }
 
   if (filter.lessonSlug) {
@@ -267,27 +433,50 @@ export async function loadPublishedLearningQuestions(
     }
 
     if (!lessonData) {
-      return [];
+      skipDatabaseQuery = true;
+    } else {
+      query = query.eq("lesson_id", lessonData.id);
+    }
+  }
+
+  let databaseQuestions: LearningQuestion[] = [];
+
+  if (!skipDatabaseQuery) {
+    const { data, error } = await query;
+
+    if (error) {
+      if (localQuestions.length > 0) {
+        console.error("Fragen-Datenbank nicht erreichbar, lokale Lernfragen werden genutzt:", error);
+        return localQuestions;
+      }
+
+      throw new Error(`Fragen konnten nicht geladen werden: ${error.message}`);
     }
 
-    query = query.eq("lesson_id", lessonData.id);
+    databaseQuestions = ((data || []) as LearningQuestionDatabaseRow[])
+      .map((row) => convertQuestionRow(row, userPlan))
+      .filter((question) => canAccessPlan(userPlan, question.requiredPlan));
   }
 
-  const { data, error } = await query;
+  const seenQuestionIds = new Set(databaseQuestions.map((question) => question.id));
+  const mergedQuestions = [
+    ...databaseQuestions,
+    ...localQuestions.filter((question) => !seenQuestionIds.has(question.id)),
+  ];
 
-  if (error) {
-    throw new Error(`Fragen konnten nicht geladen werden: ${error.message}`);
-  }
-
-  return ((data || []) as LearningQuestionDatabaseRow[])
-    .map((row) => convertQuestionRow(row, userPlan))
-    .filter((question) => canAccessPlan(userPlan, question.requiredPlan));
+  return mergedQuestions
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.question.localeCompare(b.question))
+    .slice(0, limit);
 }
 
 export async function loadLearningQuestionById(
   questionId: string,
   userPlan: UserPlan = "free"
 ): Promise<LearningQuestion | null> {
+  if (questionId.startsWith("local-question-")) {
+    return loadLocalLearningQuestionById(questionId, userPlan);
+  }
+
   const supabase = createSupabaseAdminClient();
 
   const { data, error } = await supabase
@@ -303,7 +492,7 @@ export async function loadLearningQuestionById(
   }
 
   if (!data) {
-    return null;
+    return loadLocalLearningQuestionById(questionId, userPlan);
   }
 
   const question = convertQuestionRow(data as LearningQuestionDatabaseRow, userPlan);
@@ -354,6 +543,25 @@ export async function saveLearningQuestionAttempt(
 
   if (!question) {
     throw new Error("Frage wurde nicht gefunden.");
+  }
+
+  if (question.id.startsWith("local-question-")) {
+    const selectedAnswerIndexes = normalizeNumberArray(
+      params.selectedAnswerIndexes
+    );
+
+    return {
+      id: `local-attempt-${question.id}-${Date.now()}`,
+      userId: params.userId,
+      questionId: params.questionId,
+      selectedAnswerIndexes,
+      isCorrect: arraysEqualAsSet(
+        selectedAnswerIndexes,
+        question.correctAnswerIndexes
+      ),
+      answeredAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+    };
   }
 
   const selectedAnswerIndexes = normalizeNumberArray(params.selectedAnswerIndexes);

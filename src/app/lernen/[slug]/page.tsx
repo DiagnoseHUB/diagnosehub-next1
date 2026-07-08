@@ -114,6 +114,146 @@ function AccessBox({ requiredPlan }: { requiredPlan: string }) {
   );
 }
 
+function ModuleLearningGuide({ detail }: { detail: LearningModuleDetail }) {
+  const { module, lessons } = detail;
+  const relatedItems = [
+    ...module.relatedFaultCodes,
+    ...module.relatedParts,
+    ...module.relatedSystems,
+  ].slice(0, 8);
+
+  return (
+    <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
+      <div className="grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
+        <div>
+          <p className="text-sm font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            Lernauftrag
+          </p>
+          <h2 className="mt-2 text-2xl font-black text-slate-950 dark:text-slate-100">
+            So wird aus Wissen ein Prüfweg
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
+            Arbeite das Modul nicht nur lesend durch. Formuliere nach jeder
+            Lektion einen konkreten Prüfpunkt, einen passenden Soll-/Ist-Vergleich
+            und eine Abschlussprüfung.
+          </p>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div>
+            <p className="text-2xl font-black text-slate-950 dark:text-slate-100">
+              {lessons.length}
+            </p>
+            <p className="mt-1 text-xs font-bold text-slate-500">Lektionen</p>
+          </div>
+
+          <div>
+            <p className="text-2xl font-black text-slate-950 dark:text-slate-100">
+              {module.estimatedMinutes}
+            </p>
+            <p className="mt-1 text-xs font-bold text-slate-500">Minuten</p>
+          </div>
+
+          <div>
+            <p className="text-2xl font-black text-slate-950 dark:text-slate-100">
+              {getDifficultyLabel(module.difficulty)}
+            </p>
+            <p className="mt-1 text-xs font-bold text-slate-500">Stufe</p>
+          </div>
+        </div>
+      </div>
+
+      {relatedItems.length > 0 && (
+        <div className="mt-5 flex flex-wrap gap-2">
+          {relatedItems.map((item) => (
+            <span
+              key={item}
+              className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-slate-600 dark:border-slate-800 dark:text-slate-300"
+            >
+              {item}
+            </span>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function LessonLearningTransfer({ detail }: { detail: LearningLessonDetail }) {
+  const { lesson, module } = detail;
+  const relatedItems = [
+    ...lesson.relatedFaultCodes,
+    ...lesson.relatedParts,
+    ...lesson.relatedSystems,
+    ...lesson.tags,
+  ].slice(0, 8);
+
+  return (
+    <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
+      <p className="text-sm font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        Lernauftrag
+      </p>
+      <h2 className="mt-2 text-2xl font-black text-slate-950 dark:text-slate-100">
+        Verstehen, prüfen, beweisen
+      </h2>
+
+      <div className="mt-5 grid gap-5 md:grid-cols-3">
+        <div>
+          <p className="text-xs font-black uppercase tracking-wide text-blue-700 dark:text-blue-300">
+            1. Verstehen
+          </p>
+          <h3 className="mt-2 font-black text-slate-950 dark:text-slate-100">
+            Systemfunktion erklären
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
+            Beschreibe, welche Aufgabe {module.title} im Fahrzeug erfüllt und
+            welche Eingangsgrößen, Ausgänge oder Rückmeldungen wichtig sind.
+          </p>
+        </div>
+
+        <div>
+          <p className="text-xs font-black uppercase tracking-wide text-blue-700 dark:text-blue-300">
+            2. Prüfen
+          </p>
+          <h3 className="mt-2 font-black text-slate-950 dark:text-slate-100">
+            Messpunkt festlegen
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
+            Nenne Sichtprüfung, Versorgung, Masse, Signal, Istwert oder
+            Funktionsprüfung. Sollwerte immer nach Herstellervorgabe verwenden.
+          </p>
+        </div>
+
+        <div>
+          <p className="text-xs font-black uppercase tracking-wide text-blue-700 dark:text-blue-300">
+            3. Beweisen
+          </p>
+          <h3 className="mt-2 font-black text-slate-950 dark:text-slate-100">
+            Entscheidung begründen
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
+            Zeige, welche Ursache belegt ist, welche Alternativen ausgeschlossen
+            wurden und wie die Abschlussprüfung aussieht.
+          </p>
+        </div>
+      </div>
+
+      {relatedItems.length > 0 && (
+        <div className="mt-5 flex flex-wrap gap-2">
+          {relatedItems.map((item) => (
+            <span
+              key={item}
+              className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-slate-600 dark:border-slate-800 dark:text-slate-300"
+            >
+              {item}
+            </span>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function ModulePage({ detail }: { detail: LearningModuleDetail }) {
   const { category, module, lessons, hasAccess } = detail;
 
@@ -183,6 +323,8 @@ function ModulePage({ detail }: { detail: LearningModuleDetail }) {
 
           {hasAccess && (
             <PlanAccessGate feature="learning">
+              <ModuleLearningGuide detail={detail} />
+
               <section className="mt-8">
                 <h2 className="text-2xl font-black text-slate-950 dark:text-slate-100">
                   Lektionen
@@ -286,6 +428,8 @@ function LessonPage({ detail }: { detail: LearningLessonDetail }) {
                 }}
                 estimatedMinutes={lesson.estimatedMinutes}
               />
+
+              <LessonLearningTransfer detail={detail} />
 
               <section className="mt-8 space-y-5">
                 {lesson.contentBlocks.map(renderContentBlock)}

@@ -249,7 +249,7 @@ export default function DatenschutzPage() {
 
             <section>
               <h2 className="text-2xl font-bold text-white">
-                10. Empfaenger und eingesetzte Dienstleister
+                10. Empfänger und eingesetzte Dienstleister
               </h2>
 
               <p className="mt-4">

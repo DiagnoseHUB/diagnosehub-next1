@@ -132,7 +132,7 @@ function Footer() {
               </span>
 
               <span className="rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-bold text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300">
-                Version 0.2
+                Version 0.9
               </span>
             </div>
           </div>

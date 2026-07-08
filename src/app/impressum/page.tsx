@@ -86,7 +86,7 @@ export default function ImpressumPage() {
 
               <p className="mt-4">
                 DiagnoseHUB befindet sich aktuell in einer technischen
-                Beta-Phase. Die Plattform dient der digitalen Unterstuetzung bei
+                Beta-Phase. Die Plattform dient der digitalen Unterstützung bei
                 Kfz-Diagnose, Dokumentation und Lernfunktionen.
               </p>
 
@@ -106,8 +106,8 @@ export default function ImpressumPage() {
               </h2>
 
               <p className="mt-4">
-                Die Inhalte dieser Website werden mit groeßtmöglicher Sorgfalt
-                erstellt. Für Richtigkeit, Vollständigkeit und Aktualitaet der
+                Die Inhalte dieser Website werden mit größtmöglicher Sorgfalt
+                erstellt. Für Richtigkeit, Vollständigkeit und Aktualität der
                 Inhalte kann jedoch keine Gewähr übernommen werden.
               </p>
             </section>
@@ -130,8 +130,8 @@ export default function ImpressumPage() {
 
               <p className="mt-4">
                 Die durch den Seitenbetreiber erstellten Inhalte und Werke auf
-                dieser Website unterliegen dem deutschen Urheberrecht. Beitraege
-                Dritter werden als solche gekennzeichnet. Eine Vervielfaeltigung,
+                dieser Website unterliegen dem deutschen Urheberrecht. Beiträge
+                Dritter werden als solche gekennzeichnet. Eine Vervielfältigung,
                 Bearbeitung, Verbreitung oder sonstige Verwertung außerhalb der
                 Grenzen des Urheberrechts bedarf der vorherigen schriftlichen
                 Zustimmung des jeweiligen Rechteinhabers.

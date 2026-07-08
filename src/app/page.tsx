@@ -69,22 +69,32 @@ const workflowSteps = [
 
 const audienceCards = [
   {
+    title: "Hobby-Schrauber",
+    description:
+      "Normale Sprache, klare Risiken und eine Einstufung, was selbst machbar ist und was in die Werkstatt gehört.",
+    href: "/login?setup=profile",
+    cta: "Account einrichten",
+  },
+  {
+    title: "Werkstätten",
+    description:
+      "Fehlerfälle strukturieren, Ursachen eingrenzen und Arbeitsabläufe nachvollziehbar dokumentieren.",
+    href: "/login?setup=profile",
+    cta: "Account einrichten",
+  },
+  {
     title: "Azubis",
     description:
       "Diagnosewege verstehen, Prüfungsfragen üben und technische Zusammenhänge greifbar machen.",
     href: "/azubis",
+    cta: "Mehr erfahren",
   },
   {
     title: "Schulen",
     description:
       "Fallbasierter Unterricht mit klaren Aufgaben, Fachgespräch und prüfungsnahen Abläufen.",
     href: "/schulen",
-  },
-  {
-    title: "Werkstätten",
-    description:
-      "Fehlerfälle strukturieren, Ursachen eingrenzen und Arbeitsabläufe nachvollziehbar dokumentieren.",
-    href: "/werkstaetten",
+    cta: "Mehr erfahren",
   },
 ];
 
@@ -296,11 +306,11 @@ export default function HomePage() {
                 Zielgruppen
               </p>
               <h2 className="mt-3 text-3xl font-black text-slate-950 dark:text-white">
-                Der passende Einstieg für dich
+                Hobby oder Werkstatt einrichten
               </h2>
             </div>
 
-            <div className="grid gap-5 md:grid-cols-3">
+            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
               {audienceCards.map((group) => (
                 <Link
                   key={group.href}
@@ -314,7 +324,7 @@ export default function HomePage() {
                     {group.description}
                   </p>
                   <p className="mt-5 text-sm font-black text-blue-700 dark:text-blue-300">
-                    Mehr erfahren
+                    {group.cta}
                   </p>
                 </Link>
               ))}

@@ -31,6 +31,39 @@ function jsonError(message: string, status: number) {
   return NextResponse.json({ ok: false, error: message }, { status });
 }
 
+function getReadableErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (error && typeof error === "object") {
+    const errorRecord = error as {
+      message?: unknown;
+      details?: unknown;
+      hint?: unknown;
+      code?: unknown;
+    };
+    const parts = [
+      errorRecord.message,
+      errorRecord.details,
+      errorRecord.hint,
+      errorRecord.code,
+    ].filter((part): part is string => {
+      return typeof part === "string" && part.trim().length > 0;
+    });
+
+    if (parts.length > 0) {
+      return parts.join(" ");
+    }
+  }
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  return "";
+}
+
 function cleanText(value: unknown, fallback: string, maxLength: number) {
   if (typeof value !== "string") {
     return fallback;
@@ -168,7 +201,7 @@ async function loadActiveDevices(
 }
 
 function getMissingMigrationMessage(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = getReadableErrorMessage(error);
 
   if (
     message.includes("device_registrations") ||

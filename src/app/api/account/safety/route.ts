@@ -25,6 +25,30 @@ type HvAccessPayload = {
   safetyConfirmation?: unknown;
 };
 
+type WorkshopSafetySettingsRow = {
+  id: string;
+  full_name?: string | null;
+  workshop_name?: string | null;
+  email?: string | null;
+  role?: string | null;
+  plan?: string | null;
+  account_type?: string | null;
+  qualification_level?: string | null;
+  company_name?: string | null;
+  company_address?: string | null;
+  company_phone?: string | null;
+  company_website?: string | null;
+  company_verified?: boolean | null;
+  hv_qualification?: string | null;
+  hv_certificate_url?: string | null;
+  hv_training_provider?: string | null;
+  hv_training_date?: string | null;
+  hv_certificate_name?: string | null;
+  hv_verified?: boolean | null;
+  terms_safety_accepted_at?: string | null;
+  risk_access_level?: string | null;
+};
+
 function text(value: unknown, maxLength = 220) {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
 }
@@ -82,10 +106,50 @@ function riskAccessLevelFromAccountType(value: string) {
   return "yellow";
 }
 
+function toSafetySettings(row: WorkshopSafetySettingsRow | null) {
+  return {
+    accountType: row?.account_type || "private",
+    role: row?.role || "private",
+    companyName: row?.company_name || row?.workshop_name || "",
+    companyAddress: row?.company_address || "",
+    companyPhone: row?.company_phone || "",
+    companyWebsite: row?.company_website || "",
+    companyVerified: row?.company_verified === true,
+    hvQualification: row?.hv_qualification || "none",
+    hvCertificateUrl: row?.hv_certificate_url || "",
+    hvTrainingProvider: row?.hv_training_provider || "",
+    hvTrainingDate: row?.hv_training_date || "",
+    hvCertificateName: row?.hv_certificate_name || "",
+    hvVerified: row?.hv_verified === true,
+    termsSafetyAcceptedAt: row?.terms_safety_accepted_at || null,
+    riskAccessLevel: row?.risk_access_level || "yellow",
+  };
+}
+
+async function loadSafetySettings(
+  supabase: Awaited<ReturnType<typeof loadAuthenticatedUserFromRequest>>["supabase"],
+  userId: string
+) {
+  const { data, error } = await supabase
+    .from("workshop_profiles")
+    .select(
+      "id, full_name, workshop_name, email, role, plan, account_type, qualification_level, company_name, company_address, company_phone, company_website, company_verified, hv_qualification, hv_certificate_url, hv_training_provider, hv_training_date, hv_certificate_name, hv_verified, terms_safety_accepted_at, risk_access_level"
+    )
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return (data || null) as WorkshopSafetySettingsRow | null;
+}
+
 export async function GET(request: Request) {
   try {
     const { user, supabase } = await loadAuthenticatedUserFromRequest(request);
     const profile = await loadSafetyProfile(supabase, user);
+    const settings = await loadSafetySettings(supabase, user.id);
     const { data: hvRequests, error } = await supabase
       .from("hv_access_requests")
       .select("*")
@@ -99,6 +163,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       profile,
+      settings: toSafetySettings(settings),
       hvRequests: hvRequests || [],
     });
   } catch (error) {
@@ -120,13 +185,27 @@ export async function PATCH(request: Request) {
     const payload = (await request.json().catch(() => ({}))) as SafetyProfilePayload;
     const nextAccountType = accountType(payload.accountType);
     const now = new Date().toISOString();
+    const existingSettings = await loadSafetySettings(supabase, user.id);
+    const companyName = text(payload.companyName);
 
     const updatePayload = {
+      id: user.id,
+      full_name:
+        existingSettings?.full_name ||
+        user.email?.split("@")[0] ||
+        "DiagnoseHUB Nutzer",
+      workshop_name:
+        companyName ||
+        existingSettings?.workshop_name ||
+        existingSettings?.company_name ||
+        "Nicht angegeben",
+      email: existingSettings?.email || user.email || "",
+      plan: existingSettings?.plan || "free",
       account_type: nextAccountType,
       qualification_level:
         nextAccountType === "private" ? "none" : "self_declared",
       role: role(payload.role),
-      company_name: text(payload.companyName),
+      company_name: companyName,
       company_address: text(payload.companyAddress, 500),
       company_phone: text(payload.companyPhone, 80),
       company_website: text(payload.companyWebsite, 220),
@@ -137,8 +216,7 @@ export async function PATCH(request: Request) {
 
     const { data, error } = await supabase
       .from("workshop_profiles")
-      .update(updatePayload)
-      .eq("id", user.id)
+      .upsert(updatePayload, { onConflict: "id" })
       .select("*")
       .single();
 
@@ -165,7 +243,12 @@ export async function PATCH(request: Request) {
       },
     });
 
-    return NextResponse.json({ profile: data });
+    const profile = await loadSafetyProfile(supabase, user);
+
+    return NextResponse.json({
+      profile,
+      settings: toSafetySettings(data as WorkshopSafetySettingsRow),
+    });
   } catch (error) {
     return NextResponse.json(
       {
@@ -183,6 +266,7 @@ export async function POST(request: Request) {
   try {
     const { user, supabase } = await loadAuthenticatedUserFromRequest(request);
     const payload = (await request.json().catch(() => ({}))) as HvAccessPayload;
+    const profile = await loadSafetyProfile(supabase, user);
 
     if (payload.safetyConfirmation !== true) {
       return NextResponse.json(
@@ -221,9 +305,9 @@ export async function POST(request: Request) {
       source: "account",
       risk_class: "hv",
       access_decision: "limited",
-      account_type: "private",
-      qualification_level: "none",
-      hv_verified: false,
+      account_type: profile.accountType,
+      qualification_level: profile.qualificationLevel,
+      hv_verified: profile.hvVerified,
       warning_type: "hv",
       safety_warning:
         "Nutzer hat Hochvolt-Zugang beantragt. Freischaltung erfolgt erst nach manueller Prüfung.",

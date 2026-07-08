@@ -36,6 +36,129 @@ import {
 } from "@/services/workshopProfileSupabase";
 
 const DEFAULT_ROLE = "Privatnutzer";
+type SafetyAccountType = "private" | "mechanic" | "workshop";
+type SafetyRole =
+  | "private"
+  | "azubi"
+  | "geselle"
+  | "meister"
+  | "inhaber"
+  | "serviceberater"
+  | "sonstige";
+type HvQualification = "none" | "hv1" | "hv2" | "hv3" | "other";
+type RiskAccessLevel = "green" | "yellow" | "orange" | "red" | "hv";
+type QualificationLevel =
+  | "none"
+  | "self_declared"
+  | "verified_workshop"
+  | "hv_verified";
+type HvRequestStatus = "pending" | "approved" | "rejected";
+
+type SafetyProfileState = {
+  accountType: SafetyAccountType | "admin";
+  role: string;
+  qualificationLevel: QualificationLevel;
+  companyVerified: boolean;
+  hvVerified: boolean;
+  hvQualification: HvQualification;
+  riskAccessLevel: RiskAccessLevel;
+  termsSafetyAcceptedAt: string | null;
+};
+
+type SafetySettingsState = {
+  accountType: SafetyAccountType;
+  role: SafetyRole;
+  companyName: string;
+  companyAddress: string;
+  companyPhone: string;
+  companyWebsite: string;
+  companyVerified: boolean;
+  hvQualification: HvQualification;
+  hvCertificateUrl: string;
+  hvTrainingProvider: string;
+  hvTrainingDate: string;
+  hvCertificateName: string;
+  hvVerified: boolean;
+  termsSafetyAcceptedAt: string | null;
+  riskAccessLevel: RiskAccessLevel;
+};
+
+type HvAccessRequest = {
+  id: string;
+  status: HvRequestStatus;
+  hv_qualification: HvQualification;
+  training_provider?: string | null;
+  training_date?: string | null;
+  certificate_name?: string | null;
+  company_name?: string | null;
+  review_comment?: string | null;
+  created_at: string;
+  reviewed_at?: string | null;
+};
+
+const safetyAccountTypeLabels: Record<SafetyAccountType | "admin", string> = {
+  private: "Privatnutzer",
+  mechanic: "Mechaniker",
+  workshop: "Werkstatt",
+  admin: "Admin",
+};
+
+const safetyRoleLabels: Record<SafetyRole, string> = {
+  private: "Privatnutzer",
+  azubi: "Azubi",
+  geselle: "Geselle",
+  meister: "Meister",
+  inhaber: "Inhaber",
+  serviceberater: "Serviceberater",
+  sonstige: "Sonstige",
+};
+
+const qualificationLabels: Record<QualificationLevel, string> = {
+  none: "Keine Prüfung",
+  self_declared: "Selbst angegeben",
+  verified_workshop: "Werkstatt geprüft",
+  hv_verified: "Hochvolt geprüft",
+};
+
+const hvQualificationLabels: Record<HvQualification, string> = {
+  none: "Keine",
+  hv1: "HV 1",
+  hv2: "HV 2",
+  hv3: "HV 3",
+  other: "Andere HV-Qualifikation",
+};
+
+const hvRequestStatusLabels: Record<HvRequestStatus, string> = {
+  pending: "Prüfung offen",
+  approved: "Freigegeben",
+  rejected: "Abgelehnt",
+};
+
+const riskAccessLabels: Record<RiskAccessLevel, string> = {
+  green: "Basis",
+  yellow: "Gelb",
+  orange: "Orange",
+  red: "Rot",
+  hv: "Hochvolt",
+};
+
+const defaultSafetySettings: SafetySettingsState = {
+  accountType: "private",
+  role: "private",
+  companyName: "",
+  companyAddress: "",
+  companyPhone: "",
+  companyWebsite: "",
+  companyVerified: false,
+  hvQualification: "none",
+  hvCertificateUrl: "",
+  hvTrainingProvider: "",
+  hvTrainingDate: "",
+  hvCertificateName: "",
+  hvVerified: false,
+  termsSafetyAcceptedAt: null,
+  riskAccessLevel: "yellow",
+};
 
 const setupSteps = [
   {
@@ -96,6 +219,50 @@ function getSafePlanConfig(plan: unknown) {
   return PLAN_CONFIG[normalizeUserPlan(plan)];
 }
 
+function normalizeSafetyAccountType(value: unknown): SafetyAccountType {
+  if (value === "mechanic" || value === "workshop") {
+    return value;
+  }
+
+  return "private";
+}
+
+function normalizeSafetyRole(value: unknown): SafetyRole {
+  if (
+    value === "private" ||
+    value === "azubi" ||
+    value === "geselle" ||
+    value === "meister" ||
+    value === "inhaber" ||
+    value === "serviceberater" ||
+    value === "sonstige"
+  ) {
+    return value;
+  }
+
+  const textValue = typeof value === "string" ? value.toLowerCase() : "";
+
+  if (textValue.includes("azubi")) return "azubi";
+  if (textValue.includes("geselle") || textValue.includes("mechaniker")) {
+    return "geselle";
+  }
+  if (textValue.includes("meister")) return "meister";
+  if (textValue.includes("inhaber") || textValue.includes("werkstatt")) {
+    return "inhaber";
+  }
+  if (textValue.includes("service")) return "serviceberater";
+
+  return "private";
+}
+
+function normalizeHvQualification(value: unknown): HvQualification {
+  if (value === "hv1" || value === "hv2" || value === "hv3" || value === "other") {
+    return value;
+  }
+
+  return "none";
+}
+
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string) {
   let timeoutId: number | null = null;
 
@@ -154,6 +321,17 @@ export default function LoginPage() {
     null
   );
   const [deviceLoading, setDeviceLoading] = useState(false);
+  const [safetyProfile, setSafetyProfile] =
+    useState<SafetyProfileState | null>(null);
+  const [safetySettings, setSafetySettings] =
+    useState<SafetySettingsState>(defaultSafetySettings);
+  const [hvAccessRequests, setHvAccessRequests] = useState<HvAccessRequest[]>(
+    []
+  );
+  const [safetyLoading, setSafetyLoading] = useState(false);
+  const [hvRequestLoading, setHvRequestLoading] = useState(false);
+  const [safetyTermsAccepted, setSafetyTermsAccepted] = useState(false);
+  const [hvSafetyConfirmation, setHvSafetyConfirmation] = useState(false);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
 
@@ -198,6 +376,7 @@ export default function LoginPage() {
       if (data.session?.user) {
         const profile = await loadWorkshopProfile(data.session.user);
         await loadDeviceAccess(data.session);
+        await loadSafetyProfile(data.session);
 
         if (shouldOpenProfile || !profile) {
           openProfileSetup(
@@ -225,6 +404,11 @@ export default function LoginPage() {
           setDatabaseProfile(null);
           setSavedAccount(null);
           setDeviceAccess(null);
+          setSafetyProfile(null);
+          setSafetySettings(defaultSafetySettings);
+          setHvAccessRequests([]);
+          setSafetyTermsAccepted(false);
+          setHvSafetyConfirmation(false);
           setName("");
           setWorkshop("");
           setRole(DEFAULT_ROLE);
@@ -236,6 +420,7 @@ export default function LoginPage() {
           void (async () => {
             const profile = await loadWorkshopProfile(nextSession.user);
             await loadDeviceAccess(nextSession);
+            await loadSafetyProfile(nextSession);
 
             if (!profile) {
               openProfileSetup(
@@ -292,6 +477,80 @@ export default function LoginPage() {
       setDeviceAccess(null);
     } finally {
       setDeviceLoading(false);
+    }
+  }
+
+  function applySafetyState(
+    profile?: SafetyProfileState | null,
+    settings?: Partial<SafetySettingsState> | null,
+    requests?: HvAccessRequest[]
+  ) {
+    const nextSettings = {
+      ...defaultSafetySettings,
+      ...settings,
+      accountType: normalizeSafetyAccountType(settings?.accountType),
+      role: normalizeSafetyRole(settings?.role),
+      hvQualification: normalizeHvQualification(settings?.hvQualification),
+      companyName:
+        settings?.companyName ||
+        workshop.trim() ||
+        databaseProfile?.workshop_name ||
+        "",
+    };
+
+    setSafetyProfile(profile ?? null);
+    setSafetySettings(nextSettings);
+    setSafetyTermsAccepted(Boolean(nextSettings.termsSafetyAcceptedAt));
+    setHvAccessRequests(Array.isArray(requests) ? requests : []);
+  }
+
+  async function loadSafetyProfile(existingSession?: Session | null) {
+    setSafetyLoading(true);
+
+    try {
+      const session =
+        existingSession ??
+        (await supabase.auth.getSession()).data.session ??
+        null;
+
+      if (!session?.access_token) {
+        setSafetyProfile(null);
+        setSafetySettings(defaultSafetySettings);
+        setHvAccessRequests([]);
+        return;
+      }
+
+      const { response, data } = await fetchJsonWithTimeout<{
+        profile?: SafetyProfileState;
+        settings?: Partial<SafetySettingsState>;
+        hvRequests?: HvAccessRequest[];
+        error?: string;
+      }>(
+        "/api/account/safety",
+        {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        },
+        9000
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Sicherheitsprofil konnte nicht geladen werden."
+        );
+      }
+
+      applySafetyState(data.profile, data.settings, data.hvRequests);
+    } catch (error) {
+      console.error("Sicherheitsprofil konnte nicht geladen werden:", error);
+      setSafetyProfile(null);
+      setHvAccessRequests([]);
+      setError(
+        `Sicherheitsprofil konnte nicht geladen werden: ${getErrorMessage(error)}`
+      );
+    } finally {
+      setSafetyLoading(false);
     }
   }
 
@@ -445,6 +704,7 @@ export default function LoginPage() {
 
         if (data.session) {
           await loadDeviceAccess(data.session);
+          await loadSafetyProfile(data.session);
         }
 
         return;
@@ -509,6 +769,7 @@ export default function LoginPage() {
 
             if (data.session) {
               await loadDeviceAccess(data.session);
+              await loadSafetyProfile(data.session);
             }
           } catch (setupError) {
             console.error("Login-Nachbereitung fehlgeschlagen:", setupError);
@@ -631,6 +892,11 @@ export default function LoginPage() {
       setDatabaseProfile(null);
       setSavedAccount(null);
       setDeviceAccess(null);
+      setSafetyProfile(null);
+      setSafetySettings(defaultSafetySettings);
+      setHvAccessRequests([]);
+      setSafetyTermsAccepted(false);
+      setHvSafetyConfirmation(false);
       setName("");
       setWorkshop("");
       setRole(DEFAULT_ROLE);
@@ -681,6 +947,14 @@ export default function LoginPage() {
       });
 
       applyProfileToState(profile, user);
+      setSafetySettings((currentSettings) => ({
+        ...currentSettings,
+        companyName:
+          currentSettings.companyName ||
+          cleanWorkshop ||
+          profile.workshop_name ||
+          "",
+      }));
       setProfileGuidance("");
 
       showSuccess(
@@ -692,6 +966,155 @@ export default function LoginPage() {
       );
     } finally {
       setProfileLoading(false);
+    }
+  }
+
+  async function saveSafetyProfile() {
+    setError("");
+    setSuccess("");
+
+    if (!user) {
+      setError("Bitte zuerst einloggen.");
+      return;
+    }
+
+    if (!safetyTermsAccepted) {
+      setError(
+        "Bitte bestätige die Sicherheits- und Datenhinweise, bevor du die Einstufung speicherst."
+      );
+      return;
+    }
+
+    setSafetyLoading(true);
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+
+      if (!accessToken) {
+        throw new Error("Bitte zuerst einloggen.");
+      }
+
+      const { response, data } = await fetchJsonWithTimeout<{
+        profile?: SafetyProfileState;
+        settings?: Partial<SafetySettingsState>;
+        error?: string;
+      }>(
+        "/api/account/safety",
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            accountType: safetySettings.accountType,
+            role: safetySettings.role,
+            companyName:
+              safetySettings.companyName.trim() || workshop.trim(),
+            companyAddress: safetySettings.companyAddress,
+            companyPhone: safetySettings.companyPhone,
+            companyWebsite: safetySettings.companyWebsite,
+            safetyTermsAccepted,
+          }),
+        },
+        12000
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Sicherheitsprofil konnte nicht gespeichert werden."
+        );
+      }
+
+      applySafetyState(data.profile, data.settings, hvAccessRequests);
+      await loadWorkshopProfile(user);
+      notifyWorkshopProfileChanged();
+      showSuccess(
+        "Sicherheitsprofil wurde gespeichert. Die Anzeige im Dashboard nutzt diese Einstufung."
+      );
+    } catch (error) {
+      setError(
+        `Sicherheitsprofil konnte nicht gespeichert werden: ${getErrorMessage(error)}`
+      );
+    } finally {
+      setSafetyLoading(false);
+    }
+  }
+
+  async function requestHvAccess() {
+    setError("");
+    setSuccess("");
+
+    if (!user) {
+      setError("Bitte zuerst einloggen.");
+      return;
+    }
+
+    if (!hvSafetyConfirmation) {
+      setError(
+        "Bitte bestätige, dass Hochvolt-Arbeiten nur mit passender Qualifikation und nach Herstellervorgaben durchgeführt werden."
+      );
+      return;
+    }
+
+    if (safetySettings.hvQualification === "none") {
+      setError("Bitte wähle deine Hochvolt-Qualifikation aus.");
+      return;
+    }
+
+    setHvRequestLoading(true);
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+
+      if (!accessToken) {
+        throw new Error("Bitte zuerst einloggen.");
+      }
+
+      const { response, data } = await fetchJsonWithTimeout<{
+        hvRequest?: HvAccessRequest;
+        error?: string;
+      }>(
+        "/api/account/safety",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            hvQualification: safetySettings.hvQualification,
+            trainingProvider: safetySettings.hvTrainingProvider,
+            trainingDate: safetySettings.hvTrainingDate,
+            certificateUrl: safetySettings.hvCertificateUrl,
+            certificateName: safetySettings.hvCertificateName,
+            companyName:
+              safetySettings.companyName.trim() || workshop.trim(),
+            safetyConfirmation: hvSafetyConfirmation,
+          }),
+        },
+        12000
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Hochvolt-Antrag konnte nicht gespeichert werden."
+        );
+      }
+
+      await loadSafetyProfile(sessionData.session);
+      setHvSafetyConfirmation(false);
+      showSuccess(
+        "Hochvolt-Antrag wurde gespeichert. Freigabe erfolgt erst nach manueller Prüfung."
+      );
+    } catch (error) {
+      setError(
+        `Hochvolt-Antrag konnte nicht gespeichert werden: ${getErrorMessage(error)}`
+      );
+    } finally {
+      setHvRequestLoading(false);
     }
   }
 
@@ -903,13 +1326,13 @@ export default function LoginPage() {
                     </p>
                     <h2 className="mt-3 text-2xl font-black text-slate-950 dark:text-white">
                       {deviceAccess
-                        ? `${deviceAccess.activeDeviceCount}/${deviceAccess.maxDevices} Geräte aktiv`
+                        ? deviceAccess.ok
+                          ? `${deviceAccess.activeDeviceCount}/${deviceAccess.maxDevices} Geräte aktiv`
+                          : "Geräteprüfung offen"
                         : "Geräte werden geprüft"}
                     </h2>
                     <p className="mt-2 leading-7 text-slate-600 dark:text-slate-300">
-                      {deviceAccess?.accountType === "workshop"
-                        ? "Werkstattkonten können bis zu 3 Geräte nutzen."
-                        : "Private Konten können bis zu 2 Geräte nutzen."}
+                      Erlaubt sind 3 aktive Geräte/Sessions pro Account.
                     </p>
                   </div>
 
@@ -923,9 +1346,10 @@ export default function LoginPage() {
                   </button>
                 </div>
 
-                {deviceAccess?.error && (
+                {deviceAccess && !deviceAccess.ok && (
                   <div className="mt-4 rounded-2xl border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm leading-6 text-yellow-800 dark:border-yellow-500/30 dark:bg-yellow-500/10 dark:text-yellow-200">
-                    {deviceAccess.error}
+                    {deviceAccess.error ||
+                      "Gerätezugriff konnte nicht geprüft werden. Bitte später erneut versuchen."}
                   </div>
                 )}
 
@@ -1216,6 +1640,381 @@ export default function LoginPage() {
                     disabled={!user || profileLoading}
                     className="w-full rounded-2xl border border-slate-300 bg-white px-5 py-4 text-slate-950 outline-none placeholder:text-slate-400 focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-600"
                   />
+                </div>
+              </div>
+
+              <div className="mt-8 rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950/70">
+                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <p className="text-sm font-black uppercase tracking-wide text-blue-700 dark:text-blue-300">
+                      Sicherheits- und Qualifikationsprofil
+                    </p>
+                    <h3 className="mt-2 text-xl font-black text-slate-950 dark:text-white">
+                      Einstufung für Anleitungen
+                    </h3>
+                    <p className="mt-2 leading-7 text-slate-600 dark:text-slate-300">
+                      Diese Angaben beeinflussen, wie sicherheitskritische
+                      Inhalte angezeigt werden. Höhere Freigaben werden manuell
+                      geprüft.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => void loadSafetyProfile()}
+                    disabled={!user || safetyLoading}
+                    className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-800"
+                  >
+                    {safetyLoading ? "Lädt..." : "Aktualisieren"}
+                  </button>
+                </div>
+
+                <div className="mt-5 grid gap-3 md:grid-cols-4">
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                    <p className="text-sm text-slate-500">Kontotyp</p>
+                    <p className="mt-2 font-black text-slate-950 dark:text-white">
+                      {safetyProfile
+                        ? safetyAccountTypeLabels[safetyProfile.accountType]
+                        : "Nicht geladen"}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                    <p className="text-sm text-slate-500">Qualifikation</p>
+                    <p className="mt-2 font-black text-slate-950 dark:text-white">
+                      {safetyProfile
+                        ? qualificationLabels[safetyProfile.qualificationLevel]
+                        : "Nicht geladen"}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                    <p className="text-sm text-slate-500">Freigabestufe</p>
+                    <p className="mt-2 font-black text-slate-950 dark:text-white">
+                      {safetyProfile
+                        ? riskAccessLabels[safetyProfile.riskAccessLevel]
+                        : "Nicht geladen"}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                    <p className="text-sm text-slate-500">Hochvolt</p>
+                    <p className="mt-2 font-black text-slate-950 dark:text-white">
+                      {safetyProfile?.hvVerified
+                        ? `${hvQualificationLabels[safetyProfile.hvQualification]} freigegeben`
+                        : hvAccessRequests[0]
+                          ? hvRequestStatusLabels[hvAccessRequests[0].status]
+                          : "Nicht freigegeben"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-6 grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                      Kontotyp
+                    </label>
+                    <select
+                      value={safetySettings.accountType}
+                      onChange={(event) =>
+                        setSafetySettings((currentSettings) => ({
+                          ...currentSettings,
+                          accountType: event.target.value as SafetyAccountType,
+                        }))
+                      }
+                      disabled={!user || safetyLoading}
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-5 py-4 text-slate-950 outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                    >
+                      <option value="private">Privatnutzer</option>
+                      <option value="mechanic">Mechaniker</option>
+                      <option value="workshop">Werkstatt</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                      Tätigkeit
+                    </label>
+                    <select
+                      value={safetySettings.role}
+                      onChange={(event) =>
+                        setSafetySettings((currentSettings) => ({
+                          ...currentSettings,
+                          role: event.target.value as SafetyRole,
+                        }))
+                      }
+                      disabled={!user || safetyLoading}
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-5 py-4 text-slate-950 outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                    >
+                      {Object.entries(safetyRoleLabels).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                      Betrieb/Firma für Einstufung
+                    </label>
+                    <input
+                      value={safetySettings.companyName}
+                      onChange={(event) =>
+                        setSafetySettings((currentSettings) => ({
+                          ...currentSettings,
+                          companyName: event.target.value,
+                        }))
+                      }
+                      placeholder="Optional, z. B. KFZ Musterbetrieb"
+                      disabled={!user || safetyLoading}
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-5 py-4 text-slate-950 outline-none placeholder:text-slate-400 focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                      Telefon
+                    </label>
+                    <input
+                      value={safetySettings.companyPhone}
+                      onChange={(event) =>
+                        setSafetySettings((currentSettings) => ({
+                          ...currentSettings,
+                          companyPhone: event.target.value,
+                        }))
+                      }
+                      placeholder="Optional"
+                      disabled={!user || safetyLoading}
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-5 py-4 text-slate-950 outline-none placeholder:text-slate-400 focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-600"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                      Anschrift
+                    </label>
+                    <input
+                      value={safetySettings.companyAddress}
+                      onChange={(event) =>
+                        setSafetySettings((currentSettings) => ({
+                          ...currentSettings,
+                          companyAddress: event.target.value,
+                        }))
+                      }
+                      placeholder="Optional"
+                      disabled={!user || safetyLoading}
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-5 py-4 text-slate-950 outline-none placeholder:text-slate-400 focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-600"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                      Website
+                    </label>
+                    <input
+                      value={safetySettings.companyWebsite}
+                      onChange={(event) =>
+                        setSafetySettings((currentSettings) => ({
+                          ...currentSettings,
+                          companyWebsite: event.target.value,
+                        }))
+                      }
+                      placeholder="Optional"
+                      disabled={!user || safetyLoading}
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-5 py-4 text-slate-950 outline-none placeholder:text-slate-400 focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-600"
+                    />
+                  </div>
+                </div>
+
+                <label className="mt-5 flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                  <input
+                    type="checkbox"
+                    checked={safetyTermsAccepted}
+                    onChange={(event) =>
+                      setSafetyTermsAccepted(event.target.checked)
+                    }
+                    disabled={!user || safetyLoading}
+                    className="mt-1 h-4 w-4 shrink-0"
+                  />
+                  <span>
+                    Ich bestätige, dass meine Angaben korrekt eingetragen wurden
+                    und dass DiagnoseHUB diese Daten so verarbeitet, wie sie
+                    eingegeben wurden. DiagnoseHUB übernimmt keine Verantwortung
+                    für Richtigkeit, Vollständigkeit oder Aktualität der
+                    angegebenen Daten.
+                  </span>
+                </label>
+
+                <button
+                  type="button"
+                  onClick={saveSafetyProfile}
+                  disabled={!user || safetyLoading}
+                  className="mt-5 rounded-2xl bg-blue-600 px-5 py-3 font-bold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {safetyLoading ? "Speichert..." : "Qualifikation speichern"}
+                </button>
+
+                <div className="mt-8 border-t border-slate-200 pt-6 dark:border-slate-800">
+                  <p className="text-sm font-black uppercase tracking-wide text-blue-700 dark:text-blue-300">
+                    Hochvolt-Antrag
+                  </p>
+                  <p className="mt-2 leading-7 text-slate-600 dark:text-slate-300">
+                    Hochvolt wird nicht automatisch freigeschaltet. Du kannst
+                    deine Qualifikation hinterlegen; die Freigabe erfolgt
+                    manuell.
+                  </p>
+
+                  <div className="mt-5 grid gap-4 md:grid-cols-2">
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                        HV-Qualifikation
+                      </label>
+                      <select
+                        value={safetySettings.hvQualification}
+                        onChange={(event) =>
+                          setSafetySettings((currentSettings) => ({
+                            ...currentSettings,
+                            hvQualification: event.target
+                              .value as HvQualification,
+                          }))
+                        }
+                        disabled={!user || hvRequestLoading}
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-5 py-4 text-slate-950 outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                      >
+                        <option value="none">Keine</option>
+                        <option value="hv1">HV 1</option>
+                        <option value="hv2">HV 2</option>
+                        <option value="hv3">HV 3</option>
+                        <option value="other">Andere HV-Qualifikation</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                        Schulungsanbieter
+                      </label>
+                      <input
+                        value={safetySettings.hvTrainingProvider}
+                        onChange={(event) =>
+                          setSafetySettings((currentSettings) => ({
+                            ...currentSettings,
+                            hvTrainingProvider: event.target.value,
+                          }))
+                        }
+                        placeholder="Optional"
+                        disabled={!user || hvRequestLoading}
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-5 py-4 text-slate-950 outline-none placeholder:text-slate-400 focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-600"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                        Schulungsdatum
+                      </label>
+                      <input
+                        type="date"
+                        value={safetySettings.hvTrainingDate}
+                        onChange={(event) =>
+                          setSafetySettings((currentSettings) => ({
+                            ...currentSettings,
+                            hvTrainingDate: event.target.value,
+                          }))
+                        }
+                        disabled={!user || hvRequestLoading}
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-5 py-4 text-slate-950 outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                        Zertifikat / Nachweis
+                      </label>
+                      <input
+                        value={safetySettings.hvCertificateName}
+                        onChange={(event) =>
+                          setSafetySettings((currentSettings) => ({
+                            ...currentSettings,
+                            hvCertificateName: event.target.value,
+                          }))
+                        }
+                        placeholder="Optional, z. B. Zertifikatname"
+                        disabled={!user || hvRequestLoading}
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-5 py-4 text-slate-950 outline-none placeholder:text-slate-400 focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-600"
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                        Link zum Nachweis
+                      </label>
+                      <input
+                        value={safetySettings.hvCertificateUrl}
+                        onChange={(event) =>
+                          setSafetySettings((currentSettings) => ({
+                            ...currentSettings,
+                            hvCertificateUrl: event.target.value,
+                          }))
+                        }
+                        placeholder="Optional, z. B. interner Link oder Datei-URL"
+                        disabled={!user || hvRequestLoading}
+                        className="w-full rounded-2xl border border-slate-300 bg-white px-5 py-4 text-slate-950 outline-none placeholder:text-slate-400 focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-600"
+                      />
+                    </div>
+                  </div>
+
+                  <label className="mt-5 flex gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-900 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
+                    <input
+                      type="checkbox"
+                      checked={hvSafetyConfirmation}
+                      onChange={(event) =>
+                        setHvSafetyConfirmation(event.target.checked)
+                      }
+                      disabled={!user || hvRequestLoading}
+                      className="mt-1 h-4 w-4 shrink-0"
+                    />
+                    <span>
+                      Ich bestätige, dass Hochvolt-Arbeiten lebensgefährlich
+                      sein können und nur mit passender Qualifikation,
+                      Schutzausrüstung und aktuellen Herstellervorgaben
+                      durchgeführt werden dürfen.
+                    </span>
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={requestHvAccess}
+                    disabled={!user || hvRequestLoading}
+                    className="mt-5 rounded-2xl bg-blue-600 px-5 py-3 font-bold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {hvRequestLoading
+                      ? "Antrag wird gespeichert..."
+                      : "Hochvolt-Freigabe beantragen"}
+                  </button>
+
+                  {hvAccessRequests.length > 0 && (
+                    <div className="mt-5 grid gap-3">
+                      {hvAccessRequests.slice(0, 3).map((request) => (
+                        <div
+                          key={request.id}
+                          className="rounded-2xl border border-slate-200 bg-white p-4 text-sm leading-6 dark:border-slate-800 dark:bg-slate-900"
+                        >
+                          <p className="font-black text-slate-950 dark:text-white">
+                            {hvQualificationLabels[request.hv_qualification]} ·{" "}
+                            {hvRequestStatusLabels[request.status]}
+                          </p>
+                          <p className="mt-1 text-slate-500 dark:text-slate-400">
+                            Erstellt: {formatDateTime(request.created_at)}
+                          </p>
+                          {request.review_comment && (
+                            <p className="mt-2 text-slate-700 dark:text-slate-300">
+                              {request.review_comment}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 

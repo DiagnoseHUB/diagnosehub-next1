@@ -112,6 +112,41 @@ function normalizeDevices(value: unknown) {
     .filter((device): device is DeviceRegistration => device !== null);
 }
 
+function normalizeErrorMessage(value: unknown) {
+  if (typeof value === "string") {
+    const trimmedValue = value.trim();
+
+    if (!trimmedValue || trimmedValue === "[object Object]") {
+      return undefined;
+    }
+
+    return trimmedValue;
+  }
+
+  if (value && typeof value === "object") {
+    const errorRecord = value as {
+      message?: unknown;
+      details?: unknown;
+      hint?: unknown;
+      code?: unknown;
+    };
+    const parts = [
+      errorRecord.message,
+      errorRecord.details,
+      errorRecord.hint,
+      errorRecord.code,
+    ].filter((part): part is string => {
+      return typeof part === "string" && part.trim().length > 0;
+    });
+
+    if (parts.length > 0) {
+      return parts.join(" ");
+    }
+  }
+
+  return undefined;
+}
+
 function parseDeviceResponse(
   response: Response,
   payload: Partial<DeviceAccessResponse>
@@ -125,7 +160,7 @@ function parseDeviceResponse(
       payload.code === "DEVICE_LIMIT_REACHED"
         ? "DEVICE_LIMIT_REACHED"
         : undefined,
-    error: typeof payload.error === "string" ? payload.error : undefined,
+    error: normalizeErrorMessage(payload.error),
     plan: normalizeUserPlan(payload.plan),
     accountType,
     maxDevices:

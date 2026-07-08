@@ -128,7 +128,7 @@ function Footer() {
 
             <div className="mt-6 flex flex-wrap gap-3">
               <span className="rounded-full border border-green-200 bg-green-50 px-4 py-2 text-sm font-bold text-green-700 dark:border-green-500/30 dark:bg-green-500/10 dark:text-green-300">
-                Beta aktiv
+                Beta 0.9
               </span>
 
               <span className="rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-bold text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300">
@@ -230,7 +230,7 @@ function Footer() {
               Preise
             </Link>
 
-            <span>Beta 0.2</span>
+            <span>Beta 0.9</span>
           </div>
         </div>
       </div>

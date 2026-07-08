@@ -152,7 +152,7 @@ export default function HomePage() {
           <div className="mx-auto grid max-w-7xl gap-10 px-6 py-12 lg:grid-cols-[1fr_0.85fr] lg:items-center lg:py-16">
             <div>
               <p className="inline-flex rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-xs font-black uppercase tracking-[0.24em] text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300">
-                DiagnoseHUB Beta 0.2
+                DiagnoseHUB Beta 0.9
               </p>
 
               <h1 className="mt-6 max-w-4xl text-4xl font-black tracking-tight text-slate-950 dark:text-white sm:text-5xl lg:text-6xl">

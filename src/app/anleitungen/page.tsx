@@ -19,6 +19,7 @@ import type {
   InstructionGuide,
 } from "../../types/instruction";
 import { fetchJsonWithTimeout } from "@/utils/clientApi";
+import { createClient } from "@/lib/supabase/client";
 
 const allCategoryLabel = "Alle";
 
@@ -81,7 +82,8 @@ function wait(milliseconds: number) {
 
 async function pollGeneratedInstruction(
   jobId: string,
-  query: string
+  query: string,
+  accessToken: string
 ): Promise<GenerateInstructionResponse> {
   const maxAttempts = 120;
   const pollingIntervalMs = 5000;
@@ -94,6 +96,9 @@ async function pollGeneratedInstruction(
       {
         method: "GET",
         cache: "no-store",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
       }
     );
 
@@ -146,6 +151,7 @@ async function pollGeneratedInstruction(
 
 function InstructionsPageContent() {
   const searchParams = useSearchParams();
+  const supabase = useMemo(() => createClient(), []);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [activeSearchTerm, setActiveSearchTerm] = useState("");
@@ -339,10 +345,20 @@ function InstructionsPageContent() {
     setInstructionMatchScore(null);
 
     try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        window.location.href = "/login";
+        return;
+      }
+
       const response = await fetch("/api/anleitungen/generate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           query,
@@ -390,7 +406,11 @@ function InstructionsPageContent() {
       }
 
       if (data.jobId) {
-        const pollResult = await pollGeneratedInstruction(data.jobId, query);
+        const pollResult = await pollGeneratedInstruction(
+          data.jobId,
+          query,
+          session.access_token
+        );
 
         if (!pollResult.guide) {
           throw new Error("Die API hat keine fertige Anleitung geliefert.");

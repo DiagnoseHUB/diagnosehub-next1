@@ -4,6 +4,17 @@ import {
   findSimilarSavedInstructionGuides,
   saveInstructionGuideToDatabase,
 } from "@/lib/supabase/instructionGuideStorage";
+import { loadAuthenticatedUserFromRequest } from "@/lib/supabase/auth";
+import {
+  applySafetyToGuide,
+  buildSafetyPrompt,
+  classifyInstructionRisk,
+  createLimitedSafetyGuide,
+  evaluateSafetyAccess,
+  loadSafetyProfile,
+  logSafetyAccess,
+  type SafetyEvaluation,
+} from "@/services/safetyQualification";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,6 +59,20 @@ type GenerateInstructionRequestBody = {
   source?: "search" | "diagnosis";
   diagnosisText?: string;
 };
+
+function serializeSafetyEvaluation(evaluation: SafetyEvaluation) {
+  return {
+    riskClass: evaluation.riskClass,
+    decision: evaluation.decision,
+    warningType: evaluation.warningType,
+    role: evaluation.profile.role,
+    qualificationLevel: evaluation.profile.qualificationLevel,
+    hvVerified: evaluation.profile.hvVerified,
+    allowedFullInstruction: evaluation.allowedFullInstruction,
+    limitedReason: evaluation.limitedReason,
+    blacklistReason: evaluation.blacklistReason,
+  };
+}
 
 const instructionGuideTextFormat = {
   type: "json_schema",
@@ -874,6 +899,42 @@ export async function GET(request: Request) {
       );
     }
 
+    const { user, supabase } = await loadAuthenticatedUserFromRequest(request);
+    const safetyProfile = await loadSafetyProfile(supabase, user);
+    const safetyEvaluation = evaluateSafetyAccess(
+      safetyProfile,
+      classifyInstructionRisk(query || "KI-Anleitung")
+    );
+
+    await logSafetyAccess(supabase, safetyEvaluation, {
+      action: "instruction_job_read",
+      query: query || "KI-Anleitung",
+      source: "job",
+      metadata: { jobId },
+    });
+
+    if (safetyEvaluation.decision === "block") {
+      return NextResponse.json(
+        {
+          error: safetyEvaluation.blacklistReason,
+          safetyDecision: serializeSafetyEvaluation(safetyEvaluation),
+        },
+        { status: 403 }
+      );
+    }
+
+    if (safetyEvaluation.decision === "limited") {
+      return NextResponse.json({
+        jobId,
+        status: "completed",
+        guide: createLimitedSafetyGuide(
+          query || "sicherheitsrelevante Arbeit",
+          safetyEvaluation
+        ),
+        safetyDecision: serializeSafetyEvaluation(safetyEvaluation),
+      });
+    }
+
     const response = (await client.responses.retrieve(jobId)) as OpenAI.Responses.Response & {
       incomplete_details?: { reason?: string } | null;
     };
@@ -912,12 +973,17 @@ export async function GET(request: Request) {
       outputText,
       query || "KI-Anleitung"
     );
+    const safetyGuide = applySafetyToGuide(guide, safetyEvaluation);
 
-    let savedGuide = guide;
+    let savedGuide = safetyGuide;
     let saveWarning: string | undefined;
 
     try {
-      savedGuide = await saveGeneratedGuide(guide, query || guide.title, "ai");
+      savedGuide = await saveGeneratedGuide(
+        safetyGuide,
+        query || safetyGuide.title,
+        "ai"
+      );
     } catch (saveError) {
       console.error("KI-Anleitung konnte nicht gespeichert werden:", saveError);
 
@@ -932,6 +998,7 @@ export async function GET(request: Request) {
       status: "completed",
       guide: savedGuide,
       saveWarning,
+      safetyDecision: serializeSafetyEvaluation(safetyEvaluation),
     });
   } catch (error) {
     console.error("KI-Anleitungs-Job konnte nicht gelesen werden:", error);
@@ -966,13 +1033,54 @@ export async function POST(request: Request) {
     }
 
     const duplicateSearchText = query || diagnosisText;
+    const { user, supabase } = await loadAuthenticatedUserFromRequest(request);
+    const safetyProfile = await loadSafetyProfile(supabase, user);
+    const safetyEvaluation = evaluateSafetyAccess(
+      safetyProfile,
+      classifyInstructionRisk(duplicateSearchText)
+    );
+
+    await logSafetyAccess(supabase, safetyEvaluation, {
+      action: "instruction_generate_request",
+      query: duplicateSearchText,
+      source,
+      metadata: {
+        hasDiagnosisText: Boolean(diagnosisText),
+      },
+    });
+
+    if (safetyEvaluation.decision === "block") {
+      return NextResponse.json(
+        {
+          error: safetyEvaluation.blacklistReason,
+          safetyDecision: serializeSafetyEvaluation(safetyEvaluation),
+        },
+        { status: 403 }
+      );
+    }
+
+    if (safetyEvaluation.decision === "limited") {
+      return NextResponse.json({
+        status: "completed",
+        guide: createLimitedSafetyGuide(duplicateSearchText, safetyEvaluation),
+        safetyDecision: serializeSafetyEvaluation(safetyEvaluation),
+      });
+    }
+
     const reusableInstructionGuide = await findReusableInstructionGuide(
       duplicateSearchText,
       source
     );
 
     if (reusableInstructionGuide) {
-      return NextResponse.json(reusableInstructionGuide);
+      return NextResponse.json({
+        ...reusableInstructionGuide,
+        guide: applySafetyToGuide(
+          reusableInstructionGuide.guide,
+          safetyEvaluation
+        ),
+        safetyDecision: serializeSafetyEvaluation(safetyEvaluation),
+      });
     }
 
     if (!process.env.OPENAI_API_KEY) {
@@ -1006,13 +1114,16 @@ Die Antwort muss vollständig bleiben und darf nicht wegen Länge abbrechen.
     const response = (await client.responses.create(
       buildOpenAiRequestBody(
         input,
-        buildBaseInstructions(query || "KI-Anleitung", source)
+        `${buildBaseInstructions(query || "KI-Anleitung", source)}
+
+${buildSafetyPrompt(safetyEvaluation)}`
       )
     )) as OpenAI.Responses.Response;
 
     return NextResponse.json({
       jobId: response.id,
       status: response.status || "queued",
+      safetyDecision: serializeSafetyEvaluation(safetyEvaluation),
     });
   } catch (error) {
     console.error("KI-Anleitungs-Job konnte nicht gestartet werden:", error);

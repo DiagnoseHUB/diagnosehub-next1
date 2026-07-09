@@ -323,16 +323,23 @@ html.diagnosehub-light [contenteditable="true"],
 html.diagnosehub-light [role="textbox"],
 html.diagnosehub-light [role="combobox"],
 html.diagnosehub-light [role="listbox"],
+html.diagnosehub-light [role="option"],
+html.diagnosehub-light [role="radio"],
+html.diagnosehub-light [role="switch"],
+html.diagnosehub-light [role="tab"],
+html.diagnosehub-light [aria-pressed],
 html.diagnosehub-light button[aria-haspopup],
-html.diagnosehub-light [role="button"][aria-haspopup] {
-  background-color: #f8fafc !important;
+html.diagnosehub-light [role="button"][aria-haspopup],
+html.diagnosehub-light label:has(input[type="checkbox"]),
+html.diagnosehub-light label:has(input[type="radio"]) {
+  background-color: #e2e8f0 !important;
   color: #0f172a !important;
-  border-color: #334155 !important;
-  border-width: 1.5px !important;
+  border-color: #1e293b !important;
+  border-width: 2px !important;
   box-shadow:
-    inset 0 1px 2px rgba(15, 23, 42, 0.12),
-    0 0 0 1px rgba(15, 23, 42, 0.18),
-    0 8px 18px rgba(15, 23, 42, 0.06) !important;
+    inset 0 1px 2px rgba(15, 23, 42, 0.16),
+    0 0 0 1px rgba(15, 23, 42, 0.32),
+    0 8px 18px rgba(15, 23, 42, 0.1) !important;
 }
 
 html.diagnosehub-light input::placeholder,
@@ -352,14 +359,21 @@ html.diagnosehub-light [contenteditable="true"]:hover,
 html.diagnosehub-light [role="textbox"]:hover,
 html.diagnosehub-light [role="combobox"]:hover,
 html.diagnosehub-light [role="listbox"]:hover,
+html.diagnosehub-light [role="option"]:hover,
+html.diagnosehub-light [role="radio"]:hover,
+html.diagnosehub-light [role="switch"]:hover,
+html.diagnosehub-light [role="tab"]:hover,
+html.diagnosehub-light [aria-pressed]:hover,
 html.diagnosehub-light button[aria-haspopup]:hover,
-html.diagnosehub-light [role="button"][aria-haspopup]:hover {
-  background-color: #ffffff !important;
+html.diagnosehub-light [role="button"][aria-haspopup]:hover,
+html.diagnosehub-light label:has(input[type="checkbox"]):hover,
+html.diagnosehub-light label:has(input[type="radio"]):hover {
+  background-color: #cbd5e1 !important;
   border-color: #0f172a !important;
   box-shadow:
-    inset 0 1px 2px rgba(15, 23, 42, 0.12),
-    0 0 0 1px rgba(15, 23, 42, 0.3),
-    0 10px 22px rgba(15, 23, 42, 0.08) !important;
+    inset 0 1px 2px rgba(15, 23, 42, 0.18),
+    0 0 0 1px rgba(15, 23, 42, 0.42),
+    0 10px 22px rgba(15, 23, 42, 0.12) !important;
 }
 
 html.diagnosehub-light input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):focus,
@@ -369,23 +383,28 @@ html.diagnosehub-light [contenteditable="true"]:focus,
 html.diagnosehub-light [role="textbox"]:focus,
 html.diagnosehub-light [role="combobox"]:focus,
 html.diagnosehub-light [role="listbox"]:focus,
+html.diagnosehub-light [role="option"]:focus,
+html.diagnosehub-light [role="radio"]:focus,
+html.diagnosehub-light [role="switch"]:focus,
+html.diagnosehub-light [role="tab"]:focus,
+html.diagnosehub-light [aria-pressed]:focus,
 html.diagnosehub-light button[aria-haspopup]:focus,
 html.diagnosehub-light [role="button"][aria-haspopup]:focus {
-  background-color: #ffffff !important;
-  border-color: #2563eb !important;
+  background-color: #dbeafe !important;
+  border-color: #1d4ed8 !important;
   outline: 2px solid transparent !important;
   box-shadow:
     inset 0 1px 2px rgba(15, 23, 42, 0.1),
-    0 0 0 1px #2563eb,
-    0 0 0 5px rgba(37, 99, 235, 0.22),
+    0 0 0 2px #1d4ed8,
+    0 0 0 6px rgba(37, 99, 235, 0.26),
     0 12px 28px rgba(37, 99, 235, 0.1) !important;
 }
 
 html.diagnosehub-light input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):disabled,
 html.diagnosehub-light textarea:disabled,
 html.diagnosehub-light select:disabled {
-  background-color: #cbd5e1 !important;
-  border-color: #64748b !important;
+  background-color: #94a3b8 !important;
+  border-color: #475569 !important;
   color: #334155 !important;
   cursor: not-allowed;
 }
@@ -393,11 +412,11 @@ html.diagnosehub-light select:disabled {
 html.diagnosehub-light input[type="checkbox"],
 html.diagnosehub-light input[type="radio"] {
   accent-color: #2563eb;
-  background-color: #ffffff !important;
-  border-color: #334155 !important;
+  background-color: #e2e8f0 !important;
+  border-color: #1e293b !important;
   box-shadow:
-    0 0 0 1px rgba(15, 23, 42, 0.35),
-    0 2px 6px rgba(15, 23, 42, 0.16) !important;
+    0 0 0 2px rgba(15, 23, 42, 0.55),
+    0 2px 6px rgba(15, 23, 42, 0.2) !important;
 }
 
 html.diagnosehub-light input[type="checkbox"]:focus,
@@ -417,6 +436,28 @@ html.diagnosehub-light input[type="file"]::file-selector-button {
 
 html.diagnosehub-light fieldset {
   border-color: #475569 !important;
+}
+
+html.diagnosehub-light textarea[class],
+html.diagnosehub-light select[class],
+html.diagnosehub-light [contenteditable="true"][class],
+html.diagnosehub-light [role="textbox"][class],
+html.diagnosehub-light [role="combobox"][class],
+html.diagnosehub-light [role="listbox"][class],
+html.diagnosehub-light [role="option"][class],
+html.diagnosehub-light [role="radio"][class],
+html.diagnosehub-light [role="switch"][class],
+html.diagnosehub-light [role="tab"][class],
+html.diagnosehub-light [aria-pressed][class],
+html.diagnosehub-light button[aria-haspopup][class],
+html.diagnosehub-light [role="button"][aria-haspopup][class] {
+  background-color: #e2e8f0 !important;
+  border-color: #1e293b !important;
+  color: #0f172a !important;
+  box-shadow:
+    inset 0 1px 2px rgba(15, 23, 42, 0.16),
+    0 0 0 1px rgba(15, 23, 42, 0.32),
+    0 8px 18px rgba(15, 23, 42, 0.1) !important;
 }
 
 /* Karten / Schatten */

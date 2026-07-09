@@ -9,7 +9,7 @@ const config: CapacitorConfig = {
     cleartext: false,
   },
   backgroundColor: "#020617",
-  loggingBehavior: "debug",
+  loggingBehavior: "production",
   android: {
     backgroundColor: "#020617",
   },

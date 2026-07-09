@@ -319,14 +319,46 @@ html.dark .hover\:bg-slate-100:hover:not([class*="dark:hover:bg-"]) {
 html.diagnosehub-light input,
 html.diagnosehub-light textarea,
 html.diagnosehub-light select {
-  background-color: rgba(255, 255, 255, 0.96) !important;
+  background-color: #ffffff !important;
   color: #0f172a !important;
-  border-color: #cbd5e1 !important;
+  border-color: #64748b !important;
+  box-shadow:
+    inset 0 1px 2px rgba(15, 23, 42, 0.08),
+    0 0 0 1px rgba(100, 116, 139, 0.18) !important;
 }
 
 html.diagnosehub-light input::placeholder,
 html.diagnosehub-light textarea::placeholder {
-  color: #94a3b8 !important;
+  color: #64748b !important;
+  opacity: 1 !important;
+}
+
+html.diagnosehub-light input:hover,
+html.diagnosehub-light textarea:hover,
+html.diagnosehub-light select:hover {
+  border-color: #475569 !important;
+  box-shadow:
+    inset 0 1px 2px rgba(15, 23, 42, 0.1),
+    0 0 0 1px rgba(71, 85, 105, 0.25) !important;
+}
+
+html.diagnosehub-light input:focus,
+html.diagnosehub-light textarea:focus,
+html.diagnosehub-light select:focus {
+  border-color: #2563eb !important;
+  outline: 2px solid transparent !important;
+  box-shadow:
+    inset 0 1px 2px rgba(15, 23, 42, 0.08),
+    0 0 0 3px rgba(37, 99, 235, 0.22) !important;
+}
+
+html.diagnosehub-light input:disabled,
+html.diagnosehub-light textarea:disabled,
+html.diagnosehub-light select:disabled {
+  background-color: #e2e8f0 !important;
+  border-color: #94a3b8 !important;
+  color: #64748b !important;
+  cursor: not-allowed;
 }
 
 /* Karten / Schatten */

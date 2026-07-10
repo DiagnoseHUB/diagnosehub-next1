@@ -25,8 +25,10 @@ import {
 } from "@/services/diagnosisUsageSupabase";
 import { getPlanConfig } from "@/config/plans";
 import {
+  clearLocalWorkshopProfileState,
   defaultWorkshopProfileState,
   loadWorkshopProfileState,
+  notifyWorkshopProfileChanged,
   readLocalWorkshopProfileState,
   type ProfileSource,
   type WorkshopProfileState,
@@ -494,6 +496,9 @@ export default function DashboardPage() {
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [accountDeleteOpen, setAccountDeleteOpen] = useState(false);
+  const [accountDeleteConfirmation, setAccountDeleteConfirmation] = useState("");
+  const [accountDeleteLoading, setAccountDeleteLoading] = useState(false);
 
   const normalizedUsage = normalizeDiagnosisUsage(diagnosisUsage);
   const currentPlanConfig = getPlanConfig(workshopData.plan);
@@ -521,6 +526,8 @@ export default function DashboardPage() {
 
   const isLoading =
     profileLoading || caseLoading || usageLoading || safetyLoading;
+  const canDeleteAccount =
+    accountDeleteConfirmation.trim() === "ACCOUNT LÖSCHEN";
 
   useEffect(() => {
     void loadDashboard();
@@ -864,6 +871,84 @@ export default function DashboardPage() {
     removeAccountScopedLocalStorage(CURRENT_CASE_STORAGE_KEY, user?.id);
     setSuccess("Aktuell geöffneter Diagnosefall wurde zurückgesetzt.");
     setError("");
+  }
+
+  function clearDeletedAccountLocalData(userId?: string | null) {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    removeAccountScopedLocalStorage(SAVED_CASES_STORAGE_KEY, userId);
+    removeAccountScopedLocalStorage(CURRENT_CASE_STORAGE_KEY, userId);
+    removeAccountScopedLocalStorage(DIAGNOSIS_USAGE_STORAGE_KEY, userId);
+
+    localStorage.removeItem(SAVED_CASES_STORAGE_KEY);
+    localStorage.removeItem(CURRENT_CASE_STORAGE_KEY);
+    legacyUsageStorageKeys.forEach((storageKey) => {
+      localStorage.removeItem(storageKey);
+    });
+
+    clearLocalWorkshopProfileState();
+    notifyWorkshopProfileChanged();
+  }
+
+  async function deleteAccountCompletely() {
+    setSuccess("");
+    setError("");
+
+    if (!user) {
+      setError("Du bist nicht eingeloggt.");
+      return;
+    }
+
+    if (!canDeleteAccount) {
+      setError("Bitte bestätige die Löschung mit ACCOUNT LÖSCHEN.");
+      return;
+    }
+
+    setAccountDeleteLoading(true);
+
+    try {
+      const session = (await supabase.auth.getSession()).data.session;
+
+      if (!session?.access_token) {
+        throw new Error("Keine gültige Anmeldung gefunden.");
+      }
+
+      const response = await fetch("/api/account/delete", {
+        method: "DELETE",
+        cache: "no-store",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          confirm: true,
+          confirmationText: "ACCOUNT LÖSCHEN",
+        }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error || "Account konnte nicht gelöscht werden.");
+      }
+
+      clearDeletedAccountLocalData(user.id);
+      await supabase.auth.signOut();
+      resetDashboardState();
+      setUser(null);
+      setAuthChecked(true);
+      setAccountDeleteOpen(false);
+      setAccountDeleteConfirmation("");
+
+      window.location.href = "/login?account=deleted";
+    } catch (error) {
+      setError(getErrorMessage(error));
+    } finally {
+      setAccountDeleteLoading(false);
+    }
   }
 
   function exportDashboardData() {
@@ -1387,8 +1472,105 @@ export default function DashboardPage() {
             )}
           </Section>
 
+          <Section
+            title="Account löschen"
+            description="Diesen Schritt bitte nur nutzen, wenn der DiagnoseHUB-Account wirklich vollständig entfernt werden soll."
+          >
+            <div className="rounded-3xl border border-red-200 bg-red-50 p-5 leading-7 text-red-950 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
+              <h3 className="text-xl font-black">Gefahrenbereich</h3>
+              <p className="mt-2">
+                Beim vollständigen Löschen werden der Login, gespeicherte Fälle,
+                Profil, Geräte, Service-Erinnerungen und lokale Accountdaten
+                entfernt. Ein laufendes Stripe-Abo wird vorher gekündigt.
+                Rechnungs- und Zahlungsdaten können aus gesetzlichen Gründen
+                weiterhin bei Stripe gespeichert bleiben.
+              </p>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setAccountDeleteOpen(true);
+                  setAccountDeleteConfirmation("");
+                  setError("");
+                  setSuccess("");
+                }}
+                disabled={accountDeleteLoading}
+                className="mt-4 rounded-2xl bg-red-600 px-5 py-3 font-black text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Account komplett löschen
+              </button>
+            </div>
+          </Section>
+
         </div>
       </main>
+
+      {accountDeleteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4 py-8">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="account-delete-title"
+            className="w-full max-w-xl rounded-3xl border border-red-200 bg-white p-6 shadow-2xl dark:border-red-500/30 dark:bg-slate-950"
+          >
+            <p className="text-sm font-black uppercase tracking-[0.25em] text-red-600 dark:text-red-300">
+              Endgültige Löschung
+            </p>
+            <h2
+              id="account-delete-title"
+              className="mt-2 text-2xl font-black text-slate-950 dark:text-white"
+            >
+              Account wirklich löschen?
+            </h2>
+            <p className="mt-3 leading-7 text-slate-700 dark:text-slate-300">
+              Diese Aktion löscht deinen DiagnoseHUB-Account und kündigt vorher
+              ein vorhandenes Stripe-Abo. Danach kannst du dich mit diesem
+              Account nicht mehr anmelden.
+            </p>
+            <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 leading-7 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+              Zur Bestätigung bitte exakt{" "}
+              <span className="font-black">ACCOUNT LÖSCHEN</span> eingeben.
+            </p>
+
+            <label className="mt-5 block text-sm font-bold text-slate-700 dark:text-slate-200">
+              Bestätigung
+              <input
+                value={accountDeleteConfirmation}
+                onChange={(event) =>
+                  setAccountDeleteConfirmation(event.target.value)
+                }
+                autoFocus
+                className="mt-2 w-full rounded-2xl border border-slate-400 bg-slate-100 px-4 py-3 font-bold text-slate-950 outline-none transition focus:border-red-500 focus:bg-white focus:ring-4 focus:ring-red-100 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:focus:border-red-400 dark:focus:ring-red-500/20"
+                placeholder="ACCOUNT LÖSCHEN"
+              />
+            </label>
+
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setAccountDeleteOpen(false);
+                  setAccountDeleteConfirmation("");
+                }}
+                disabled={accountDeleteLoading}
+                className="rounded-2xl border border-slate-300 bg-white px-5 py-3 font-bold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Abbrechen
+              </button>
+              <button
+                type="button"
+                onClick={() => void deleteAccountCompletely()}
+                disabled={accountDeleteLoading || !canDeleteAccount}
+                className="rounded-2xl bg-red-600 px-5 py-3 font-black text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {accountDeleteLoading
+                  ? "Abo und Account werden gelöscht..."
+                  : "Endgültig löschen"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Footer />
     </div>

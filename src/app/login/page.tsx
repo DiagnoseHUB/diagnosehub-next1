@@ -357,9 +357,12 @@ export default function LoginPage() {
     loadLocalAccount();
 
     async function loadSession() {
-      const shouldOpenProfile =
-        typeof window !== "undefined" &&
-        new URLSearchParams(window.location.search).get("setup") === "profile";
+      const searchParams =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search)
+          : null;
+      const shouldOpenProfile = searchParams?.get("setup") === "profile";
+      const accountStatus = searchParams?.get("account") || "";
       const { data, error } = await supabase.auth.getSession();
 
       if (error) {
@@ -368,6 +371,12 @@ export default function LoginPage() {
       }
 
       setUser(data.session?.user ?? null);
+
+      if (!data.session && accountStatus === "deleted") {
+        setAuthMessage(
+          "Dein Account wurde gelöscht. Ein vorhandenes Stripe-Abo wurde vorher gekündigt."
+        );
+      }
 
       if (data.session?.user?.email) {
         setAuthEmail(data.session.user.email);

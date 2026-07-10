@@ -15,7 +15,7 @@ export type TorqueSpecSafetyLevel =
 
 export type TorqueSpecRow = {
   id: string;
-  user_id: string;
+  user_id: string | null;
   manufacturer: string | null;
   model: string | null;
   series: string | null;
@@ -49,7 +49,7 @@ export type TorqueSpecRow = {
 
 export type TorqueSpec = {
   id: string;
-  userId: string;
+  userId: string | null;
   manufacturer: string;
   model: string;
   series: string;

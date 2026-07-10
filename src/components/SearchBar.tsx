@@ -2345,6 +2345,12 @@ ${chatText}
           </div>
         )}
 
+        <p className="mb-3 text-sm leading-6 text-slate-400">
+          Je mehr Fahrzeugdaten du eingibst, desto genauer wird die Antwort:
+          Modell, Baujahr, Motorcode, Kilometerstand, Fehlercode, Symptome,
+          Messwerte und was bereits geprüft wurde.
+        </p>
+
         <textarea
           id="diagnosehub-main-diagnosis-input"
           value={search}
@@ -2364,12 +2370,6 @@ ${chatText}
           targetElementId="diagnosehub-main-diagnosis-input"
           targetLabel="Diagnosefeld"
         />
-
-        <p className="mt-2 text-sm leading-6 text-slate-400">
-          Je mehr Fahrzeugdaten du eingibst, desto genauer wird die Antwort:
-          Modell, Baujahr, Motorcode, Kilometerstand, Fehlercode, Symptome,
-          Messwerte und was bereits geprüft wurde.
-        </p>
 
         {search.trim() ? (
           <InputQualityPreview profile={typedInputQualityProfile} />

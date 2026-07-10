@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
+import PublicOnly from "@/components/PublicOnly";
 import SearchBar from "@/components/SearchBar";
 
 const heroStats = [
@@ -148,6 +149,7 @@ export default function HomePage() {
       <Header />
 
       <main>
+        <PublicOnly>
         <section className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
           <div className="mx-auto grid max-w-7xl gap-10 px-6 py-12 lg:grid-cols-[1fr_0.85fr] lg:items-center lg:py-16">
             <div>
@@ -241,6 +243,8 @@ export default function HomePage() {
           </div>
         </section>
 
+        </PublicOnly>
+
         <section
           id="diagnose"
           className="border-y border-slate-200 bg-white py-12 dark:border-slate-800 dark:bg-slate-900/70"
@@ -266,6 +270,7 @@ export default function HomePage() {
           </div>
         </section>
 
+        <PublicOnly>
         <section id="workflow" className="mx-auto max-w-7xl px-6 py-14">
           <div className="mb-8 max-w-3xl">
             <p className="text-sm font-black uppercase tracking-[0.24em] text-blue-700 dark:text-blue-300">
@@ -331,6 +336,8 @@ export default function HomePage() {
             </div>
           </div>
         </section>
+
+        </PublicOnly>
 
         <section id="hinweis" className="mx-auto max-w-7xl px-6 py-14">
           <div className="rounded-3xl border border-yellow-300 bg-yellow-50 p-8 dark:border-yellow-700/60 dark:bg-yellow-950/30">

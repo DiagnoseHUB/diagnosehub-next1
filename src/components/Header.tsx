@@ -373,6 +373,7 @@ function Header() {
                   </Link>
                 ))}
 
+                {!demoAccount && (
                 <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950">
                   <p className="px-2 text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
                     Für wen?
@@ -388,6 +389,7 @@ function Header() {
                     </Link>
                   ))}
                 </div>
+                )}
 
                 <Link
                   href="/#diagnose"

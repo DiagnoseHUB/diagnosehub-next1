@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import FeedbackForm from "@/components/FeedbackForm";
+import PublicOnly from "@/components/PublicOnly";
 
 const productLinks = [
   {
@@ -153,21 +154,23 @@ function Footer() {
             </div>
           </div>
 
-          <div>
-            <p className="font-black text-slate-950 dark:text-white">Info</p>
+          <PublicOnly>
+            <div>
+              <p className="font-black text-slate-950 dark:text-white">Info</p>
 
-            <div className="mt-5 grid gap-3">
-              {infoLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="text-sm font-semibold text-slate-600 transition hover:text-blue-700 dark:text-slate-300 dark:hover:text-blue-300"
-                >
-                  {link.label}
-                </Link>
-              ))}
+              <div className="mt-5 grid gap-3">
+                {infoLinks.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className="text-sm font-semibold text-slate-600 transition hover:text-blue-700 dark:text-slate-300 dark:hover:text-blue-300"
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
             </div>
-          </div>
+          </PublicOnly>
 
           <div>
             <p className="font-black text-slate-950 dark:text-white">

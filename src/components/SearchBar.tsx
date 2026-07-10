@@ -11,6 +11,7 @@ import {
 import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 import CaseFeedbackPanel from "@/components/CaseFeedbackPanel";
 import RelatedLearningPanel from "@/components/RelatedLearningPanel";
+import VoiceAssistant from "@/components/VoiceAssistant";
 import { createClient } from "@/lib/supabase/client";
 import {
   readAccountScopedLocalStorage,
@@ -45,8 +46,6 @@ import {
   type TechnicalSpecContext,
 } from "@/services/technicalSpecs";
 import {
-  PLAN_CONFIG,
-  SELECTABLE_USER_PLANS,
   getPlanConfig,
   isUnlimitedPlan,
   isValidUserPlan,
@@ -111,7 +110,6 @@ const DIAGNOSIS_USAGE_STORAGE_KEY = "diagnosehub-diagnosis-usage";
 const AUDIENCE_MODE_STORAGE_KEY = "diagnosehub-audience-mode";
 const PENDING_PREFILL_STORAGE_KEY = "diagnosehub-pending-prefill";
 
-const showLocalPlanSwitcher = process.env.NODE_ENV === "development";
 const audienceModeOptions: Array<{
   value: DiagnosisAudienceMode;
   label: string;
@@ -131,6 +129,19 @@ const audienceModeOptions: Array<{
 
 function getUserMessageLabel(mode?: DiagnosisAudienceMode) {
   return mode === "hobby" ? "Hobby" : "Werkstatt";
+}
+
+function inferAudienceModeFromAccountRole(role: unknown): DiagnosisAudienceMode {
+  const normalizedRole = String(role || "").toLowerCase();
+
+  if (
+    normalizedRole.includes("privat") ||
+    normalizedRole.includes("hobby")
+  ) {
+    return "hobby";
+  }
+
+  return "workshop";
 }
 
 const baseQuickQuestions = [
@@ -1192,15 +1203,15 @@ export default function SearchBar() {
 
   const [user, setUser] = useState<User | null>(null);
 
-  const [caseStorageSource, setCaseStorageSource] =
+  const [, setCaseStorageSource] =
     useState<CaseStorageSource>("local");
-  const [caseSyncLoading, setCaseSyncLoading] = useState(false);
-  const [caseSyncMessage, setCaseSyncMessage] = useState("");
+  const [, setCaseSyncLoading] = useState(false);
+  const [, setCaseSyncMessage] = useState("");
 
-  const [usageStorageSource, setUsageStorageSource] =
+  const [, setUsageStorageSource] =
     useState<UsageStorageSource>("local");
-  const [usageSyncLoading, setUsageSyncLoading] = useState(false);
-  const [usageSyncMessage, setUsageSyncMessage] = useState("");
+  const [, setUsageSyncLoading] = useState(false);
+  const [, setUsageSyncMessage] = useState("");
 
   const [search, setSearch] = useState("");
   const [causingPart, setCausingPart] = useState("");
@@ -1218,6 +1229,7 @@ export default function SearchBar() {
   const [audienceMode, setAudienceMode] =
     useState<DiagnosisAudienceMode>("workshop");
   const [audienceModeHydrated, setAudienceModeHydrated] = useState(false);
+  const [saveDetailsOpen, setSaveDetailsOpen] = useState(false);
   const [diagnosisUsage, setDiagnosisUsage] = useState<DiagnosisUsage>(
     getInitialDiagnosisUsage(),
   );
@@ -1290,24 +1302,12 @@ export default function SearchBar() {
 
   const monthlyLimit = currentPlan.dailyDiagnosisLimit;
   const planIsUnlimited = isUnlimitedPlan(userPlan);
-  const diagnosisLimitLabel = planIsUnlimited ? "unbegrenzt" : String(monthlyLimit);
   const savedCaseLimitLabel = planIsUnlimited
     ? "unbegrenzt"
     : String(currentPlan.savedCaseLimit);
-
   const remainingDiagnoses = Math.max(monthlyLimit - normalizedUsage.count, 0);
-  const remainingDiagnosesLabel = planIsUnlimited
-    ? "unbegrenzt"
-    : String(remainingDiagnoses);
 
   const savingDisabledForPlan = currentPlan.savedCaseLimit <= 0;
-
-  const remainingSavedCases = savingDisabledForPlan
-    ? 0
-    : Math.max(currentPlan.savedCaseLimit - savedCases.length, 0);
-  const remainingSavedCasesLabel = planIsUnlimited
-    ? "unbegrenzt"
-    : String(remainingSavedCases);
 
   const diagnosisLimitReached = remainingDiagnoses <= 0;
 
@@ -1612,7 +1612,7 @@ export default function SearchBar() {
     try {
       const { data, error } = await supabase
         .from("workshop_profiles")
-        .select("plan")
+        .select("plan, role")
         .eq("id", activeUser.id)
         .maybeSingle();
 
@@ -1624,6 +1624,9 @@ export default function SearchBar() {
         data && isValidUserPlan(String(data.plan)) ? data.plan : "free";
 
       setUserPlan(remotePlan);
+      changeAudienceMode(
+        inferAudienceModeFromAccountRole(data?.role || "Privatnutzer"),
+      );
       localStorage.setItem(USER_PLAN_STORAGE_KEY, remotePlan);
     } catch (error) {
       console.error("Kontoplan konnte nicht geladen werden:", error);
@@ -1711,49 +1714,6 @@ export default function SearchBar() {
     } finally {
       setCaseSyncLoading(false);
     }
-  }
-
-  async function reloadSupabaseCases() {
-    if (!user) {
-      setError("Für die Fallhistorie zuerst einloggen.");
-      return;
-    }
-
-    await loadCasesForAuthenticatedUser(user, []);
-  }
-
-  async function reloadSupabaseUsage() {
-    if (!user) {
-      setError("Für den Nutzungszähler zuerst einloggen.");
-      return;
-    }
-
-    await loadPlanForAuthenticatedUser(user);
-    await loadUsageForAuthenticatedUser(user);
-  }
-
-  async function migrateLocalCasesNow() {
-    if (!user) {
-      setError("Für lokale Fälle zuerst einloggen.");
-      return;
-    }
-
-    await loadCasesForAuthenticatedUser(user, loadLocalSavedCases(user.id));
-  }
-
-  function changeUserPlan(nextPlan: UserPlan) {
-    if (user) {
-      setError(
-        "Bei aktivem Konto wird der Plan über Login/Profil gespeichert. Die Schnellumschaltung ist nur für lokale Tests ohne Login aktiv.",
-      );
-      return;
-    }
-
-    setUserPlan(nextPlan);
-    localStorage.setItem(USER_PLAN_STORAGE_KEY, nextPlan);
-    setError("");
-    setCopySuccess(false);
-    setSaveSuccess(false);
   }
 
   function applyServerUsageLimit(usageLimit: UsageLimitPayload) {
@@ -2034,9 +1994,22 @@ Antwortformat exakt:
     setSaveSuccess(false);
     setCopiedMessageIndex(null);
     setOpenedCaseId(null);
+    setSaveDetailsOpen(false);
     setError("");
     shouldAutoScrollRef.current = false;
     removeAccountScopedLocalStorage(STORAGE_KEY, user?.id);
+  }
+
+  function openSaveDetails() {
+    if (messages.length === 0 || savedCaseLimitReached) {
+      return;
+    }
+
+    setSaveDetailsOpen(true);
+    setCopySuccess(false);
+    setSaveSuccess(false);
+    setCopiedMessageIndex(null);
+    setError("");
   }
 
   async function saveCurrentCase() {
@@ -2119,6 +2092,7 @@ Antwortformat exakt:
     saveCasesToLocalStorage(updatedSavedCases, user?.id);
 
     setSaveSuccess(true);
+    setSaveDetailsOpen(false);
     setCopySuccess(false);
     setCopiedMessageIndex(null);
     setError("");
@@ -2143,6 +2117,7 @@ Antwortformat exakt:
     setQualityCheck(savedCase.qualityCheck);
     setOpenedCaseId(savedCase.id);
     setSearch("");
+    setSaveDetailsOpen(false);
     setError("");
     setCopySuccess(false);
     setSaveSuccess(false);
@@ -2329,54 +2304,49 @@ ${chatText}
     }
   }
 
-  const caseStorageLabel =
-    caseStorageSource === "supabase"
-      ? "Online-Fallhistorie"
-      : "Lokale Fallhistorie";
-
-  const usageStorageLabel =
-    usageStorageSource === "supabase" ? "Online-Nutzung" : "Lokale Nutzung";
-
   return (
     <div className="w-full">
       <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-4 shadow-2xl shadow-blue-950/30">
-        <div className="mb-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-sm font-black uppercase tracking-wide text-blue-300">
-                Ausgabemodus
-              </p>
-              <p className="mt-1 text-sm text-slate-400">
-                Gleicher Inhalt, aber Sprache, Risiko und Detailtiefe passen
-                sich an.
-              </p>
-            </div>
+        {!user && (
+          <div className="mb-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-sm font-black uppercase tracking-wide text-blue-300">
+                  Ausgabemodus
+                </p>
+                <p className="mt-1 text-sm text-slate-400">
+                  Gleicher Inhalt, aber Sprache, Risiko und Detailtiefe passen
+                  sich an.
+                </p>
+              </div>
 
-            <div className="grid gap-2 sm:grid-cols-2 lg:min-w-[32rem]">
-              {audienceModeOptions.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => changeAudienceMode(option.value)}
-                  className={
-                    audienceMode === option.value
-                      ? "rounded-2xl border border-blue-500 bg-blue-600 px-4 py-3 text-left text-white shadow-lg shadow-blue-950/30"
-                      : "rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-left text-slate-300 transition hover:border-blue-500 hover:text-blue-200"
-                  }
-                >
-                  <span className="block text-sm font-black">
-                    {option.label}
-                  </span>
-                  <span className="mt-1 block text-xs leading-5 opacity-85">
-                    {option.description}
-                  </span>
-                </button>
-              ))}
+              <div className="grid gap-2 sm:grid-cols-2 lg:min-w-[32rem]">
+                {audienceModeOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => changeAudienceMode(option.value)}
+                    className={
+                      audienceMode === option.value
+                        ? "rounded-2xl border border-blue-500 bg-blue-600 px-4 py-3 text-left text-white shadow-lg shadow-blue-950/30"
+                        : "rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-left text-slate-300 transition hover:border-blue-500 hover:text-blue-200"
+                    }
+                  >
+                    <span className="block text-sm font-black">
+                      {option.label}
+                    </span>
+                    <span className="mt-1 block text-xs leading-5 opacity-85">
+                      {option.description}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         <textarea
+          id="diagnosehub-main-diagnosis-input"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           onKeyDown={handleKeyDown}
@@ -2387,6 +2357,12 @@ ${chatText}
           }
           rows={4}
           className="w-full resize-none rounded-2xl border border-slate-800 bg-slate-950 p-5 text-white outline-none placeholder:text-slate-400 focus:border-blue-500"
+        />
+
+        <VoiceAssistant
+          placement="inline"
+          targetElementId="diagnosehub-main-diagnosis-input"
+          targetLabel="Diagnosefeld"
         />
 
         <p className="mt-2 text-sm leading-6 text-slate-400">
@@ -2528,18 +2504,53 @@ ${chatText}
           )
         ) : null}
 
-        <label className="mt-3 grid gap-2">
-          <span className="text-xs font-black uppercase tracking-wide text-slate-400">
-            Interne Notiz / verursachendes Teil
-          </span>
-          <input
-            value={causingPart}
-            onChange={(event) => setCausingPart(event.target.value)}
-            placeholder="z. B. Ladeluftschlauch gerissen, AGR klemmt, noch offen"
-            className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-blue-500"
-          />
-        </label>
+        {saveDetailsOpen && (
+          <div className="mt-4 rounded-2xl border border-green-500/30 bg-green-500/10 p-4">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-sm font-black uppercase tracking-wide text-green-300">
+                  Fall speichern
+                </p>
+                <p className="mt-1 text-sm leading-6 text-slate-300">
+                  Interne Notiz und Schadensursache werden nur beim Speichern
+                  gepflegt.
+                </p>
+              </div>
+            </div>
 
+            <label className="mt-3 grid gap-2">
+              <span className="text-xs font-black uppercase tracking-wide text-slate-400">
+                Interne Notiz / Schadensursache
+              </span>
+              <input
+                value={causingPart}
+                onChange={(event) => setCausingPart(event.target.value)}
+                placeholder="z. B. Ladeluftschlauch gerissen, AGR klemmt, noch offen"
+                className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-blue-500"
+              />
+            </label>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void saveCurrentCase()}
+                disabled={messages.length === 0 || savedCaseLimitReached}
+                className="rounded-xl bg-green-600 px-4 py-2 text-sm font-black text-white transition hover:bg-green-500 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Jetzt speichern
+              </button>
+              <button
+                type="button"
+                onClick={() => setSaveDetailsOpen(false)}
+                className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-bold text-slate-300 transition hover:bg-slate-800"
+              >
+                Abbrechen
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!user && (
         <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-slate-400">
           <span className="rounded-full border border-slate-800 bg-slate-950/70 px-3 py-1.5">
             Ein Feld für alles
@@ -2560,141 +2571,22 @@ ${chatText}
             Sollwerte
           </span>
         </div>
+        )}
 
-        <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <div>
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-blue-300">
-                  {currentPlan.badge}
-                </span>
-
-                <p className="font-bold text-white">{currentPlan.label}</p>
-
-                <p className="text-sm text-slate-400">
-                  {normalizedUsage.count} / {diagnosisLimitLabel} KI-Anfragen diesen
-                  Monat
-                </p>
-
-                <p className="text-sm text-slate-400">
-                  {savingDisabledForPlan
-                    ? "Speichern erst ab Pro"
-                    : `${savedCases.length} / ${savedCaseLimitLabel} Fälle gespeichert`}
-                </p>
-
-                <span
-                  className={
-                    caseStorageSource === "supabase"
-                      ? "rounded-full border border-green-500/30 bg-green-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-green-300"
-                      : "rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-yellow-300"
-                  }
-                >
-                  {caseStorageLabel}
-                </span>
-
-                <span
-                  className={
-                    usageStorageSource === "supabase"
-                      ? "rounded-full border border-green-500/30 bg-green-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-green-300"
-                      : "rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-yellow-300"
-                  }
-                >
-                  {usageStorageLabel}
-                </span>
-              </div>
-
-              <p className="mt-2 text-sm text-slate-400">
-                {currentPlan.description} Noch verfügbar:{" "}
-                <span className="font-bold text-slate-300">
-                  {remainingDiagnosesLabel}
-                </span>{" "}
-                KI-Anfragen. {savingDisabledForPlan ? (
-                  <span className="font-bold text-yellow-300">
-                    Speichern ist erst ab Pro enthalten.
-                  </span>
-                ) : (
-                  <>
-                    Noch freie Speicherplätze:{" "}
-                    <span className="font-bold text-slate-300">
-                      {remainingSavedCasesLabel}
-                    </span>
-                    .
-                  </>
-                )}
-              </p>
-
-              <p className="mt-2 text-sm text-slate-400">
-                {user
-                  ? `Eingeloggt: ${user.email}.`
-                  : "Nicht eingeloggt: Bitte einloggen, um Diagnosen mit serverseitigem Monatslimit zu starten."}
-              </p>
-            </div>
-
-            {showLocalPlanSwitcher && !user && (
-              <div className="flex flex-wrap gap-2">
-                {SELECTABLE_USER_PLANS.map((plan) => (
-                  <button
-                    key={plan}
-                    type="button"
-                    onClick={() => changeUserPlan(plan)}
-                    title="Lokalen Testplan ändern"
-                    className={
-                      userPlan === plan
-                        ? "rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white"
-                        : "rounded-xl border border-slate-700 px-4 py-2 text-sm font-bold text-slate-300 transition hover:bg-slate-800"
-                    }
-                  >
-                    {PLAN_CONFIG[plan].label}
-                  </button>
-                ))}
-              </div>
-            )}
+        {!user && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-500/30 bg-blue-500/10 p-4">
+            <p className="text-sm font-semibold leading-6 text-blue-100">
+              Zum Starten bitte einloggen. Konto, Plan und Nutzung verwaltest
+              du im Accountbereich.
+            </p>
+            <a
+              href="/login"
+              className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white transition hover:bg-blue-500"
+            >
+              Login öffnen
+            </a>
           </div>
-
-          <div className="mt-4 flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={reloadSupabaseCases}
-              disabled={!user || caseSyncLoading}
-              className="rounded-xl border border-green-500/40 px-4 py-2 text-sm font-semibold text-green-300 transition hover:bg-green-500 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {caseSyncLoading ? "Synchronisiert..." : "Fälle neu laden"}
-            </button>
-
-            <button
-              type="button"
-              onClick={reloadSupabaseUsage}
-              disabled={!user || usageSyncLoading}
-              className="rounded-xl border border-green-500/40 px-4 py-2 text-sm font-semibold text-green-300 transition hover:bg-green-500 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {usageSyncLoading ? "Lädt..." : "Plan/Nutzung neu laden"}
-            </button>
-
-            <button
-              type="button"
-              onClick={migrateLocalCasesNow}
-              disabled={!user || caseSyncLoading}
-              className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Lokale Fälle übernehmen
-            </button>
-
-            {!user && (
-              <a
-                href="/login"
-                className="rounded-xl border border-blue-500/40 px-4 py-2 text-sm font-semibold text-blue-300 transition hover:bg-blue-500 hover:text-white"
-              >
-                Login öffnen
-              </a>
-            )}
-          </div>
-
-          {(caseSyncMessage || usageSyncMessage) && (
-            <div className="mt-4 rounded-xl border border-green-500/30 bg-green-500/10 p-3 text-sm font-semibold text-green-300">
-              {caseSyncMessage || usageSyncMessage}
-            </div>
-          )}
-        </div>
+        )}
 
         {error && (
           <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm font-semibold text-red-300">
@@ -2736,11 +2628,15 @@ ${chatText}
 
           <button
             type="button"
-            onClick={() => void saveCurrentCase()}
+            onClick={openSaveDetails}
             disabled={messages.length === 0 || savedCaseLimitReached}
             className="rounded-xl border border-green-500/40 px-5 py-3 font-bold text-green-300 transition hover:bg-green-500 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {savingDisabledForPlan ? "Speichern ab Pro" : "Fall speichern"}
+            {savingDisabledForPlan
+              ? "Speichern ab Pro"
+              : saveDetailsOpen
+                ? "Speicherbereich offen"
+                : "Fall speichern"}
           </button>
 
           <button
@@ -2784,6 +2680,9 @@ ${chatText}
                 index === latestAssistantMessageIndex
                   ? latestAssistantMessageRef
                   : null
+              }
+              data-diagnosehub-read-aloud={
+                message.role === "assistant" ? "answer" : undefined
               }
               className={
                 message.role === "user"

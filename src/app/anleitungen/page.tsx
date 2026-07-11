@@ -687,7 +687,7 @@ function GeneratedInstructionPanel({
       items: instruction.missingVehicleData ?? [],
     },
     {
-      title: "Teile / Material",
+      title: "Benötigte Ersatzteile / Material",
       items: instruction.partsAndMaterials ?? [],
     },
   ].filter((box) => box.items.length > 0);
@@ -781,7 +781,7 @@ function GeneratedInstructionPanel({
 
       <div className="grid gap-5 lg:grid-cols-2">
         <GeneratedBox title="Symptome" items={instruction.symptoms} />
-        <GeneratedBox title="Werkzeuge" items={instruction.tools} />
+        <GeneratedBox title="Benötigte Werkzeuge" items={instruction.tools} />
         <GeneratedBox title="Sicherheit" items={instruction.safetyNotes} />
         <GeneratedBox title="Erstprüfung" items={instruction.initialChecks} />
       </div>
@@ -930,18 +930,41 @@ function getGeneratedCauseBadgeClass(priority: string) {
   return "border-slate-300 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200";
 }
 
+function parseGeneratedRequirementItem(item: string) {
+  const match = item.match(
+    /^(Pflicht|Diagnose|Messung|Spezial|Optional|Arbeitsplatz|Bereitlegen|Nur bei Befund|Einmalteil|Dichtung|Betriebsstoff|Nach Herstellerdaten):\s*(.+)$/i,
+  );
+
+  if (!match) {
+    return {
+      label: "",
+      text: item,
+    };
+  }
+
+  return {
+    label: match[1],
+    text: match[2],
+  };
+}
+
 function GeneratedBox({ title, items }: GeneratedBoxProps) {
+  const normalizedTitle = title.toLowerCase();
   const isCauseBox =
-    title.toLowerCase().includes("typische fehler") ||
-    title.toLowerCase().includes("ursachen");
-  const wrapperClass = isCauseBox
-    ? "rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-950"
+    normalizedTitle.includes("typische fehler") ||
+    normalizedTitle.includes("ursachen");
+  const isRequirementBox =
+    normalizedTitle.includes("werkzeug") ||
+    normalizedTitle.includes("ersatzteile") ||
+    normalizedTitle.includes("material");
+  const wrapperClass = isRequirementBox
+    ? "rounded-3xl border border-slate-300 bg-slate-50 p-5 shadow-sm transition-colors dark:border-slate-700 dark:bg-slate-950"
     : "rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-950";
   const titleClass = "text-xl font-black text-slate-950 dark:text-slate-100";
-  const itemClass = isCauseBox
+  const itemClass = isCauseBox || isRequirementBox
     ? "flex gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-700 dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-300"
     : "flex gap-3 text-sm leading-6 text-slate-700 dark:text-slate-300";
-  const dotClass = isCauseBox
+  const dotClass = isCauseBox || isRequirementBox
     ? "mt-2 h-2 w-2 shrink-0 rounded-full bg-slate-500 dark:bg-slate-400"
     : "mt-2 h-2 w-2 shrink-0 rounded-full bg-slate-400 dark:bg-slate-500";
 
@@ -951,13 +974,18 @@ function GeneratedBox({ title, items }: GeneratedBoxProps) {
 
       {items.length > 0 ? (
         <ul className="mt-4 space-y-3">
-          {items.map((item) => {
+          {items.map((item, index) => {
             const causeItem = isCauseBox
               ? parseGeneratedCauseItem(item)
               : { priority: "", text: item };
+            const requirementItem =
+              !isCauseBox && isRequirementBox
+                ? parseGeneratedRequirementItem(item)
+                : { label: "", text: item };
+            const itemText = isCauseBox ? causeItem.text : requirementItem.text;
 
             return (
-              <li key={item} className={itemClass}>
+              <li key={`${item}-${index}`} className={itemClass}>
                 <span className={dotClass} />
                 <span className="min-w-0 flex-1">
                   {causeItem.priority && (
@@ -969,7 +997,12 @@ function GeneratedBox({ title, items }: GeneratedBoxProps) {
                       {causeItem.priority}
                     </span>
                   )}
-                  <span className="block">{causeItem.text}</span>
+                  {requirementItem.label && (
+                    <span className="mb-2 inline-flex rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs font-black uppercase tracking-wide text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">
+                      {requirementItem.label}
+                    </span>
+                  )}
+                  <span className="block">{itemText}</span>
                 </span>
               </li>
             );

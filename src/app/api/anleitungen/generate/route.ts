@@ -145,12 +145,16 @@ const instructionGuideTextFormat = {
       },
       tools: {
         type: "array",
+        description:
+          "Benötigte Werkzeuge nach Zweck. Mit kurzen Präfixen arbeiten: Pflicht, Diagnose, Messung, Spezial, Optional, Arbeitsplatz.",
         items: {
           type: "string",
         },
       },
       partsAndMaterials: {
         type: "array",
+        description:
+          "Benötigte Ersatzteile und Material. Keine Teile auf Verdacht. Mit Präfixen arbeiten: Bereitlegen, Nur bei Befund, Einmalteil, Dichtung, Betriebsstoff, Nach Herstellerdaten.",
         items: {
           type: "string",
         },
@@ -510,16 +514,22 @@ function normalizeGuide(rawGuide: unknown, query: string): Guide {
     tools: normalizeStringArray(
       raw.tools,
       [
-        "Diagnosetester",
-        "Drehmomentschlüssel",
-        "geeignetes Handwerkzeug",
-        "fahrzeugabhängiges Spezialwerkzeug",
+        "Pflicht: geeignetes Handwerkzeug passend zur Baugruppe",
+        "Diagnose: Diagnosetester oder Live-Daten, falls für den Fall relevant",
+        "Messung: Multimeter, Prüflampe oder Druck-/Temperaturmessgerät nur bei passender Prüfung",
+        "Spezial: fahrzeugabhängiges Spezialwerkzeug nach Herstellerdaten",
+        "Arbeitsplatz: Hebebühne, Unterstellböcke oder sichere Abstützung nur wenn nötig",
       ],
       10
     ),
     partsAndMaterials: normalizeStringArray(
       raw.partsAndMaterials,
-      ["Ersatzteile, Dichtungen, Schrauben und Betriebsstoffe erst nach Diagnose und Herstellerdaten festlegen."],
+      [
+        "Bereitlegen: nur Hilfs- und Verbrauchsmaterial, das für die Prüfung sicher benötigt wird",
+        "Nur bei Befund: Ersatzteile erst nach bestätigter Ursache ersetzen",
+        "Einmalteil: Dehnschrauben, Muttern, Clips oder Sicherungen nach Herstellerdaten erneuern",
+        "Dichtung/Betriebsstoff: Dichtungen, Öl, Kühlmittel oder Kältemittel nur passend zum Arbeitsumfang festlegen",
+      ],
       8
     ),
     safetyNotes: normalizeStringArray(
@@ -534,7 +544,7 @@ function normalizeGuide(rawGuide: unknown, query: string): Guide {
       raw.initialChecks,
       [
         "Fahrzeug, Baujahr, Motorisierung und Motorkennbuchstaben prüfen.",
-        "Teile, Dichtungen, Schrauben und Spezialwerkzeug bereitlegen.",
+        "Benötigte Werkzeuge und nur wirklich erforderliche Ersatzteile anhand Arbeitsumfang und Herstellerdaten festlegen.",
         "Fehlerspeicher und Istwerte prüfen, falls relevant.",
       ],
       5
@@ -722,8 +732,11 @@ STRUKTUR:
 KOMPAKTHEIT:
 - safetyNotes maximal 2–4 kurze Punkte.
 - initialChecks maximal 3–5 kurze Punkte.
-- tools maximal 6–10 Einträge.
-- partsAndMaterials maximal 4–8 Einträge.
+- tools maximal 6–10 Einträge und nach Zweck schreiben: "Pflicht:", "Diagnose:", "Messung:", "Spezial:", "Optional:" oder "Arbeitsplatz:".
+- partsAndMaterials maximal 4–8 Einträge und nach Verwendung schreiben: "Bereitlegen:", "Nur bei Befund:", "Einmalteil:", "Dichtung:", "Betriebsstoff:" oder "Nach Herstellerdaten:".
+- In partsAndMaterials keine pauschalen Ersatzteil-Empfehlungen. Ersatzteile nur nennen, wenn sie zum Arbeitsumfang gehören oder nach bestätigtem Befund plausibel sind.
+- Wenn ein Ersatzteil fahrzeugabhängig ist, nicht raten: "Nach Herstellerdaten anhand VIN/Motorcode festlegen" schreiben.
+- Bei Schrauben, Dichtungen, Clips, Sicherungen, Öl, Kühlmittel, Kältemittel und Bremsflüssigkeit klar sagen, ob sie zwingend neu müssen oder nur bei Demontage/Befund.
 - symptoms maximal 3–6 Einträge.
 - commonCauses maximal 3–6 Einträge und dort typische Fehler, mögliche Ursachen, bekannte Schwachstellen und Fehldiagnosen gemeinsam nennen.
 - commonCauses bevorzugt mit Priorität beginnen: [hoch], [mittel] oder [niedrig].
@@ -797,6 +810,8 @@ Vor Ausgabe intern prüfen:
 - Wurde eine falsche Baugruppe genannt?
 - Wurden Drehmomente erfunden?
 - Wurden Schlüsselweiten erfunden?
+- Sind benötigte Werkzeuge vollständig genug für Diagnose, Messung und Demontage?
+- Sind Ersatzteile/Material klar als "bereitlegen", "nur bei Befund" oder "nach Herstellerdaten" eingeordnet?
 - Ist die Anleitung praktisch nutzbar?
 - Ist das JSON vollständig?
 - Ist die Antwort kompakt genug?

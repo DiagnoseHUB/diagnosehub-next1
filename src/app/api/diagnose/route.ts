@@ -864,7 +864,8 @@ Pflichtinhalt Hobby-Modus:
 - Soll-/Richtwerte: immer angeben, wenn interne Werte zum Fall erkannt wurden.
 - Selbst machbar?: Ja, nein oder eingeschränkt, mit Begründung.
 - Schwierigkeit: Einfach, mittel, schwer oder Profi.
-- Werkzeug: Grundwerkzeug, Spezialwerkzeug, Diagnosegerät, Hebebühne nötig?
+- Werkzeug: Grundwerkzeug, Diagnosegerät, Messmittel, Spezialwerkzeug und Hebebühne getrennt nennen.
+- Benötigte Ersatzteile / Material: nicht auf Verdacht; nur "bereitlegen" oder "nur bei Befund ersetzen" nennen.
 - Risiko: nur relevante Risiken nennen, aber klar.
 - Prüfreihenfolge: erst einfache Checks, dann Messungen, dann Teiletausch.
 - Werkstattkosten grob: optional; wenn genannt, immer als grobe Schätzung kennzeichnen.
@@ -876,6 +877,7 @@ Antwortformat Hobby-Modus:
 # Selbst machbar?
 # Schwierigkeit
 # Werkzeug
+# Benötigte Ersatzteile / Material
 # Risiko
 # Prüfreihenfolge
 # Werkstattkosten grob
@@ -891,8 +893,9 @@ Fokus: Diagnosepfad, Messlogik, Plausibilität und nächster Arbeitsschritt.
 Pflichtinhalt Werkstatt-Modus:
 - Diagnosepfad: Symptom -> Ursachen/typische Fehler -> Prüfungen -> Messwerte -> Entscheidung.
 - Soll-/Richtwerte: erkannte Werte immer nennen und in die Messwertlogik einbauen.
-- Arbeitswerte/Teile: nur wenn sicher; sonst "als interne Daten/Herstellerdaten ergänzen" schreiben.
-- Spezialwerkzeug: klar benennen, wenn nötig; keine erfundenen Werkzeugnummern.
+- Benötigte Werkzeuge: Diagnosetester, Messmittel, Grundwerkzeug, Spezialwerkzeug und Hebebühne/Arbeitsplatz getrennt nennen.
+- Benötigte Ersatzteile / Material: nur wenn prüf- oder arbeitsbedingt plausibel; sonst klar "erst nach Befund/Herstellerdaten festlegen" schreiben.
+- Ersatzteile nicht als Diagnoseersatz verwenden: Dichtungen, Einmalschrauben, Betriebsstoffe und Befestigungsmaterial nur nennen, wenn sie für die Arbeit realistisch benötigt werden.
 - Ursachen / typische Fehler: mögliche Ursachen, Fehldiagnosen, bekannte Schwachstellen und Plausibilitätschecks zusammen bewerten.
 - Format für Ursachen / typische Fehler: je Bullet mit Priorität und Feldern schreiben:
   - [hoch] Ursache: ... | Typischer Fehler: ... | Prüfbeweis: ...
@@ -905,7 +908,8 @@ Antwortformat Werkstatt-Modus:
 # Soll-/Richtwerte
 # Prüfungen und Messwerte
 # Entscheidung
-# Spezialwerkzeug / Teile
+# Benötigte Werkzeuge
+# Benötigte Ersatzteile / Material
 # Speicherung / Notizen
 `;
 }
@@ -931,7 +935,20 @@ Ja, nein oder eingeschränkt. Kurz begründen und klare Grenze nennen.
 Einfach, mittel, schwer oder Profi.
 
 # Werkzeug
-Grundwerkzeug, Spezialwerkzeug, Diagnosegerät oder Hebebühne nennen, nur wenn relevant.
+Getrennt nennen:
+- Grundwerkzeug
+- Diagnosegerät / Messmittel
+- Spezialwerkzeug
+- Hebebühne / Arbeitsplatz
+Nur relevante Werkzeuge nennen. Keine erfundenen Spezialwerkzeugnummern.
+
+# Benötigte Ersatzteile / Material
+Trennen zwischen:
+- vorher bereitlegen
+- nur bei Befund ersetzen
+- Einmalteile / Dichtungen / Schrauben
+- Betriebsstoffe
+Keine Teile auf Verdacht empfehlen. Wenn unklar: "erst nach Prüfung und Herstellerdaten festlegen".
 
 # Risiko
 Nur relevante Risiken nennen: Bremse, Airbag, Hochvolt, Kraftstoff, Steuerzeiten, Lenkung, Klima-Kältemittel oder Fahrzeug bleibt liegen.
@@ -1010,7 +1027,20 @@ Antwortformat bei ausdrücklicher Anleitung:
 Wenn der Nutzer schreibt "genaue Anleitung", "Schritt für Schritt", "Ausbauanleitung", "Einbauanleitung" oder "druckbar", dann ausführlicher, aber weiterhin kompakt:
 
 # Werkzeug
-Nur relevante Werkzeuge.
+Getrennt nennen:
+- Grundwerkzeug
+- Diagnosegerät / Messmittel
+- Spezialwerkzeug
+- Hebebühne / Arbeitsplatz
+Nur relevante Werkzeuge nennen. Keine erfundenen Spezialwerkzeugnummern.
+
+# Benötigte Ersatzteile / Material
+Trennen zwischen:
+- vorher bereitlegen
+- nur bei Befund ersetzen
+- Einmalteile / Dichtungen / Schrauben
+- Betriebsstoffe
+Keine Teile auf Verdacht empfehlen. Wenn unklar: "erst nach Prüfung und Herstellerdaten festlegen".
 
 # Zugang
 Konkrete Demontage bis zum Bauteil.
@@ -1073,6 +1103,8 @@ Grundregeln:
 - Keine unnötigen Sicherheitshinweise.
 - Keine erfundenen Drehmomente, Füllmengen, Spezialwerkzeugnummern oder Herstellersollwerte.
 - Wenn genaue Werte fahrzeugabhängig sind, schreibe kurz: "nach Herstellervorgabe prüfen".
+- Benötigte Werkzeuge konkret und nach Zweck nennen: Diagnose, Messung, Demontage, Spezialwerkzeug, Arbeitsplatz.
+- Benötigte Ersatzteile und Material nie als pauschalen Teiletausch ausgeben; immer zwischen "bereitlegen", "nur bei Befund" und "nach Herstellerdaten" unterscheiden.
 - Keine illegalen Manipulationen erklären.
 - Keine Deaktivierung von Abgas-, Airbag-, ABS-, ESP- oder Assistenzsystemen erklären.
 
@@ -1341,6 +1373,7 @@ function answerMatchesAudienceMode(
       "# selbst machbar",
       "# schwierigkeit",
       "# werkzeug",
+      "# benötigte ersatzteile / material",
       "# risiko",
       "# prüfreihenfolge",
       "# nächste schritte",
@@ -1354,6 +1387,8 @@ function answerMatchesAudienceMode(
     "# ursachen / typische fehler",
     "# prüfungen und messwerte",
     "# entscheidung",
+    "# benötigte werkzeuge",
+    "# benötigte ersatzteile / material",
   ];
 
   return workshopHeadings.every((heading) => normalizedAnswer.includes(heading));
@@ -1370,6 +1405,7 @@ Verwende zwingend die Hobby-Abschnitte:
 # Selbst machbar?
 # Schwierigkeit
 # Werkzeug
+# Benötigte Ersatzteile / Material
 # Risiko
 # Prüfreihenfolge
 # Werkstattkosten grob
@@ -1387,7 +1423,8 @@ Verwende zwingend die Werkstatt-Abschnitte:
 # Soll-/Richtwerte
 # Prüfungen und Messwerte
 # Entscheidung
-# Spezialwerkzeug / Teile
+# Benötigte Werkzeuge
+# Benötigte Ersatzteile / Material
 # Speicherung / Notizen
   `;
 }

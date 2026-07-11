@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type RefObject,
+} from "react";
 import Link from "next/link";
 import type {
   AuthChangeEvent,
@@ -291,9 +298,87 @@ function scheduleProfileScroll(profileSectionRef: RefObject<HTMLDivElement | nul
   }, 120);
 }
 
+function isPlaceholderProfileName(name: string, email?: string | null) {
+  const cleanName = name.trim().toLowerCase();
+  const emailPrefix = email?.split("@")[0]?.trim().toLowerCase() || "";
+
+  return (
+    !cleanName ||
+    cleanName === "diagnosehub nutzer" ||
+    cleanName === "nicht hinterlegt" ||
+    cleanName === "profil noch nicht gespeichert" ||
+    Boolean(emailPrefix && cleanName === emailPrefix)
+  );
+}
+
+function isPlaceholderWorkshopName(workshopName: string) {
+  const cleanWorkshopName = workshopName.trim().toLowerCase();
+
+  return (
+    !cleanWorkshopName ||
+    cleanWorkshopName === "nicht angegeben" ||
+    cleanWorkshopName === "profil noch nicht gespeichert"
+  );
+}
+
+function needsWorkshopProfileSetup(
+  profile: WorkshopProfileDatabaseRow | null,
+  currentUser?: User | null
+) {
+  if (!profile) {
+    return true;
+  }
+
+  return (
+    isPlaceholderProfileName(profile.full_name, profile.email || currentUser?.email) ||
+    !profile.email ||
+    !profile.email.includes("@")
+  );
+}
+
+function isEnterNavigationInput(
+  target: EventTarget | null
+): target is HTMLInputElement {
+  if (!(target instanceof HTMLInputElement)) {
+    return false;
+  }
+
+  return ![
+    "button",
+    "checkbox",
+    "file",
+    "hidden",
+    "radio",
+    "range",
+    "reset",
+    "submit",
+  ].includes(target.type);
+}
+
+function isFocusableEnterTarget(element: HTMLElement) {
+  if (
+    element instanceof HTMLInputElement ||
+    element instanceof HTMLSelectElement ||
+    element instanceof HTMLButtonElement
+  ) {
+    return !element.disabled;
+  }
+
+  return true;
+}
+
+function focusEnterTarget(element: HTMLElement) {
+  element.focus();
+
+  if (element instanceof HTMLInputElement && element.type !== "date") {
+    element.select();
+  }
+}
+
 export default function LoginPage() {
   const supabase = useMemo(() => createClient(), []);
   const profileSectionRef = useRef<HTMLDivElement | null>(null);
+  const profileNameInputRef = useRef<HTMLInputElement | null>(null);
 
   const [user, setUser] = useState<User | null>(null);
 
@@ -353,6 +438,85 @@ export default function LoginPage() {
     ).label}`;
   }, [databaseProfile, savedAccount, user]);
 
+  function handleEnterToNextField(event: ReactKeyboardEvent<HTMLElement>) {
+    if (
+      event.key !== "Enter" ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey ||
+      !isEnterNavigationInput(event.target)
+    ) {
+      return;
+    }
+
+    const currentElement = event.target;
+    const scope = currentElement.closest("[data-enter-scope]") as HTMLElement | null;
+
+    if (!scope) {
+      return;
+    }
+
+    const targets = Array.from(
+      scope.querySelectorAll<HTMLElement>("[data-enter-next]")
+    ).filter(isFocusableEnterTarget);
+    const currentIndex = targets.findIndex((target) => target === currentElement);
+    const nextTarget = currentIndex >= 0 ? targets[currentIndex + 1] : null;
+
+    event.preventDefault();
+
+    if (nextTarget) {
+      focusEnterTarget(nextTarget);
+      return;
+    }
+
+    const fallbackTargetId = scope.dataset.enterSubmitTarget;
+    const fallbackTarget = fallbackTargetId
+      ? document.getElementById(fallbackTargetId)
+      : null;
+
+    if (fallbackTarget) {
+      focusEnterTarget(fallbackTarget);
+    }
+  }
+
+  function prepareProfileFieldsForSetup(
+    profile: WorkshopProfileDatabaseRow | null,
+    currentUser?: User | null
+  ) {
+    if (!profile) {
+      setDatabaseProfile(null);
+      setSavedAccount(null);
+      setName("");
+      setWorkshop("");
+      setRole(DEFAULT_ROLE);
+      setPlan("free");
+      return;
+    }
+
+    setName(
+      isPlaceholderProfileName(profile.full_name, profile.email || currentUser?.email)
+        ? ""
+        : profile.full_name
+    );
+    setWorkshop(
+      isPlaceholderWorkshopName(profile.workshop_name)
+        ? ""
+        : profile.workshop_name
+    );
+    setRole(profile.role || DEFAULT_ROLE);
+    setPlan(normalizeUserPlan(profile.plan || "free"));
+  }
+
+  function openRequiredProfileSetup(
+    profile: WorkshopProfileDatabaseRow | null,
+    currentUser: User | null,
+    message: string
+  ) {
+    prepareProfileFieldsForSetup(profile, currentUser);
+    openProfileSetup(message);
+  }
+
   useEffect(() => {
     loadLocalAccount();
 
@@ -387,12 +551,18 @@ export default function LoginPage() {
         await loadDeviceAccess(data.session);
         await loadSafetyProfile(data.session);
 
-        if (shouldOpenProfile || !profile) {
-          openProfileSetup(
-            profile
-              ? "Prüfe kurz dein Nutzerprofil und passe es bei Bedarf an."
-              : "Erstelle jetzt dein Nutzerprofil. Danach kannst du DiagnoseHUB sauber nutzen."
-          );
+        if (shouldOpenProfile || needsWorkshopProfileSetup(profile, data.session.user)) {
+          if (needsWorkshopProfileSetup(profile, data.session.user)) {
+            openRequiredProfileSetup(
+              profile,
+              data.session.user,
+              "Erstelle jetzt dein Nutzerprofil. Danach kannst du DiagnoseHUB sauber nutzen."
+            );
+          } else {
+            openProfileSetup(
+              "Prüfe kurz dein Nutzerprofil und passe es bei Bedarf an."
+            );
+          }
         }
       }
     }
@@ -431,8 +601,10 @@ export default function LoginPage() {
             await loadDeviceAccess(nextSession);
             await loadSafetyProfile(nextSession);
 
-            if (!profile) {
-              openProfileSetup(
+            if (needsWorkshopProfileSetup(profile, nextSession.user)) {
+              openRequiredProfileSetup(
+                profile,
+                nextSession.user,
                 "Erstelle jetzt dein Nutzerprofil. Danach sind Dashboard, Diagnose und Service sauber mit deinem Account verbunden."
               );
             }
@@ -634,6 +806,10 @@ export default function LoginPage() {
   function openProfileSetup(message: string) {
     setProfileGuidance(message);
     scheduleProfileScroll(profileSectionRef);
+    window.setTimeout(() => {
+      profileNameInputRef.current?.focus();
+      profileNameInputRef.current?.select();
+    }, 220);
   }
 
   async function handleRegister() {
@@ -676,39 +852,17 @@ export default function LoginPage() {
         setUser(data.user);
         setAuthPassword("");
         setAuthMessage(
-          "Registrierung erfolgreich. Prüfe jetzt kurz dein Nutzerprofil."
+          "Account erstellt. Bitte lege jetzt dein Nutzerprofil an."
         );
 
         if (data.user) {
-          try {
-            const profile = await saveWorkshopProfileToSupabase(
-              supabase,
-              data.user,
-              {
-                fullName:
-                  name.trim() ||
-                  data.user.email?.split("@")[0] ||
-                  "DiagnoseHUB Nutzer",
-                workshopName: workshop.trim(),
-                email: data.user.email || cleanEmail,
-                role: role || DEFAULT_ROLE,
-              }
-            );
-
-            applyProfileToState(profile, data.user);
-            openProfileSetup(
-              "Dein Profil wurde automatisch vorbereitet. Prüfe Name und optional Betrieb/Firma und speichere bei Bedarf."
-            );
-          } catch (profileError) {
-            console.error(
-              "Nutzerprofil konnte nach Registrierung nicht automatisch erstellt werden:",
-              profileError
-            );
-            await loadWorkshopProfile(data.user);
-            openProfileSetup(
-              "Bitte erstelle jetzt dein Nutzerprofil. Danach sind deine Daten zentral gespeichert."
-            );
-          }
+          clearLocalWorkshopProfileState();
+          notifyWorkshopProfileChanged();
+          openRequiredProfileSetup(
+            null,
+            data.user,
+            "Bitte erstelle jetzt dein Nutzerprofil. Danach sind deine Daten zentral gespeichert."
+          );
         }
 
         if (data.session) {
@@ -770,8 +924,10 @@ export default function LoginPage() {
           try {
             const profile = await loadWorkshopProfile(data.user);
 
-            if (!profile) {
-              openProfileSetup(
+            if (needsWorkshopProfileSetup(profile, data.user)) {
+              openRequiredProfileSetup(
+                profile,
+                data.user,
                 "Lege jetzt dein Nutzerprofil an. Danach kannst du DiagnoseHUB vollständig nutzen."
               );
             }
@@ -1441,65 +1597,75 @@ export default function LoginPage() {
                     </button>
                   </div>
 
-                  <div className="mt-6 grid gap-4">
-                    <div>
-                      <label className="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-300">
-                        E-Mail
-                      </label>
-
-                      <input
-                        value={authEmail}
-                        onChange={(event) => setAuthEmail(event.target.value)}
-                        placeholder="mail@beispiel.de"
-                        autoComplete="email"
-                        className="w-full rounded-2xl border border-slate-300 bg-white px-5 py-4 text-slate-950 outline-none placeholder:text-slate-400 focus:border-blue-500 dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-600"
-                      />
-                    </div>
-
-                    {authMode !== "reset" && (
-                    <div>
-                      <label className="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-300">
-                        Passwort
-                      </label>
-
-                      <input
-                        value={authPassword}
-                        onChange={(event) =>
-                          setAuthPassword(event.target.value)
-                        }
-                        type="password"
-                        placeholder="Mindestens 6 Zeichen"
-                        autoComplete={
-                          authMode === "login"
-                            ? "current-password"
-                            : "new-password"
-                        }
-                        className="w-full rounded-2xl border border-slate-300 bg-white px-5 py-4 text-slate-950 outline-none placeholder:text-slate-400 focus:border-blue-500 dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-600"
-                      />
-                    </div>
-                    )}
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={
-                      authMode === "login"
-                        ? handleLogin
-                        : authMode === "register"
-                          ? handleRegister
-                          : handlePasswordResetRequest
-                    }
-                    disabled={authLoading}
-                    className="mt-6 w-full rounded-2xl bg-blue-600 px-6 py-4 font-bold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  <div
+                    data-enter-scope
+                    data-enter-submit-target="auth-submit-button"
+                    onKeyDown={handleEnterToNextField}
                   >
-                    {authLoading
-                      ? "Bitte warten..."
-                      : authMode === "login"
-                        ? "Einloggen"
-                        : authMode === "register"
-                          ? "Account erstellen"
-                          : "Link senden"}
-                  </button>
+                    <div className="mt-6 grid gap-4">
+                      <div>
+                        <label className="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                          E-Mail
+                        </label>
+
+                        <input
+                          data-enter-next
+                          value={authEmail}
+                          onChange={(event) => setAuthEmail(event.target.value)}
+                          placeholder="mail@beispiel.de"
+                          autoComplete="email"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-5 py-4 text-slate-950 outline-none placeholder:text-slate-400 focus:border-blue-500 dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-600"
+                        />
+                      </div>
+
+                      {authMode !== "reset" && (
+                        <div>
+                          <label className="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                            Passwort
+                          </label>
+
+                          <input
+                            data-enter-next
+                            value={authPassword}
+                            onChange={(event) =>
+                              setAuthPassword(event.target.value)
+                            }
+                            type="password"
+                            placeholder="Mindestens 6 Zeichen"
+                            autoComplete={
+                              authMode === "login"
+                                ? "current-password"
+                                : "new-password"
+                            }
+                            className="w-full rounded-2xl border border-slate-300 bg-white px-5 py-4 text-slate-950 outline-none placeholder:text-slate-400 focus:border-blue-500 dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-600"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      id="auth-submit-button"
+                      data-enter-next
+                      type="button"
+                      onClick={
+                        authMode === "login"
+                          ? handleLogin
+                          : authMode === "register"
+                            ? handleRegister
+                            : handlePasswordResetRequest
+                      }
+                      disabled={authLoading}
+                      className="mt-6 w-full rounded-2xl bg-blue-600 px-6 py-4 font-bold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {authLoading
+                        ? "Bitte warten..."
+                        : authMode === "login"
+                          ? "Einloggen"
+                          : authMode === "register"
+                            ? "Account erstellen"
+                            : "Link senden"}
+                    </button>
+                  </div>
 
                   <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-sm font-semibold">
                     {authMode !== "reset" ? (
@@ -1593,13 +1759,20 @@ export default function LoginPage() {
                 optional und kann für private Nutzer leer bleiben.
               </p>
 
-              <div className="mt-8 grid gap-4">
+              <div
+                className="mt-8 grid gap-4"
+                data-enter-scope
+                data-enter-submit-target="profile-save-button"
+                onKeyDown={handleEnterToNextField}
+              >
                 <div>
                   <label className="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-300">
                     Name
                   </label>
 
                   <input
+                    ref={profileNameInputRef}
+                    data-enter-next
                     value={name}
                     onChange={(event) => setName(event.target.value)}
                     placeholder="Max Mustermann"
@@ -1614,6 +1787,7 @@ export default function LoginPage() {
                   </label>
 
                   <input
+                    data-enter-next
                     value={workshop}
                     onChange={(event) => setWorkshop(event.target.value)}
                     placeholder="Optional, z. B. KFZ Musterbetrieb"
@@ -1643,6 +1817,7 @@ export default function LoginPage() {
                   </label>
 
                   <input
+                    data-enter-next
                     value={role}
                     onChange={(event) => setRole(event.target.value)}
                     placeholder="Privatnutzer / Mechaniker / Meister / Inhaber"
@@ -1718,7 +1893,12 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                <div className="mt-6 grid gap-4 md:grid-cols-2">
+                <div
+                  className="mt-6 grid gap-4 md:grid-cols-2"
+                  data-enter-scope
+                  data-enter-submit-target="safety-terms-checkbox"
+                  onKeyDown={handleEnterToNextField}
+                >
                   <div>
                     <label className="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-300">
                       Kontotyp
@@ -1768,6 +1948,7 @@ export default function LoginPage() {
                       Betrieb/Firma für Einstufung
                     </label>
                     <input
+                      data-enter-next
                       value={safetySettings.companyName}
                       onChange={(event) =>
                         setSafetySettings((currentSettings) => ({
@@ -1786,6 +1967,7 @@ export default function LoginPage() {
                       Telefon
                     </label>
                     <input
+                      data-enter-next
                       value={safetySettings.companyPhone}
                       onChange={(event) =>
                         setSafetySettings((currentSettings) => ({
@@ -1804,6 +1986,7 @@ export default function LoginPage() {
                       Anschrift
                     </label>
                     <input
+                      data-enter-next
                       value={safetySettings.companyAddress}
                       onChange={(event) =>
                         setSafetySettings((currentSettings) => ({
@@ -1822,6 +2005,7 @@ export default function LoginPage() {
                       Website
                     </label>
                     <input
+                      data-enter-next
                       value={safetySettings.companyWebsite}
                       onChange={(event) =>
                         setSafetySettings((currentSettings) => ({
@@ -1838,6 +2022,7 @@ export default function LoginPage() {
 
                 <label className="mt-5 flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
                   <input
+                    id="safety-terms-checkbox"
                     type="checkbox"
                     checked={safetyTermsAccepted}
                     onChange={(event) =>
@@ -1874,7 +2059,12 @@ export default function LoginPage() {
                     manuell.
                   </p>
 
-                  <div className="mt-5 grid gap-4 md:grid-cols-2">
+                  <div
+                    className="mt-5 grid gap-4 md:grid-cols-2"
+                    data-enter-scope
+                    data-enter-submit-target="hv-confirmation-checkbox"
+                    onKeyDown={handleEnterToNextField}
+                  >
                     <div>
                       <label className="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-300">
                         HV-Qualifikation
@@ -1904,6 +2094,7 @@ export default function LoginPage() {
                         Schulungsanbieter
                       </label>
                       <input
+                        data-enter-next
                         value={safetySettings.hvTrainingProvider}
                         onChange={(event) =>
                           setSafetySettings((currentSettings) => ({
@@ -1922,6 +2113,7 @@ export default function LoginPage() {
                         Schulungsdatum
                       </label>
                       <input
+                        data-enter-next
                         type="date"
                         value={safetySettings.hvTrainingDate}
                         onChange={(event) =>
@@ -1940,6 +2132,7 @@ export default function LoginPage() {
                         Zertifikat / Nachweis
                       </label>
                       <input
+                        data-enter-next
                         value={safetySettings.hvCertificateName}
                         onChange={(event) =>
                           setSafetySettings((currentSettings) => ({
@@ -1958,6 +2151,7 @@ export default function LoginPage() {
                         Link zum Nachweis
                       </label>
                       <input
+                        data-enter-next
                         value={safetySettings.hvCertificateUrl}
                         onChange={(event) =>
                           setSafetySettings((currentSettings) => ({
@@ -1974,6 +2168,7 @@ export default function LoginPage() {
 
                   <label className="mt-5 flex gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-900 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
                     <input
+                      id="hv-confirmation-checkbox"
                       type="checkbox"
                       checked={hvSafetyConfirmation}
                       onChange={(event) =>
@@ -2088,6 +2283,7 @@ export default function LoginPage() {
 
               <div className="mt-8 flex flex-wrap gap-3">
                 <button
+                  id="profile-save-button"
                   type="button"
                   onClick={saveAccount}
                   disabled={!user || profileLoading}

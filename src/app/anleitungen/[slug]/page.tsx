@@ -92,7 +92,7 @@ export default async function InstructionDetailPage({
       items: instruction.requiredSkill ? [instruction.requiredSkill] : [],
     },
     {
-      title: "Fehlende Fahrzeugdaten",
+      title: "Fehlende Daten für mehr Genauigkeit",
       items: instruction.missingVehicleData ?? [],
     },
     {
@@ -167,7 +167,7 @@ export default async function InstructionDetailPage({
 
             <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
               <strong className="text-slate-950 dark:text-slate-100">
-                Gültigkeit:
+                Gültigkeit / Datenbasis:
               </strong>{" "}
               {instruction.vehicleApplicability}
             </div>

@@ -675,6 +675,12 @@ function GeneratedInstructionPanel({
 }: GeneratedInstructionPanelProps) {
   const overviewBoxes = [
     {
+      title: "Gültigkeit / Datenbasis",
+      items: instruction.vehicleApplicability
+        ? [instruction.vehicleApplicability]
+        : [],
+    },
+    {
       title: "Diagnoseziel",
       items: instruction.diagnosisGoal ? [instruction.diagnosisGoal] : [],
     },
@@ -683,7 +689,7 @@ function GeneratedInstructionPanel({
       items: instruction.requiredSkill ? [instruction.requiredSkill] : [],
     },
     {
-      title: "Fehlende Fahrzeugdaten",
+      title: "Fehlende Daten für mehr Genauigkeit",
       items: instruction.missingVehicleData ?? [],
     },
     {

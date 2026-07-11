@@ -9,7 +9,8 @@
     "lint": "eslint",
     "cap:sync": "cap sync",
     "cap:android": "cap open android",
-    "cap:ios": "cap open ios"
+    "cap:ios": "cap open ios",
+    "seed:library": "node scripts/seed-diagnosishub-library.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.1",

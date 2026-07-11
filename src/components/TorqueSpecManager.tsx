@@ -141,7 +141,7 @@ function Field({
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         required={required}
-        className="min-h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-950 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-blue-950"
+        className="min-h-11 w-full min-w-0 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-950 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-blue-950"
       />
     </label>
   );
@@ -168,7 +168,7 @@ function TextAreaField({
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         rows={rows}
-        className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-blue-950"
+        className="w-full min-w-0 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-blue-950"
       />
     </label>
   );
@@ -192,16 +192,16 @@ function TorqueSpecSummary({
     <div
       className={
         framed
-          ? "rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-900"
+          ? "min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-900 sm:p-5"
           : ""
       }
     >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-lg font-black text-slate-950 dark:text-white">
+      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <p className="break-words text-lg font-black text-slate-950 dark:text-white">
             {formatTorqueSpecTitle(spec)}
           </p>
-          <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
+          <p className="mt-1 break-words text-sm font-semibold text-slate-500 dark:text-slate-400">
             {vehicleParts.length ? vehicleParts.join(" · ") : "Fahrzeugbezug offen"}
           </p>
         </div>
@@ -429,17 +429,17 @@ export default function TorqueSpecManager() {
   const pendingCount = ownSpecs.filter((spec) => spec.status === "pending_review").length;
 
   return (
-    <div className="mx-auto grid max-w-7xl gap-8">
-      <section className="grid gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-900">
+    <div className="mx-auto grid w-full min-w-0 max-w-7xl gap-8">
+      <section className="grid min-w-0 gap-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-900 sm:p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
+          <div className="min-w-0">
             <p className="text-sm font-black uppercase tracking-wide text-blue-700 dark:text-blue-300">
               Drehmoment-Freigabe
             </p>
-            <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950 dark:text-white md:text-4xl">
+            <h1 className="mt-2 break-words text-3xl font-black tracking-tight text-slate-950 dark:text-white md:text-4xl">
               Gemeinsame Drehmoment-Datenbank
             </h1>
-            <p className="mt-3 max-w-3xl leading-7 text-slate-600 dark:text-slate-300">
+            <p className="mt-3 max-w-3xl break-words leading-7 text-slate-600 dark:text-slate-300">
               Du erfasst Werte als Entwurf oder Einreichung. Erst nach manueller
               Betreiber-Freigabe werden sie für alle Nutzer sichtbar und automatisch in passenden
               Diagnoseantworten ergänzt.
@@ -471,7 +471,7 @@ export default function TorqueSpecManager() {
       </section>
 
       {authenticated === false && (
-        <section className="rounded-3xl border border-amber-200 bg-amber-50 p-6 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100">
+        <section className="min-w-0 rounded-3xl border border-amber-200 bg-amber-50 p-4 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100 sm:p-6">
           <p className="font-black">Bitte einloggen.</p>
           <p className="mt-2 leading-7">
             Freigegebene Werte liegen in der gemeinsamen Datenbank. Eigene Entwürfe
@@ -483,7 +483,7 @@ export default function TorqueSpecManager() {
 
       {(notice || errorMessage) && (
         <section
-          className={`rounded-3xl border p-5 text-sm font-bold ${
+          className={`min-w-0 rounded-3xl border p-4 text-sm font-bold sm:p-5 ${
             errorMessage
               ? "border-red-200 bg-red-50 text-red-800 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-200"
               : "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-200"
@@ -493,8 +493,8 @@ export default function TorqueSpecManager() {
         </section>
       )}
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-900">
-        <h2 className="text-2xl font-black text-slate-950 dark:text-white">
+      <section className="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+        <h2 className="break-words text-2xl font-black text-slate-950 dark:text-white">
           Drehmomentwert für die gemeinsame Datenbank eintragen
         </h2>
         <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-500 dark:text-slate-400">
@@ -615,7 +615,7 @@ export default function TorqueSpecManager() {
                 onChange={(event) =>
                   updateForm("safetyLevel", event.target.value as TorqueSpecSafetyLevel)
                 }
-                className="min-h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-950 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-blue-950"
+                className="min-h-11 w-full min-w-0 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-950 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:ring-blue-950"
               >
                 {safetyLevelOptions.map((option) => (
                   <option key={option} value={option}>
@@ -654,7 +654,7 @@ export default function TorqueSpecManager() {
               onChange={(value) => updateForm("sourceReference", value)}
               placeholder="Dokument, Version, Seite, Datenstand"
             />
-            <label className="flex min-h-11 items-center gap-3 self-end rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">
+            <label className="flex min-h-11 min-w-0 items-center gap-3 self-end rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">
               <input
                 type="checkbox"
                 checked={formState.newFastenerRequired}
@@ -695,13 +695,13 @@ export default function TorqueSpecManager() {
         </form>
       </section>
 
-      <section className="rounded-3xl border border-emerald-200 bg-emerald-50 p-6 shadow-sm transition-colors dark:border-emerald-500/40 dark:bg-emerald-500/10">
+      <section className="min-w-0 rounded-3xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm transition-colors dark:border-emerald-500/40 dark:bg-emerald-500/10 sm:p-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
+          <div className="min-w-0">
             <p className="text-sm font-black uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
               Freigegebene Werte
             </p>
-            <h2 className="mt-2 text-2xl font-black text-slate-950 dark:text-white">
+            <h2 className="mt-2 break-words text-2xl font-black text-slate-950 dark:text-white">
               Gemeinsame Drehmoment-Datenbank
             </h2>
             <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">
@@ -739,13 +739,13 @@ export default function TorqueSpecManager() {
       </section>
 
       {canApprove && (
-        <section className="rounded-3xl border border-blue-200 bg-blue-50 p-6 shadow-sm transition-colors dark:border-blue-500/40 dark:bg-blue-500/10">
+        <section className="min-w-0 rounded-3xl border border-blue-200 bg-blue-50 p-4 shadow-sm transition-colors dark:border-blue-500/40 dark:bg-blue-500/10 sm:p-6">
           <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-            <div>
+            <div className="min-w-0">
               <p className="text-sm font-black uppercase tracking-wide text-blue-700 dark:text-blue-300">
                 Betreiber-Freigabe
               </p>
-              <h2 className="mt-2 text-2xl font-black text-slate-950 dark:text-white">
+              <h2 className="mt-2 break-words text-2xl font-black text-slate-950 dark:text-white">
                 Für die gemeinsame Datenbank freigeben
               </h2>
               <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">
@@ -804,10 +804,10 @@ export default function TorqueSpecManager() {
         </section>
       )}
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-black text-slate-950 dark:text-white">
+      <section className="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0">
+            <h2 className="break-words text-2xl font-black text-slate-950 dark:text-white">
               Meine Entwürfe und Einreichungen
             </h2>
             <p className="mt-2 text-sm font-semibold text-slate-500 dark:text-slate-400">

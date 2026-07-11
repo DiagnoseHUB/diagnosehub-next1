@@ -450,6 +450,30 @@ function normalizeSteps(value: unknown): GuideStep[] {
   return steps.length > 0 ? steps : fallbackSteps;
 }
 
+function normalizeVehicleApplicability(value: unknown) {
+  const fallback =
+    "Allgemeiner Arbeits- und Diagnoseablauf. Exakte Werte, Zugang, Teile und Spezialwerkzeug erst nach eindeutiger Fahrzeugidentifikation, Motorcode/Systemvariante und Herstellerdaten festlegen.";
+
+  const text =
+    typeof value === "string" && value.trim()
+      ? truncate(value, 420)
+      : fallback;
+
+  const hasDataBasis =
+    /fahrzeug|vin|motorcode|motorkenn|herstellerdaten|systemvariante|modell|baujahr/i.test(
+      text
+    );
+
+  if (hasDataBasis) {
+    return text;
+  }
+
+  return truncate(
+    `${text} Fahrzeugabhängige Werte, Teile und Spezialwerkzeug nach VIN/Motorcode und Herstellerdaten prüfen.`,
+    420
+  );
+}
+
 function normalizeGuide(rawGuide: unknown, query: string): Guide {
   const raw =
     rawGuide && typeof rawGuide === "object"
@@ -477,11 +501,9 @@ function normalizeGuide(rawGuide: unknown, query: string): Guide {
       typeof raw.estimatedTime === "string" && raw.estimatedTime.trim()
         ? truncate(raw.estimatedTime, 80)
         : "Fahrzeugabhängig",
-    vehicleApplicability:
-      typeof raw.vehicleApplicability === "string" &&
-      raw.vehicleApplicability.trim()
-        ? truncate(raw.vehicleApplicability, 420)
-        : "Nur nach eindeutiger Fahrzeugidentifikation, Motorkennbuchstaben und Reparaturumfang anwenden.",
+    vehicleApplicability: normalizeVehicleApplicability(
+      raw.vehicleApplicability
+    ),
     tags: normalizeStringArray(raw.tags, [query, "KI-Anleitung"], 8),
     diagnosisGoal:
       typeof raw.diagnosisGoal === "string" && raw.diagnosisGoal.trim()
@@ -490,8 +512,10 @@ function normalizeGuide(rawGuide: unknown, query: string): Guide {
     missingVehicleData: normalizeStringArray(
       raw.missingVehicleData,
       [
-        "Hersteller, Modell, Baujahr, Motorcode und Systemvariante prüfen.",
-        "Fehlercode mit vollständigem Testertext dokumentieren, falls vorhanden.",
+        "Hersteller, Modell, Baujahr, Motorcode, Getriebe/Antrieb und Systemvariante angeben.",
+        "VIN oder HSN/TSN ergänzen, wenn Werte, Ersatzteile oder Spezialwerkzeug eindeutig bestimmt werden sollen.",
+        "Fehlercode mit vollständigem Testertext, Freeze-Frame und Istwerten dokumentieren, falls vorhanden.",
+        "Bereits geprüfte Punkte und Messbedingungen nennen, damit keine Prüfung doppelt läuft.",
       ],
       6
     ),
@@ -553,7 +577,8 @@ function normalizeGuide(rawGuide: unknown, query: string): Guide {
       raw.measurementPlan,
       [
         "Messwerte nur unter definiertem Betriebszustand bewerten.",
-        "Soll-/Istwerte dokumentieren und Abweichung vor Teiletausch bestätigen.",
+        "Soll-/Istwerte dokumentieren und exakte Sollwerte nur aus Herstellerdaten oder geprüfter Datenquelle übernehmen.",
+        "Abweichung vor Teiletausch durch zweite Prüfung oder Plausibilitätscheck bestätigen.",
       ],
       8
     ),
@@ -581,7 +606,7 @@ function normalizeGuide(rawGuide: unknown, query: string): Guide {
     proHint:
       typeof raw.proHint === "string" && raw.proHint.trim()
         ? truncate(raw.proHint, 320)
-        : "Praxis-Hinweis: Die Anleitung gibt den Werkstattablauf vor. Exakte Werte bei Bedarf gegen Herstellerdaten prüfen.",
+        : "Praxis-Hinweis: Die Anleitung gibt den Ablauf vor. Exakte Werte, Teilenummern und Spezialwerkzeug nur aus Fahrzeugdaten, VIN oder Herstellerdaten übernehmen.",
     lastUpdated: new Date().toISOString().slice(0, 10),
   };
 }
@@ -715,6 +740,15 @@ Keine unnötigen Belehrungen.
 Keine wiederholten Standardhinweise.
 Keine erfundenen Drehmomente, Schlüsselweiten, Spezialwerkzeugnummern oder Herstellerwerte.
 
+DATENBASIS UND GENAUIGKEIT:
+- Die Anleitung darf nur so konkret sein, wie Suchbegriff, Diagnoseinhalt und vorhandene Fahrzeugdaten es erlauben.
+- Wenn Hersteller, Modell, Baujahr, Motorcode, Getriebe, Antrieb, Systemvariante oder VIN fehlen, müssen fahrzeugabhängige Punkte als fahrzeugabhängig markiert werden.
+- Exakte Drehmomente, Drehwinkel, Füllmengen, Druckwerte, Spannungswerte, Pinbelegungen, Sicherungsnummern, Teilenummern, Spezialwerkzeugnummern und Arbeitswerte nur nennen, wenn sie ausdrücklich in der Eingabe stehen oder aus geprüften internen Daten stammen.
+- Da für diese Anfrage keine geprüfte Herstellerdatenbank mitgeliefert wird, solche exakten Werte im Zweifel nicht ausgeben, sondern "nach Herstellerdaten anhand VIN/Motorcode festlegen" schreiben.
+- expectedResult darf allgemeine Sollzustände nennen, aber keine exakten Zahlenwerte raten.
+- vehicleApplicability muss klar sagen, ob die Anleitung nur ein allgemeiner Arbeits-/Diagnoseablauf ist oder für ein konkretes Fahrzeug/System gilt.
+- missingVehicleData muss genau die Daten nennen, die die Anleitung sicherer und genauer machen.
+
 AUSGABE:
 Du musst ausschließlich gültiges JSON im vorgegebenen Schema ausgeben.
 Die Antwort muss vollständig abgeschlossen werden.
@@ -744,7 +778,8 @@ KOMPAKTHEIT:
 - measurementPlan maximal 3–8 Einträge.
 - finalChecks maximal 3–8 Einträge.
 - diagnosisGoal: ein klarer Satz, welches Problem bewiesen oder gelöst wird.
-- missingVehicleData: fehlende Fahrzeug-/Systemdaten nennen, die die Anleitung genauer machen.
+- vehicleApplicability: Datenbasis und Gültigkeit der Anleitung nennen, inklusive Grenzen bei fehlendem Fahrzeugbezug.
+- missingVehicleData: fehlende Fahrzeug-/Systemdaten nennen, die die Anleitung genauer machen. Dazu gehören je nach Fall Hersteller, Modell, Baujahr, Motorcode, Getriebe/Antrieb, Systemvariante, VIN, Fehlercode, Istwerte und bereits geprüfte Punkte.
 - requiredSkill: klar sagen, ob Hobby, fortgeschritten, Werkstatt oder Profi.
 - escalationCriteria: wann abbrechen, nicht weiterfahren oder Fachbetrieb/Herstellerdaten nötig sind.
 - proHint maximal 1–2 kurze Sätze.
@@ -810,6 +845,8 @@ Vor Ausgabe intern prüfen:
 - Wurde eine falsche Baugruppe genannt?
 - Wurden Drehmomente erfunden?
 - Wurden Schlüsselweiten erfunden?
+- Wurden exakte Füllmengen, Druckwerte, Spannungswerte, Pinbelegungen, Sicherungsnummern, Teilenummern oder Spezialwerkzeugnummern ohne Datenbasis genannt?
+- Sind alle fahrzeugabhängigen Punkte als fahrzeugabhängig oder "nach Herstellerdaten" markiert?
 - Sind benötigte Werkzeuge vollständig genug für Diagnose, Messung und Demontage?
 - Sind Ersatzteile/Material klar als "bereitlegen", "nur bei Befund" oder "nach Herstellerdaten" eingeordnet?
 - Ist die Anleitung praktisch nutzbar?
@@ -1013,7 +1050,7 @@ async function findReusableInstructionGuide(
   source: "search" | "diagnosis"
 ) {
   const similarGuides = await findSimilarSavedInstructionGuides(query, {
-    limit: 300,
+    limit: 1500,
     minScore: source === "diagnosis" ? 66 : 58,
   });
 
@@ -1272,8 +1309,10 @@ ${diagnosisText || "Nicht angegeben"}
 
 Aufgabe:
 Erstelle eine kompakte, direkte und fachlich brauchbare Werkstatt-Anleitung.
-Bei fehlenden Fahrzeugdaten kurz als Pflichtprüfung markieren.
-Keine erfundenen Drehmomente, Schlüsselweiten, Spezialwerkzeugnummern oder Herstellerwerte.
+Bei fehlenden Fahrzeugdaten kurz als Pflichtprüfung markieren und in missingVehicleData konkret benennen.
+Die Anleitung darf nur so genau sein, wie Suchbegriff und Diagnoseinhalt es erlauben.
+Fahrzeugabhängige Werte, Zugang, Ersatzteile, Spezialwerkzeug und Messwerte als fahrzeugabhängig kennzeichnen, wenn Modell/Motor/Systemdaten fehlen.
+Keine erfundenen Drehmomente, Drehwinkel, Füllmengen, Schlüsselweiten, Pinbelegungen, Teilenummern, Spezialwerkzeugnummern oder Herstellerwerte.
 Keine langen Disclaimer.
 Die Antwort muss vollständig bleiben und darf nicht wegen Länge abbrechen.
 `;

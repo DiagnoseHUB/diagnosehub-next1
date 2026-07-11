@@ -36,6 +36,7 @@ import {
   isValidUserPlan,
   type UserPlan,
 } from "@/config/plans";
+import { findSimilarDiagnosisLibraryEntry } from "@/lib/supabase/diagnosisLibraryStorage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -1609,6 +1610,72 @@ export async function POST(request: Request) {
       input,
       messages
     );
+
+    let diagnosisLibraryMatch: Awaited<
+      ReturnType<typeof findSimilarDiagnosisLibraryEntry>
+    > = null;
+
+    try {
+      diagnosisLibraryMatch = await findSimilarDiagnosisLibraryEntry(
+        combinedContext,
+        audienceMode,
+        {
+          limit: 1500,
+          minScore: audienceMode === "hobby" ? 74 : 72,
+        }
+      );
+    } catch (error) {
+      console.error(
+        "Gespeicherte Diagnosebibliothek konnte nicht geprüft werden:",
+        error
+      );
+    }
+
+    if (diagnosisLibraryMatch) {
+      let cachedResult = diagnosisLibraryMatch.entry.answer;
+
+      cachedResult = appendAutomaticInputQualityBlock(
+        cachedResult,
+        inputQualityProfile
+      );
+      cachedResult = appendAutomaticTechnicalSpecBlock(
+        cachedResult,
+        technicalSpecContext
+      );
+      cachedResult = appendAutomaticTorqueSpecBlock(
+        cachedResult,
+        torqueSpecContext
+      );
+
+      return NextResponse.json({
+        result: cachedResult,
+        engineContext,
+        faultCodeContext,
+        technicalSpecContext,
+        torqueSpecContext,
+        qualityCheck: `Gespeicherte Diagnose verwendet. Treffer: ${diagnosisLibraryMatch.score} %. Datenqualität: ${inputQualityProfile.score}/100 (${inputQualityProfile.level}).`,
+        reusedExistingDiagnosis: true,
+        diagnosisLibraryMatch: {
+          score: diagnosisLibraryMatch.score,
+          matchedTerms: diagnosisLibraryMatch.matchedTerms,
+          title: diagnosisLibraryMatch.entry.title,
+          slug: diagnosisLibraryMatch.entry.slug,
+          source: diagnosisLibraryMatch.entry.source,
+        },
+        diagnosisConfig: {
+          model: "gespeicherte Diagnosebibliothek",
+          reasoningEffort: "not_used",
+          maxOutputTokens: 0,
+          autoRetry: false,
+          audienceMode,
+        },
+        inputQuality: inputQualityProfile,
+        usageLimit: buildUsageLimitPayload(
+          usageControl,
+          usageControl.countBefore
+        ),
+      });
+    }
 
     let result = await createDiagnosisAnswer(
       engineContext,

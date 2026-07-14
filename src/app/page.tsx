@@ -123,46 +123,38 @@ const audienceCards = [
   },
 ];
 
-function DiagnosticBoardPreview() {
+function HeroVideoPreview() {
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-200/70 dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/20">
-      <div className="border-b border-slate-200 pb-4 dark:border-slate-800">
+    <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl shadow-slate-200/70 dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/20">
+      <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
         <p className="text-xs font-black uppercase tracking-[0.24em] text-blue-700 dark:text-blue-300">
-          Beispiel-Ablauf
+          Kurz erklärt
         </p>
-        <h2 className="mt-2 text-2xl font-black text-slate-950 dark:text-white">
-          P0299 Ladedruck zu gering
+        <h2 className="mt-2 text-2xl font-black leading-tight text-slate-950 dark:text-white">
+          DiagnoseHUB in 60 Sekunden
         </h2>
-        <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
-          Aus einer groben Fehlermeldung wird ein prüfbarer Arbeitsplan mit Reihenfolge, Messwertlogik und Risiko.
+      </div>
+
+      <div className="aspect-video w-full bg-slate-950">
+        <video
+          className="h-full w-full bg-slate-950 object-contain"
+          controls
+          playsInline
+          preload="metadata"
+          poster="/videos/diagnosehub-60sek-funktionen-poster.png"
+        >
+          <source src="/videos/diagnosehub-60sek-funktionen-elevenlabs.mp4?v=20260714" type="video/mp4" />
+          Dein Browser kann dieses Video nicht abspielen.
+        </video>
+      </div>
+
+      <div className="px-5 py-4">
+        <p className="text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">
+          Kurzer Überblick für neue Besucher: Diagnose eingeben, Prüfplan erhalten,
+          Fall speichern und weiterarbeiten.
         </p>
       </div>
 
-      <div className="mt-5 grid gap-3">
-        {[
-          "Fehlerspeicher und Freeze-Frame prüfen",
-          "Ladeluftstrecke mit Druck oder Rauch testen",
-          "Soll-/Ist-Ladedruck im Fahrbetrieb vergleichen",
-          "VTG/Wastegate, Sensorik und Unterdruck bewerten",
-        ].map((item, index) => (
-          <div
-            key={item}
-            className="grid grid-cols-[2.5rem_1fr] items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950"
-          >
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-950 text-xs font-black text-white dark:bg-slate-100 dark:text-slate-950">
-              P{index + 1}
-            </span>
-            <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-              {item}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-950 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-100">
-        Gute Eingabe: Fahrzeug, Baujahr, Motorcode, Fehlercode, Symptom,
-        Messwert und was schon geprüft wurde. Je mehr Kontext, desto genauer die Antwort.
-      </div>
     </div>
   );
 }
@@ -227,7 +219,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            <DiagnosticBoardPreview />
+            <HeroVideoPreview />
           </div>
         </section>
 

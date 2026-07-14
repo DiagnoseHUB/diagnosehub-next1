@@ -10,6 +10,7 @@ import {
 } from "react";
 import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 import CaseFeedbackPanel from "@/components/CaseFeedbackPanel";
+import ProtocolPrintButton from "@/components/ProtocolPrintButton";
 import RelatedLearningPanel from "@/components/RelatedLearningPanel";
 import VoiceAssistant from "@/components/VoiceAssistant";
 import { createClient } from "@/lib/supabase/client";
@@ -444,9 +445,17 @@ Bitte Diagnosepfad mit einfachen Checks, Messungen, Plausibilitätschecks, Entsc
 function appendTechnicalSpecPrompt(
   diagnosisInput: string,
   technicalSpecContext: TechnicalSpecContext,
+  context: "diagnosis" | "instruction" = "diagnosis",
 ) {
   const technicalSpecPrompt =
-    formatTechnicalSpecContextForPrompt(technicalSpecContext);
+    context === "instruction"
+      ? technicalSpecContext.foundSpecs.length > 0
+        ? `Erkannte mögliche Soll-/Richtwerte:
+${formatTechnicalSpecContext(technicalSpecContext)}
+
+Wichtig für Anleitungen: Diese Werte nicht pauschal ausgeben. Nur nennen, wenn der konkrete Arbeitsschritt ohne diesen Wert fachlich nicht korrekt ausführbar ist. Beispiel: Beim DQ250-DSG-Getriebeölwechsel nach dem Durchschalten der Fahrstufen Öltemperatur für die Ölstandseinstellung auf 35-45 °C bringen und per Diagnosetester überwachen.`
+        : ""
+      : formatTechnicalSpecContextForPrompt(technicalSpecContext);
 
   if (!technicalSpecPrompt) {
     return diagnosisInput;
@@ -1091,13 +1100,37 @@ function renderAssistantLine(
   );
 }
 
-function AssistantAnswer({ content }: { content: string }) {
-  const sections = parseAssistantSections(content);
+function normalizeAssistantContentForAudience(
+  content: string,
+  mode: DiagnosisAudienceMode,
+) {
+  if (mode !== "workshop") {
+    return content;
+  }
+
+  return content.replace(
+    /^(\s*#{1,6}\s*)Wann\s+in\s+die\s+Wer(?:kstatt)?\??\s*$/gim,
+    "$1Abbruchgrenze / Eskalation",
+  );
+}
+
+function AssistantAnswer({
+  content,
+  audienceMode,
+}: {
+  content: string;
+  audienceMode: DiagnosisAudienceMode;
+}) {
+  const normalizedContent = normalizeAssistantContentForAudience(
+    content,
+    audienceMode,
+  );
+  const sections = parseAssistantSections(normalizedContent);
 
   if (sections.length === 0) {
     return (
       <div className="whitespace-pre-wrap text-sm leading-7 text-slate-300">
-        {content}
+        {normalizedContent}
       </div>
     );
   }
@@ -1779,23 +1812,54 @@ export default function SearchBar() {
 
   function isInstructionRequest(value: string) {
     const text = value.toLowerCase();
+    const normalizedText = text
+      .replaceAll("ue", "ü")
+      .replaceAll("oe", "ö")
+      .replaceAll("ae", "ä");
 
-    return [
+    const instructionTerms = [
       "anleitung",
+      "arbeitsanweisung",
       "ausbau",
       "ausbauen",
-      "ausbauen?",
       "einbau",
       "einbauen",
+      "notentriegelung",
+      "notentriegeln",
+      "entriegelung",
+      "entriegeln",
+      "tausch",
       "tauschen",
+      "wechsel",
       "wechseln",
       "ersetzen",
+      "erneuern",
+      "demontage",
       "demontieren",
+      "montage",
       "montieren",
+      "freilegen",
+      "ausclipsen",
+      "abbauen",
+      "ausrasten",
+      "einstellen",
+      "anlernen",
+      "adaptieren",
+      "grundeinstellung",
+      "service zurückstellen",
+      "zurückstellen",
+      "zurücksetzen",
+      "öffnen",
+      "verkleidung ab",
+      "verkleidung entfernen",
       "reparaturanleitung",
       "schritt für schritt",
       "druckbar",
-    ].some((term) => text.includes(term));
+    ];
+
+    return instructionTerms.some(
+      (term) => text.includes(term) || normalizedText.includes(term),
+    );
   }
 
   function buildUnifiedDiagnosisInput(currentInput: string) {
@@ -1811,6 +1875,14 @@ export default function SearchBar() {
         audienceModeRef.current === "hobby"
           ? "- In normaler Sprache schreiben und Fachbegriffe kurz erklären."
           : "- Fachlich knapp und entscheidungsorientiert schreiben.";
+      const instructionBoundaryRule =
+        audienceModeRef.current === "hobby"
+          ? "- Am Ende klar sagen, wann der Nutzer nicht weiter selbst arbeiten sollte."
+          : "- Am Ende klar sagen, wann Herstellerdaten, Spezialwerkzeug, DSG-Grundeinstellung oder ein Spezialist nötig sind.";
+      const instructionFinalHeading =
+        audienceModeRef.current === "hobby"
+          ? "# Wann in die Werkstatt?"
+          : "# Abbruchgrenze / Eskalation";
 
       return appendTechnicalSpecPrompt(
         `Erstelle direkt im aktuellen Diagnosefall eine ${instructionMode}.
@@ -1820,13 +1892,16 @@ ${cleanInput}
 
 Regeln für diese Anleitung:
 ${instructionToneRule}
+${instructionBoundaryRule}
 - Keine allgemeine Diagnose wiederholen, sondern eine konkrete Anleitung aus Eingabe und Fallverlauf erstellen.
 - Erst klären, welches Ziel bewiesen oder repariert werden soll.
 - Fehlende Fahrzeugdaten nennen, wenn sie die Genauigkeit der Anleitung begrenzen.
 - Arbeitsschritte so schreiben, dass ein echter Zugang, eine echte Prüfung oder eine echte Montage daraus möglich wird.
 - Nicht pauschal "Zugang schaffen" schreiben, sondern typische Verkleidungen, Abdeckungen, Stecker, Halter, Befestigungen, Lage und Richtung nennen, wenn sinnvoll.
-- Messpunkte, Sollzustand und Entscheidung nennen, wenn ein Prüfschritt davon abhängt.
-- Sollwerte nur nennen, wenn sie im Kontext vorhanden oder allgemein sicher sind. Unsichere Herstellerwerte klar als fehlend kennzeichnen.
+- Messpunkte, Sollzustand und Entscheidung nur nennen, wenn ein Prüfschritt davon abhängt.
+- Soll-/Richtwerte bei Anleitungen nicht pauschal nennen. Nur angeben, wenn der Arbeitsschritt ohne diesen Wert fachlich nicht korrekt ausführbar ist.
+- Bei DSG-Getriebeölwechsel DQ250 als zwingenden Prozesswert nennen: nach dem Durchschalten der Fahrstufen Öltemperatur für die Ölstandseinstellung auf 35-45 °C bringen und per Diagnosetester überwachen.
+- Unsichere oder fahrzeugabhängige Werte klar als fehlende Herstellerdaten kennzeichnen.
 - Linksgewinde nennen, wenn möglich oder typisch.
 - Schrauben, Exzenter, Einstellpunkte oder Markierungen nennen, die nicht gelöst oder nicht verstellt werden dürfen.
 - Daten sichern nur nennen, wenn Steuergerät, Codierung, Programmierung oder Anlernung betroffen ist.
@@ -1835,17 +1910,19 @@ ${instructionToneRule}
 
 Antwortformat exakt:
 # Datenqualität
-# Diagnoseziel
+# Ziel der Anleitung
+# Selbst machbar?
 # Werkzeug
 # Teile / Material
+# Vorbereitung
 # Zugang
 # Arbeitsschritte
-# Mess-/Entscheidungspunkte
-# Kritische Punkte
-# Qualitätskontrolle
+# Prüfpunkte / zwingende Prozesswerte
+# Risiken
 # Abschlussprüfung
-# Nächste Schritte`,
+${instructionFinalHeading}`,
         detectedTechnicalSpecContext,
+        "instruction",
       );
     }
 
@@ -1903,7 +1980,7 @@ Antwortformat exakt:
 
     const userMessage: ChatMessage = {
       role: "user",
-      content: diagnosisInput,
+      content: currentInput,
       audienceMode: currentAudienceMode,
     };
 
@@ -1961,6 +2038,7 @@ Antwortformat exakt:
       const assistantMessage: ChatMessage = {
         role: "assistant",
         content: data.result,
+        audienceMode: currentAudienceMode,
       };
 
       setMessages([...nextMessages, assistantMessage]);
@@ -2719,7 +2797,10 @@ ${chatText}
               </div>
 
               {message.role === "assistant" ? (
-                <AssistantAnswer content={message.content} />
+                <AssistantAnswer
+                  content={message.content}
+                  audienceMode={message.audienceMode ?? audienceMode}
+                />
               ) : (
                 <div className="whitespace-pre-wrap leading-8">
                   {message.content}
@@ -2732,9 +2813,17 @@ ${chatText}
 
       {messages.length > 0 && (
         <div className="mt-5">
-          <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">
-            Schnellfragen
-          </p>
+          <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+              Schnellfragen
+            </p>
+
+            <ProtocolPrintButton
+              source="diagnosis"
+              label="PDF-Prüfprotokoll"
+              className="inline-flex w-fit rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-black text-slate-800 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800"
+            />
+          </div>
 
           <div className="flex flex-wrap gap-3">
             {quickQuestions.map((question) => (

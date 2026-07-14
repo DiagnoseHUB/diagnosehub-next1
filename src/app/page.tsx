@@ -5,15 +5,39 @@ import PublicOnly from "@/components/PublicOnly";
 import SearchBar from "@/components/SearchBar";
 
 const heroStats = [
-  { label: "Start", value: "Diagnose" },
-  { label: "Weiter", value: "Prüfplan" },
-  { label: "Danach", value: "Speichern" },
+  { label: "Weniger Raten", value: "Prüfen" },
+  { label: "Besser erklären", value: "Dokumentieren" },
+  { label: "Weiterlernen", value: "Verstehen" },
+];
+
+const valueCards = [
+  {
+    title: "Fehlteile vermeiden",
+    description:
+      "DiagnoseHUB zwingt den Fall in eine Prüfreihenfolge: erst einfache Checks, dann Messwerte, dann Teiletausch.",
+  },
+  {
+    title: "Zeit im Fall sparen",
+    description:
+      "Fehlercode, Symptom, Messwert und Vorprüfung werden zu einem Arbeitsplan, statt lose in Notizen zu verschwinden.",
+  },
+  {
+    title: "Kunden und Azubis besser abholen",
+    description:
+      "Werkstattantworten bleiben technisch, Hobby- und Lernantworten erklären Risiken, Begriffe und nächste Schritte verständlicher.",
+  },
+];
+
+const paidReasons = [
+  "Wenn ein unüberlegter Teiletausch teurer wäre als ein Monat DiagnoseHUB.",
+  "Wenn Fälle später wieder auffindbar sein müssen, auch mit anderen Suchbegriffen.",
+  "Wenn Diagnose, Anleitung, Lerninhalt und Dokumentation nicht in vier getrennten Werkzeugen liegen sollen.",
 ];
 
 const quickActions = [
   {
     step: "01",
-    title: "Fehler diagnostizieren",
+    title: "Fehler strukturiert prüfen",
     description:
       "Fahrzeug, Fehlercode, Symptom oder Messwert eingeben und einen geordneten Prüfplan erhalten.",
     href: "/#diagnose",
@@ -21,7 +45,7 @@ const quickActions = [
   },
   {
     step: "02",
-    title: "Gespeicherte Fälle öffnen",
+    title: "Fälle wiederfinden",
     description:
       "Eigene Diagnosefälle, Nutzung, Tarif und Profil an einem zentralen Ort prüfen.",
     href: "/dashboard",
@@ -110,7 +134,7 @@ function DiagnosticBoardPreview() {
           P0299 Ladedruck zu gering
         </h2>
         <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
-          Aus einer groben Fehlermeldung wird ein prüfbarer Arbeitsplan.
+          Aus einer groben Fehlermeldung wird ein prüfbarer Arbeitsplan mit Reihenfolge, Messwertlogik und Risiko.
         </p>
       </div>
 
@@ -137,7 +161,7 @@ function DiagnosticBoardPreview() {
 
       <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-950 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-100">
         Gute Eingabe: Fahrzeug, Baujahr, Motorcode, Fehlercode, Symptom,
-        Messwert und was schon geprüft wurde.
+        Messwert und was schon geprüft wurde. Je mehr Kontext, desto genauer die Antwort.
       </div>
     </div>
   );
@@ -158,13 +182,11 @@ export default function HomePage() {
               </p>
 
               <h1 className="mt-6 max-w-4xl text-4xl font-black tracking-tight text-slate-950 dark:text-white sm:text-5xl lg:text-6xl">
-                Kfz-Diagnose verständlich sortieren.
+                Kfz-Diagnose so sortieren, dass weniger Zeit und Geld verloren geht.
               </h1>
 
               <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-600 dark:text-slate-300">
-                DiagnoseHUB bündelt KI-Diagnose, gespeicherte Fälle,
-                Lernportal und Service-Erinnerung in einem einfachen Ablauf:
-                eingeben, prüfen, speichern, weiterarbeiten.
+                DiagnoseHUB macht aus Fehlercode, Symptom, Messwert und Vorprüfung einen nachvollziehbaren Prüfplan. Für Werkstätten, Azubis und private Schrauber, die nicht blind Teile tauschen wollen.
               </p>
 
               <div className="mt-8 flex flex-wrap gap-3">
@@ -175,16 +197,16 @@ export default function HomePage() {
                   Diagnose starten
                 </a>
                 <Link
-                  href="/login?setup=profile"
+                  href="/preise"
                   className="rounded-xl border border-slate-300 bg-white px-6 py-3 text-sm font-black text-slate-800 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
                 >
-                  Account einrichten
+                  Preise ansehen
                 </Link>
                 <Link
-                  href="/preise"
+                  href="/login?setup=profile"
                   className="rounded-xl border border-blue-200 bg-blue-50 px-6 py-3 text-sm font-black text-blue-700 transition hover:bg-blue-100 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/20"
                 >
-                  Tarife vergleichen
+                  Kostenlos testen
                 </Link>
               </div>
 
@@ -206,6 +228,26 @@ export default function HomePage() {
             </div>
 
             <DiagnosticBoardPreview />
+          </div>
+        </section>
+
+        <section className="border-b border-slate-200 bg-slate-50 py-10 dark:border-slate-800 dark:bg-slate-950">
+          <div className="mx-auto max-w-7xl px-6">
+            <div className="grid gap-4 md:grid-cols-3">
+              {valueCards.map((card) => (
+                <article
+                  key={card.title}
+                  className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                >
+                  <h2 className="text-xl font-black text-slate-950 dark:text-white">
+                    {card.title}
+                  </h2>
+                  <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                    {card.description}
+                  </p>
+                </article>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -298,6 +340,37 @@ export default function HomePage() {
                 </p>
               </article>
             ))}
+          </div>
+        </section>
+
+        <section className="border-y border-slate-200 bg-white py-14 dark:border-slate-800 dark:bg-slate-900/70">
+          <div className="mx-auto grid max-w-7xl gap-8 px-6 lg:grid-cols-[0.8fr_1fr] lg:items-center">
+            <div>
+              <p className="text-sm font-black uppercase tracking-[0.24em] text-blue-700 dark:text-blue-300">
+                Warum bezahlen?
+              </p>
+              <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950 dark:text-white">
+                DiagnoseHUB soll sich im Alltag rechnen.
+              </h2>
+              <p className="mt-4 leading-7 text-slate-600 dark:text-slate-300">
+                Der Wert entsteht nicht durch eine hübsche Antwort, sondern durch weniger Sucherei,
+                bessere Prüfreihenfolge, wiederverwendbare Fälle und verständlichere Dokumentation.
+              </p>
+            </div>
+
+            <div className="grid gap-3">
+              {paidReasons.map((reason) => (
+                <div
+                  key={reason}
+                  className="flex gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950"
+                >
+                  <span className="mt-1 h-5 w-5 shrink-0 rounded-full border border-blue-500 bg-blue-50 dark:bg-blue-500/10" />
+                  <p className="text-sm font-semibold leading-6 text-slate-700 dark:text-slate-200">
+                    {reason}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 

@@ -11,13 +11,13 @@ export default function DatenschutzPage() {
     <div className="min-h-screen bg-slate-950 text-white">
       <Header />
 
-      <main className="mx-auto max-w-4xl px-6 py-14">
-        <section className="rounded-[2rem] border border-slate-800 bg-slate-900/80 p-8 shadow-2xl shadow-blue-950/30">
+      <main className="mx-auto max-w-4xl px-4 py-14 sm:px-6">
+        <section className="rounded-[2rem] border border-slate-800 bg-slate-900/80 p-6 shadow-2xl shadow-blue-950/30 sm:p-8">
           <p className="text-sm font-bold uppercase tracking-[0.3em] text-blue-400">
             DiagnoseHUB
           </p>
 
-          <h1 className="mt-4 text-4xl font-black tracking-tight md:text-5xl">
+          <h1 className="mt-4 break-words text-2xl font-black tracking-tight sm:text-4xl md:text-5xl">
             Datenschutzerklärung
           </h1>
 

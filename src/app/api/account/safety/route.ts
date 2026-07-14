@@ -47,6 +47,7 @@ type WorkshopSafetySettingsRow = {
   hv_verified?: boolean | null;
   terms_safety_accepted_at?: string | null;
   risk_access_level?: string | null;
+  community_rank?: string | null;
 };
 
 function text(value: unknown, maxLength = 220) {
@@ -106,6 +107,14 @@ function riskAccessLevelFromAccountType(value: string) {
   return "yellow";
 }
 
+function verifiedRank(value: unknown): "geselle" | "meister" | null {
+  if (value === "geselle" || value === "meister") {
+    return value;
+  }
+
+  return null;
+}
+
 function toSafetySettings(row: WorkshopSafetySettingsRow | null) {
   return {
     accountType: row?.account_type || "private",
@@ -133,7 +142,7 @@ async function loadSafetySettings(
   const { data, error } = await supabase
     .from("workshop_profiles")
     .select(
-      "id, full_name, workshop_name, email, role, plan, account_type, qualification_level, company_name, company_address, company_phone, company_website, company_verified, hv_qualification, hv_certificate_url, hv_training_provider, hv_training_date, hv_certificate_name, hv_verified, terms_safety_accepted_at, risk_access_level"
+      "id, full_name, workshop_name, email, role, plan, account_type, qualification_level, company_name, company_address, company_phone, company_website, company_verified, hv_qualification, hv_certificate_url, hv_training_provider, hv_training_date, hv_certificate_name, hv_verified, terms_safety_accepted_at, risk_access_level, community_rank"
     )
     .eq("id", userId)
     .maybeSingle();
@@ -187,6 +196,32 @@ export async function PATCH(request: Request) {
     const now = new Date().toISOString();
     const existingSettings = await loadSafetySettings(supabase, user.id);
     const companyName = text(payload.companyName);
+    const existingVerifiedRank = verifiedRank(existingSettings?.community_rank);
+    const isHvVerified =
+      existingSettings?.hv_verified === true ||
+      existingSettings?.qualification_level === "hv_verified" ||
+      existingSettings?.risk_access_level === "hv";
+    const syncedAccountType =
+      existingVerifiedRank === "meister"
+        ? "workshop"
+        : existingVerifiedRank === "geselle"
+          ? nextAccountType === "workshop"
+            ? "workshop"
+            : "mechanic"
+          : nextAccountType;
+    const syncedRole = existingVerifiedRank || role(payload.role);
+    const syncedQualificationLevel = isHvVerified
+      ? "hv_verified"
+      : existingVerifiedRank
+        ? "verified_workshop"
+        : nextAccountType === "private"
+          ? "none"
+          : "self_declared";
+    const syncedRiskAccessLevel = isHvVerified
+      ? "hv"
+      : existingVerifiedRank
+        ? "red"
+        : riskAccessLevelFromAccountType(nextAccountType);
 
     const updatePayload = {
       id: user.id,
@@ -201,17 +236,16 @@ export async function PATCH(request: Request) {
         "Nicht angegeben",
       email: existingSettings?.email || user.email || "",
       plan: existingSettings?.plan || "free",
-      account_type: nextAccountType,
-      qualification_level:
-        nextAccountType === "private" ? "none" : "self_declared",
-      role: role(payload.role),
+      account_type: syncedAccountType,
+      qualification_level: syncedQualificationLevel,
+      role: syncedRole,
       company_name: companyName,
       company_address: text(payload.companyAddress, 500),
       company_phone: text(payload.companyPhone, 80),
       company_website: text(payload.companyWebsite, 220),
       terms_safety_accepted_at:
         payload.safetyTermsAccepted === true ? now : null,
-      risk_access_level: riskAccessLevelFromAccountType(nextAccountType),
+      risk_access_level: syncedRiskAccessLevel,
     };
 
     const { data, error } = await supabase

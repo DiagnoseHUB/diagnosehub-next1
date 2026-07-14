@@ -21,6 +21,22 @@ const productLinks = [
     href: "/service-erinnerung",
   },
   {
+    label: "Teilemarkt",
+    href: "/teilemarkt",
+  },
+  {
+    label: "KVA per Bild",
+    href: "/kva-per-bild",
+  },
+  {
+    label: "Forum",
+    href: "/forum",
+  },
+  {
+    label: "Signale",
+    href: "/signale",
+  },
+  {
     label: "Prüfprotokoll",
     href: "/pruefprotokoll",
   },

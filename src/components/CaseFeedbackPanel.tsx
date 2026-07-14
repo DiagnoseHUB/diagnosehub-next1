@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 import { fetchJsonWithTimeout } from "@/utils/clientApi";
 
 type CaseFeedbackPanelProps = {
@@ -10,6 +11,22 @@ type CaseFeedbackPanelProps = {
 
 type Rating = "up" | "down" | "";
 type FeedbackStatus = "idle" | "sending" | "sent" | "error";
+type CorrectionStatus = "idle" | "sending" | "sent" | "error";
+
+const correctionIssueOptions = [
+  { value: "technical_error", label: "Fachlich falsch" },
+  { value: "safety_risk", label: "Sicherheitsrisiko" },
+  { value: "missing_spec", label: "Sollwert fehlt" },
+  { value: "unclear_wording", label: "Unklar formuliert" },
+  { value: "manufacturer_data_needed", label: "Herstellerdaten nötig" },
+  { value: "wrong_priority", label: "Falsche Priorität" },
+] as const;
+
+const correctionSeverityOptions = [
+  { value: "normal", label: "Normal" },
+  { value: "important", label: "Wichtig" },
+  { value: "safety_critical", label: "Sicherheitsrelevant" },
+] as const;
 
 function getCurrentPage() {
   if (typeof window === "undefined") {
@@ -28,6 +45,17 @@ export default function CaseFeedbackPanel({
   const [missingInfo, setMissingInfo] = useState(false);
   const [status, setStatus] = useState<FeedbackStatus>("idle");
   const [error, setError] = useState("");
+  const [correctionOpen, setCorrectionOpen] = useState(false);
+  const [correctionIssueType, setCorrectionIssueType] =
+    useState<(typeof correctionIssueOptions)[number]["value"]>("technical_error");
+  const [correctionSeverity, setCorrectionSeverity] =
+    useState<(typeof correctionSeverityOptions)[number]["value"]>("important");
+  const [correctionQuote, setCorrectionQuote] = useState("");
+  const [correctionSuggestion, setCorrectionSuggestion] = useState("");
+  const [correctionKeywords, setCorrectionKeywords] = useState("");
+  const [correctionStatus, setCorrectionStatus] =
+    useState<CorrectionStatus>("idle");
+  const [correctionError, setCorrectionError] = useState("");
 
   async function submitFeedback() {
     setError("");
@@ -79,6 +107,77 @@ export default function CaseFeedbackPanel({
     }
   }
 
+  async function submitCorrection() {
+    setCorrectionError("");
+
+    if (correctionSuggestion.trim().length < 12) {
+      setCorrectionStatus("error");
+      setCorrectionError(
+        "Bitte kurz beschreiben, was fachlich korrigiert werden soll.",
+      );
+      return;
+    }
+
+    setCorrectionStatus("sending");
+
+    try {
+      const {
+        data: { session },
+      } = await createClient().auth.getSession();
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+
+      if (session?.access_token) {
+        headers.Authorization = `Bearer ${session.access_token}`;
+      }
+
+      const { response, data } = await fetchJsonWithTimeout<{
+        error?: string;
+        message?: string;
+      }>(
+        "/api/diagnose/corrections",
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            sourceType: "diagnosis",
+            issueType: correctionIssueType,
+            severity: correctionSeverity,
+            title: caseTitle,
+            page: getCurrentPage(),
+            caseContext: caseContext.slice(0, 5000),
+            quotedText: correctionQuote.trim(),
+            suggestedCorrection: correctionSuggestion.trim(),
+            matchKeywords: correctionKeywords
+              .split(/[,\n;]/g)
+              .map((keyword) => keyword.trim())
+              .filter(Boolean),
+          }),
+        },
+        15000,
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Fachliche Korrektur konnte nicht gespeichert werden.",
+        );
+      }
+
+      setCorrectionStatus("sent");
+      setCorrectionQuote("");
+      setCorrectionSuggestion("");
+      setCorrectionKeywords("");
+    } catch (error) {
+      setCorrectionStatus("error");
+      setCorrectionError(
+        error instanceof Error
+          ? error.message
+          : "Fachliche Korrektur konnte nicht gespeichert werden.",
+      );
+    }
+  }
+
   return (
     <section className="mt-6 rounded-3xl border border-slate-800 bg-slate-900/80 p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -120,6 +219,119 @@ export default function CaseFeedbackPanel({
             Daumen runter
           </button>
         </div>
+      </div>
+
+      <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+        <button
+          type="button"
+          onClick={() => setCorrectionOpen((current) => !current)}
+          className="flex w-full items-center justify-between gap-3 text-left"
+        >
+          <span>
+            <span className="block text-sm font-black uppercase tracking-wide text-amber-300">
+              Fachlichen Fehler melden
+            </span>
+            <span className="mt-1 block text-sm leading-6 text-slate-400">
+              Vorschläge werden gespeichert, aber erst nach manueller Freigabe
+              als Regel genutzt.
+            </span>
+          </span>
+          <span className="rounded-full border border-slate-700 px-3 py-1 text-xs font-black text-slate-300">
+            {correctionOpen ? "Schließen" : "Öffnen"}
+          </span>
+        </button>
+
+        {correctionOpen && (
+          <div className="mt-4 grid gap-3">
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="grid gap-2 text-sm font-bold text-slate-300">
+                Art der Korrektur
+                <select
+                  value={correctionIssueType}
+                  onChange={(event) =>
+                    setCorrectionIssueType(
+                      event.target.value as typeof correctionIssueType,
+                    )
+                  }
+                  className="rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-white outline-none focus:border-blue-500"
+                >
+                  {correctionIssueOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="grid gap-2 text-sm font-bold text-slate-300">
+                Wichtigkeit
+                <select
+                  value={correctionSeverity}
+                  onChange={(event) =>
+                    setCorrectionSeverity(
+                      event.target.value as typeof correctionSeverity,
+                    )
+                  }
+                  className="rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-white outline-none focus:border-blue-500"
+                >
+                  {correctionSeverityOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <textarea
+              value={correctionQuote}
+              onChange={(event) => setCorrectionQuote(event.target.value)}
+              placeholder='Welche Aussage ist falsch? Beispiel: "Getriebe warmfahren."'
+              rows={2}
+              className="resize-none rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-blue-500"
+            />
+
+            <textarea
+              value={correctionSuggestion}
+              onChange={(event) => setCorrectionSuggestion(event.target.value)}
+              placeholder="Was soll stattdessen gelten? Beispiel: Öltemperatur mit Diagnosetester nach Herstellerdaten prüfen, Öl nicht heiß ablassen."
+              rows={4}
+              className="resize-none rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-blue-500"
+            />
+
+            <input
+              value={correctionKeywords}
+              onChange={(event) => setCorrectionKeywords(event.target.value)}
+              placeholder="Optionale Suchwörter, z. B. DSG, DQ381, Getriebeöl, Öltemperatur"
+              className="rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-blue-500"
+            />
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <button
+                type="button"
+                onClick={() => void submitCorrection()}
+                disabled={correctionStatus === "sending"}
+                className="rounded-xl bg-amber-500 px-5 py-3 text-sm font-black text-slate-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {correctionStatus === "sending"
+                  ? "Wird gespeichert..."
+                  : "Zur Prüfung speichern"}
+              </button>
+
+              {correctionStatus === "sent" && (
+                <p className="text-sm font-semibold text-green-300">
+                  Korrektur ist gespeichert und wartet auf Freigabe.
+                </p>
+              )}
+
+              {correctionStatus === "error" && correctionError && (
+                <p className="text-sm font-semibold text-red-300">
+                  {correctionError}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="mt-4 grid gap-3">

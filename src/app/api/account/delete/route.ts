@@ -437,6 +437,24 @@ async function cleanupAccountDataBeforeAuthDelete(
     await deleteFromTable(adminClient, "service_reminder_notification_log", "user_id", userId)
   );
   results.push(await deleteFromTable(adminClient, "safety_access_logs", "user_id", userId));
+  results.push(await deleteFromTable(adminClient, "estimate_image_cases", "user_id", userId));
+  results.push(await deleteFromTable(adminClient, "used_part_inquiries", "buyer_id", userId));
+  results.push(await deleteFromTable(adminClient, "used_part_listings", "seller_id", userId));
+  results.push(
+    await updateReferencesToNull(adminClient, "used_part_inquiries", "seller_id", userId)
+  );
+  results.push(
+    await updateReferencesToNull(adminClient, "community_questions", "author_id", userId)
+  );
+  results.push(
+    await updateReferencesToNull(adminClient, "community_answers", "author_id", userId)
+  );
+  results.push(
+    await updateReferencesToNull(adminClient, "community_answers", "accepted_by", userId)
+  );
+  results.push(
+    await updateReferencesToNull(adminClient, "community_reputation_events", "user_id", userId)
+  );
   results.push(await anonymizeApprovedTorqueSpecs(adminClient, userId));
   results.push(
     await deleteFromTable(adminClient, "torque_specs", "user_id", userId)

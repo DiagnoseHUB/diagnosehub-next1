@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import RoleVerificationAccountPanel from "@/components/RoleVerificationAccountPanel";
 import { createClient } from "@/lib/supabase/client";
 import {
   readAccountScopedLocalStorage,
@@ -1297,6 +1298,8 @@ export default function DashboardPage() {
               <EmptyState text="Sicherheitsprofil konnte noch nicht geladen werden." />
             )}
           </Section>
+
+          <RoleVerificationAccountPanel />
 
           <Section
             title="Nutzungszähler"

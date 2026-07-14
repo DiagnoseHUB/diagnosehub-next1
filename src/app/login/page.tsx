@@ -16,6 +16,7 @@ import type {
 } from "@supabase/supabase-js";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import RoleVerificationAccountPanel from "@/components/RoleVerificationAccountPanel";
 import { createClient } from "@/lib/supabase/client";
 import {
   getOrCreateDeviceId,
@@ -1744,7 +1745,7 @@ export default function LoginPage() {
               </p>
 
               <h2 className="mt-3 text-3xl font-bold text-slate-950 dark:text-white">
-                Nutzerprofil erstellen
+                Nutzerprofil und Website-Qualifikation erstellen
               </h2>
 
               {profileGuidance && (
@@ -1755,8 +1756,9 @@ export default function LoginPage() {
 
               <p className="mt-3 leading-7 text-slate-600 dark:text-slate-300">
                 Das Profil verbindet deinen Login mit Dashboard, Diagnose,
-                gespeicherten Fällen und Service-Erinnerung. Betrieb/Firma ist
-                optional und kann für private Nutzer leer bleiben.
+                gespeicherten Fällen, Service-Erinnerung und deiner zentralen
+                Qualifikation. Betrieb/Firma ist optional und kann für private
+                Nutzer leer bleiben.
               </p>
 
               <div
@@ -1834,12 +1836,13 @@ export default function LoginPage() {
                       Sicherheits- und Qualifikationsprofil
                     </p>
                     <h3 className="mt-2 text-xl font-black text-slate-950 dark:text-white">
-                      Einstufung für Anleitungen
+                      Einstufung für die komplette Website
                     </h3>
                     <p className="mt-2 leading-7 text-slate-600 dark:text-slate-300">
                       Diese Angaben beeinflussen, wie sicherheitskritische
-                      Inhalte angezeigt werden. Höhere Freigaben werden manuell
-                      geprüft.
+                      Inhalte angezeigt werden. Geselle und Meister werden über
+                      einen Nachweis freigegeben und gelten dann für Diagnose,
+                      Anleitungen, Forum und Teilemarkt.
                     </p>
                   </div>
 
@@ -2318,6 +2321,12 @@ export default function LoginPage() {
             </div>
           </div>
         </section>
+
+        {user && (
+          <div className="mt-10">
+            <RoleVerificationAccountPanel />
+          </div>
+        )}
       </main>
 
       <Footer />

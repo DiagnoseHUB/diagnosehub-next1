@@ -18,6 +18,7 @@ import {
   readLocalWorkshopProfileState,
   type WorkshopProfileState,
 } from "@/services/workshopProfileSupabase";
+import type { InstructionGuide, InstructionStep } from "@/types/instruction";
 
 
 type PlanSource = "supabase" | "localStorage" | "fallback";
@@ -76,6 +77,13 @@ type InspectionProfile = {
 };
 
 const CURRENT_CASE_STORAGE_KEY = "diagnosehub-current-case";
+const PRINT_PROTOCOL_STORAGE_KEY = "diagnosehub-print-protocol";
+
+type PrintProtocolPayload = {
+  type?: "instruction";
+  instruction?: InstructionGuide;
+  createdAt?: string;
+};
 
 const planSourceLabels: Record<PlanSource, string> = {
   supabase: "Online-Profil",
@@ -638,6 +646,284 @@ function NumberedList({ items }: { items: string[] }) {
   );
 }
 
+function ProtocolBlankField({
+  label,
+  tall = false,
+}: {
+  label: string;
+  tall?: boolean;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4 print:border-gray-300 print:bg-white">
+      <p className="text-sm font-bold text-white print:text-black">{label}</p>
+      <div
+        className={
+          tall
+            ? "mt-8 min-h-16 border-b border-slate-700 print:border-gray-500"
+            : "mt-7 border-b border-slate-700 print:border-gray-500"
+        }
+      />
+    </div>
+  );
+}
+
+function StepDetail({ label, value }: { label: string; value?: string }) {
+  if (!value) {
+    return null;
+  }
+
+  return (
+    <p className="text-sm leading-6 text-slate-400 print:text-gray-700">
+      <span className="font-bold text-white print:text-black">{label}: </span>
+      {value}
+    </p>
+  );
+}
+
+function InstructionStepProtocol({
+  step,
+  stepNumber,
+}: {
+  step: InstructionStep;
+  stepNumber: number;
+}) {
+  return (
+    <div className="break-inside-avoid rounded-3xl border border-slate-800 bg-slate-950/70 p-5 print:border-gray-300 print:bg-white">
+      <div className="flex gap-4">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-black text-white print:border print:border-gray-400 print:bg-white print:text-black">
+          {stepNumber}
+        </span>
+
+        <div className="min-w-0 flex-1">
+          <h3 className="text-lg font-black text-white print:text-black">
+            {step.title}
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-slate-400 print:text-gray-700">
+            {step.description}
+          </p>
+
+          <div className="mt-4 grid gap-2">
+            <StepDetail label="Prüfpunkt" value={step.check} />
+            <StepDetail label="Messung" value={step.measurement} />
+            <StepDetail label="Sollzustand" value={step.expectedResult} />
+            <StepDetail label="Entscheidung" value={step.decision} />
+            <StepDetail label="Qualitätskontrolle" value={step.qualityCheck} />
+            <StepDetail label="Warnhinweis" value={step.warning} />
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-3 md:grid-cols-4">
+        <ProtocolBlankField label="Erledigt / nicht erledigt" />
+        <ProtocolBlankField label="Istwert / Befund" />
+        <ProtocolBlankField label="Entscheidung / Folgearbeit" />
+        <ProtocolBlankField label="Kürzel / Zeit" />
+      </div>
+    </div>
+  );
+}
+
+function InstructionProtocolArticle({
+  instruction,
+  workshopData,
+}: {
+  instruction: InstructionGuide;
+  workshopData: WorkshopData;
+}) {
+  const summaryBoxes = [
+    { title: "Werkzeuge", items: instruction.tools },
+    { title: "Teile / Material", items: instruction.partsAndMaterials ?? [] },
+    { title: "Sicherheit", items: instruction.safetyNotes },
+    { title: "Erstprüfung", items: instruction.initialChecks },
+  ].filter((box) => box.items.length > 0);
+  const controlBoxes = [
+    { title: "Messplan", items: instruction.measurementPlan ?? [] },
+    { title: "Endkontrolle", items: instruction.finalChecks ?? [] },
+    {
+      title: "Abbruchgrenze / Eskalation",
+      items: instruction.escalationCriteria ?? [],
+    },
+  ].filter((box) => box.items.length > 0);
+
+  return (
+    <article className="print-area space-y-8 rounded-[2rem] border border-slate-800 bg-slate-950 p-6 shadow-2xl shadow-blue-950/30 print:border-0 print:bg-white print:p-0 print:text-black print:shadow-none">
+      <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 print:border-0 print:bg-white print:p-0">
+        <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-blue-500/20 bg-slate-900 p-2 print:border-gray-300 print:bg-white">
+              <Image
+                src="/diagnosehub-logo.png"
+                alt="DiagnoseHUB Logo"
+                width={64}
+                height={64}
+                className="h-full w-full object-contain"
+              />
+            </div>
+
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-wide text-blue-400 print:text-gray-600">
+                DiagnoseHUB
+              </p>
+              <h2 className="text-3xl font-black text-white print:text-black">
+                Prüfprotokoll zur Anleitung
+              </h2>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-sm text-slate-400 print:border-gray-300 print:bg-white print:text-gray-700">
+            <p>
+              Erstellt:{" "}
+              <span className="font-semibold text-white print:text-black">
+                {getCurrentDateTime()}
+              </span>
+            </p>
+            <p>
+              Anleitung:{" "}
+              <span className="font-semibold text-white print:text-black">
+                {instruction.lastUpdated}
+              </span>
+            </p>
+            <p>
+              Kategorie:{" "}
+              <span className="font-semibold text-white print:text-black">
+                {instruction.category}
+              </span>
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-6 grid gap-4 md:grid-cols-4">
+          <InfoRow label="Werkstatt" value={workshopData.workshop} />
+          <InfoRow label="Bearbeiter" value={workshopData.name} />
+          <InfoRow label="E-Mail" value={workshopData.email} />
+          <InfoRow label="Rolle" value={workshopData.role} />
+        </div>
+      </section>
+
+      <SectionCard title={instruction.title}>
+        <p className="text-sm font-semibold uppercase tracking-wide text-blue-400 print:text-gray-600">
+          {instruction.subtitle}
+        </p>
+
+        <div className="mt-5 grid gap-4 md:grid-cols-3">
+          <InfoRow label="Schwierigkeit" value={instruction.difficulty} />
+          <InfoRow label="Zeitbedarf" value={instruction.estimatedTime} />
+          <InfoRow
+            label="Benötigte Erfahrung"
+            value={instruction.requiredSkill || "nicht gesondert angegeben"}
+          />
+        </div>
+
+        <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-950/70 p-5 print:border-gray-300 print:bg-white">
+          <p className="font-bold text-white print:text-black">
+            Gültigkeit / Datenbasis
+          </p>
+          <p className="mt-2 leading-7 text-slate-400 print:text-gray-700">
+            {instruction.vehicleApplicability}
+          </p>
+        </div>
+
+        {instruction.diagnosisGoal && (
+          <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-950/70 p-5 print:border-gray-300 print:bg-white">
+            <p className="font-bold text-white print:text-black">
+              Ziel der Arbeit
+            </p>
+            <p className="mt-2 leading-7 text-slate-400 print:text-gray-700">
+              {instruction.diagnosisGoal}
+            </p>
+          </div>
+        )}
+      </SectionCard>
+
+      {summaryBoxes.length > 0 && (
+        <SectionCard title="Vorbereitung">
+          <div className="grid gap-6 lg:grid-cols-2">
+            {summaryBoxes.map((box) => (
+              <div key={box.title}>
+                <h3 className="mb-3 text-xl font-bold text-white print:text-black">
+                  {box.title}
+                </h3>
+                <CheckList items={box.items} />
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+      )}
+
+      {instruction.missingVehicleData &&
+        instruction.missingVehicleData.length > 0 && (
+          <SectionCard title="Fehlende Daten vor Arbeitsbeginn prüfen">
+            <CheckList items={instruction.missingVehicleData} />
+          </SectionCard>
+        )}
+
+      <SectionCard title="Arbeits- und Prüfplan">
+        <div className="space-y-5">
+          {instruction.steps.map((step, index) => (
+            <InstructionStepProtocol
+              key={`${step.title}-${index}`}
+              step={step}
+              stepNumber={index + 1}
+            />
+          ))}
+        </div>
+      </SectionCard>
+
+      {controlBoxes.length > 0 && (
+        <SectionCard title="Kontrolle und Freigabe">
+          <div className="grid gap-6 lg:grid-cols-3">
+            {controlBoxes.map((box) => (
+              <div key={box.title}>
+                <h3 className="mb-3 text-xl font-bold text-white print:text-black">
+                  {box.title}
+                </h3>
+                <CheckList items={box.items} />
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+      )}
+
+      <SectionCard title="Dokumentation">
+        <div className="grid gap-4 md:grid-cols-2">
+          <ProtocolBlankField label="Ausgangszustand / Kundenbeanstandung" tall />
+          <ProtocolBlankField label="Durchgeführte Zusatzprüfungen" tall />
+          <ProtocolBlankField label="Verwendete Teile / Material" tall />
+          <ProtocolBlankField label="Abschlussprüfung / Probefahrt" tall />
+        </div>
+
+        <div className="mt-8 grid gap-8 md:grid-cols-3">
+          <div>
+            <p className="font-bold text-white print:text-black">
+              Prüfung durchgeführt von
+            </p>
+            <div className="mt-8 border-b border-slate-700 print:border-gray-500" />
+          </div>
+
+          <div>
+            <p className="font-bold text-white print:text-black">Datum</p>
+            <div className="mt-8 border-b border-slate-700 print:border-gray-500" />
+          </div>
+
+          <div>
+            <p className="font-bold text-white print:text-black">
+              Unterschrift
+            </p>
+            <div className="mt-8 border-b border-slate-700 print:border-gray-500" />
+          </div>
+        </div>
+
+        <p className="mt-8 text-sm leading-7 text-slate-500 print:text-gray-600">
+          Hinweis: Dieses Prüfprotokoll dokumentiert den Arbeitsablauf zur
+          Anleitung. Herstellerdaten, Sicherheitsvorschriften,
+          fahrzeugspezifische Werte, Drehmomente und Freigaben müssen vor und
+          nach der Arbeit geprüft werden.
+        </p>
+      </SectionCard>
+    </article>
+  );
+}
+
 export default function PrüfprotokollPage() {
   const supabase = useMemo(() => createClient(), []);
 
@@ -648,10 +934,13 @@ export default function PrüfprotokollPage() {
   const [planSource, setPlanSource] = useState<PlanSource>("fallback");
   const [workshopData, setWorkshopData] =
     useState<WorkshopData>(defaultWorkshopData);
+  const [instructionProtocol, setInstructionProtocol] =
+    useState<InstructionGuide | null>(null);
   const [loadingPlan, setLoadingPlan] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    loadInstructionPrintProtocol();
     void loadPlanAndWorkshopData();
 
     const {
@@ -669,6 +958,39 @@ export default function PrüfprotokollPage() {
       subscription.unsubscribe();
     };
   }, [supabase]);
+
+  function loadInstructionPrintProtocol() {
+    try {
+      const savedProtocol = window.sessionStorage.getItem(
+        PRINT_PROTOCOL_STORAGE_KEY
+      );
+
+      if (!savedProtocol) {
+        setInstructionProtocol(null);
+        return;
+      }
+
+      const parsedProtocol = JSON.parse(
+        savedProtocol
+      ) as PrintProtocolPayload;
+
+      if (
+        parsedProtocol.type === "instruction" &&
+        parsedProtocol.instruction?.title
+      ) {
+        setInstructionProtocol(parsedProtocol.instruction);
+        return;
+      }
+
+      setInstructionProtocol(null);
+    } catch (error) {
+      console.error(
+        "Anleitungs-Prüfprotokoll konnte nicht geladen werden:",
+        error
+      );
+      setInstructionProtocol(null);
+    }
+  }
 
   function loadCurrentCase(userId?: string | null) {
     try {
@@ -804,7 +1126,12 @@ export default function PrüfprotokollPage() {
           </div>
         )}
 
-        {!currentCase || messages.length === 0 ? (
+        {instructionProtocol ? (
+          <InstructionProtocolArticle
+            instruction={instructionProtocol}
+            workshopData={workshopData}
+          />
+        ) : !currentCase || messages.length === 0 ? (
           <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-8">
             <h2 className="text-3xl font-bold">Kein Diagnosefall geladen</h2>
 

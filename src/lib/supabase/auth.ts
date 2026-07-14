@@ -10,6 +10,20 @@ type AuthenticatedRequestUser = {
   supabase: SupabaseClient;
 };
 
+export class AuthenticatedRequestError extends Error {
+  status: number;
+
+  constructor(message: string, status = 401) {
+    super(message);
+    this.name = "AuthenticatedRequestError";
+    this.status = status;
+  }
+}
+
+export function getAuthenticatedRequestErrorStatus(error: unknown, fallback = 500) {
+  return error instanceof AuthenticatedRequestError ? error.status : fallback;
+}
+
 function getSupabaseUrl() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
@@ -65,7 +79,10 @@ export async function loadAuthenticatedUserFromRequest(
   const accessToken = getBearerToken(request);
 
   if (!accessToken) {
-    throw new Error("Nicht eingeloggt. Supabase Access Token fehlt.");
+    throw new AuthenticatedRequestError(
+      "Nicht eingeloggt. Supabase Access Token fehlt.",
+      401
+    );
   }
 
   const supabase = createAuthenticatedSupabaseClient(accessToken);
@@ -73,11 +90,11 @@ export async function loadAuthenticatedUserFromRequest(
   const { data, error } = await supabase.auth.getUser(accessToken);
 
   if (error) {
-    throw new Error(`Supabase-Session ungültig: ${error.message}`);
+    throw new AuthenticatedRequestError(`Supabase-Session ungültig: ${error.message}`, 401);
   }
 
   if (!data.user) {
-    throw new Error("Keine gültige Supabase-Session gefunden.");
+    throw new AuthenticatedRequestError("Keine gültige Supabase-Session gefunden.", 401);
   }
 
   return {

@@ -37,6 +37,15 @@ import {
   type UserPlan,
 } from "@/config/plans";
 import { findSimilarDiagnosisLibraryEntry } from "@/lib/supabase/diagnosisLibraryStorage";
+import {
+  detectSignalLibraryContext,
+  formatSignalLibraryContextForPrompt,
+} from "@/services/signalLibrary";
+import {
+  formatDiagnosisCorrectionsForPrompt,
+  loadApprovedDiagnosisCorrections,
+  type ApprovedDiagnosisCorrection,
+} from "@/services/diagnosisCorrections";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -54,6 +63,7 @@ type ChatMessage = {
 };
 
 type DiagnosisAudienceMode = "workshop" | "hobby";
+type DiagnosisRequestIntent = "diagnosis" | "instruction";
 
 type WorkshopProfileDatabaseRow = {
   id: string;
@@ -833,6 +843,63 @@ function getAudienceModeLabel(audienceMode: DiagnosisAudienceMode) {
   return audienceMode === "hobby" ? "Hobby-Modus" : "Werkstatt-Modus";
 }
 
+function detectDiagnosisRequestIntent(input: string): DiagnosisRequestIntent {
+  const normalizedInput = normalizeTechnicalSearchText(input);
+
+  const instructionTerms = [
+    "anleitung",
+    "arbeitsanweisung",
+    "schritt fuer schritt",
+    "schritt-fuer-schritt",
+    "notentriegelung",
+    "notentriegeln",
+    "entriegelung",
+    "entriegeln",
+    "ausbau",
+    "ausbauen",
+    "einbau",
+    "einbauen",
+    "demontage",
+    "demontieren",
+    "montage",
+    "montieren",
+    "wechsel",
+    "wechseln",
+    "tausch",
+    "tauschen",
+    "ersetzen",
+    "erneuern",
+    "freilegen",
+    "ausclipsen",
+    "abbauen",
+    "ausbauen",
+    "ausrasten",
+    "einstellen",
+    "anlernen",
+    "adaptieren",
+    "grundeinstellung",
+    "service zurueckstellen",
+    "zurueckstellen",
+    "zuruecksetzen",
+    "oeffnen",
+    "verkleidung ab",
+    "verkleidung entfernen",
+  ];
+
+  if (instructionTerms.some((term) => normalizedInput.includes(term))) {
+    return "instruction";
+  }
+
+  const compactProcedurePattern =
+    /\b(ausbau|einbau|wechsel|tausch|reset|notentriegelung|entriegelung|grundeinstellung)\b/i;
+
+  return compactProcedurePattern.test(normalizedInput) ? "instruction" : "diagnosis";
+}
+
+function getRequestIntentLabel(intent: DiagnosisRequestIntent) {
+  return intent === "instruction" ? "Anleitung" : "Diagnose";
+}
+
 function buildDiagnosisToneInstructions(audienceMode: DiagnosisAudienceMode) {
   if (audienceMode === "hobby") {
     return `
@@ -1066,13 +1133,144 @@ Antwortformat bei kurzer Folgefrage:
 `;
 }
 
+function buildRequestIntentInstructions(
+  requestIntent: DiagnosisRequestIntent,
+  audienceMode: DiagnosisAudienceMode
+) {
+  if (requestIntent === "instruction") {
+    const modeText =
+      audienceMode === "hobby"
+        ? "normalsprachliche, vorsichtige Hobby-Anleitung"
+        : "präzise Werkstatt-Anleitung";
+    const instructionBoundaryRule =
+      audienceMode === "hobby"
+        ? "- Am Ende klar sagen, wann der Nutzer nicht weiter selbst arbeiten sollte."
+        : "- Am Ende klar sagen, wann Herstellerdaten, Spezialwerkzeug, DSG-Grundeinstellung oder ein Spezialist nötig sind.";
+    const instructionFinalHeading =
+      audienceMode === "hobby"
+        ? "# Wann in die Werkstatt?"
+        : "# Abbruchgrenze / Eskalation";
+
+    return `
+Erkannte Anfrageart: Anleitung.
+Die aktuelle Eingabe ist als Arbeitsanweisung zu behandeln, nicht als Fehlerdiagnose.
+Beispiele: "Superb 2018 DSG Notentriegelung", "Gebläsemotor ausbauen", "Batterie anlernen".
+
+Pflicht:
+- Liefere eine ${modeText}.
+- Keine normale Diagnose mit Ursachenliste ausgeben, außer ein Prüfschritt ist für die Anleitung nötig.
+- Wenn es um Notentriegelung, Entriegelung, Ausbau, Einbau, Wechsel, Anlernen, Grundeinstellung, Zurückstellen oder Demontage geht, steht der Ablauf im Vordergrund.
+- Nenne Werkzeug und Teile / Material getrennt. Ersatzteile nur empfehlen, wenn sie zur Arbeit sicher gehören oder klar als "nur bei Befund" gekennzeichnet sind.
+- Nenne fehlende Daten, aber blockiere die Antwort nicht, wenn ein typischer sicherer Ablauf möglich ist.
+- Bei DSG/Automatik-Notentriegelung: klar zwischen Pannen-/Rangierhilfe und Reparaturdiagnose unterscheiden.
+- Soll-/Richtwerte bei Anleitungen nicht pauschal nennen. Nur angeben, wenn der Arbeitsschritt ohne diesen Wert fachlich nicht korrekt ausführbar ist.
+- Bei DSG-Getriebeölwechsel DQ250 als zwingenden Prozesswert nennen: nach dem Durchschalten der Fahrstufen Öltemperatur für die Ölstandseinstellung auf 35-45 °C bringen und per Diagnosetester überwachen.
+- Unsichere oder fahrzeugabhängige Werte klar als fehlende Herstellerdaten kennzeichnen.
+- Keine illegalen Umgehungen, Wegfahrsperren-, Airbag-, Abgas- oder Sicherheitsmanipulationen erklären.
+${instructionBoundaryRule}
+
+Antwortformat bei erkannter Anleitung:
+# Datenqualität
+# Ziel der Anleitung
+# Selbst machbar?
+# Werkzeug
+# Teile / Material
+# Vorbereitung
+# Zugang
+# Arbeitsschritte
+# Prüfpunkte / zwingende Prozesswerte
+# Risiken
+# Abschlussprüfung
+${instructionFinalHeading}
+`;
+  }
+
+  return `
+Erkannte Anfrageart: Diagnose.
+Die aktuelle Eingabe ist als Fehlersuche/Prüfplan zu behandeln.
+Wenn der Nutzer nur ein Arbeitsziel ohne Symptom nennt, nicht künstlich eine Diagnose erfinden.
+`;
+}
+
+function answerMatchesRequestIntent(
+  answer: string,
+  requestIntent: DiagnosisRequestIntent
+) {
+  const normalizedAnswer = normalizeAnswerForModeCheck(answer);
+
+  if (requestIntent === "instruction") {
+    return (
+      normalizedAnswer.includes("# ziel der anleitung") &&
+      normalizedAnswer.includes("# arbeitsschritte") &&
+      (normalizedAnswer.includes("# abschlussprüfung") ||
+        normalizedAnswer.includes("# abschlusspruefung"))
+    );
+  }
+
+  return true;
+}
+
+function enforceInstructionHeadingForAudience(
+  answer: string,
+  audienceMode: DiagnosisAudienceMode,
+  requestIntent: DiagnosisRequestIntent
+) {
+  if (requestIntent !== "instruction" || audienceMode !== "workshop") {
+    return answer;
+  }
+
+  return answer.replace(
+    /^(\s*#{1,6}\s*)Wann\s+in\s+die\s+Wer(?:kstatt)?\??\s*$/gim,
+    "$1Abbruchgrenze / Eskalation"
+  );
+}
+
+function buildRequestIntentRetryWarning(
+  requestIntent: DiagnosisRequestIntent,
+  audienceMode: DiagnosisAudienceMode
+) {
+  if (requestIntent !== "instruction") {
+    return "";
+  }
+  const instructionFinalHeading =
+    audienceMode === "hobby"
+      ? "# Wann in die Werkstatt?"
+      : "# Abbruchgrenze / Eskalation";
+  const instructionModeRule =
+    audienceMode === "hobby"
+      ? "Schreibe normalsprachlich und mit klarer Risikogrenze."
+      : "Schreibe werkstattnah, knapp und mit fachlicher Abbruchgrenze statt Werkstattverweis.";
+
+  return `
+ACHTUNG: Die vorherige Antwort hat die Anfrage fälschlich als Diagnose behandelt.
+Erzeuge die Antwort neu.
+Die erkannte Anfrageart ist Anleitung.
+Verwende zwingend diese Abschnitte:
+# Datenqualität
+# Ziel der Anleitung
+# Selbst machbar?
+# Werkzeug
+# Teile / Material
+# Vorbereitung
+# Zugang
+# Arbeitsschritte
+# Prüfpunkte / zwingende Prozesswerte
+# Risiken
+# Abschlussprüfung
+${instructionFinalHeading}
+${instructionModeRule}
+  `;
+}
+
 function buildSystemPrompt(
   engineContext: EngineContext,
   faultCodeContext: FaultCodeContext,
   technicalSpecContext: TechnicalSpecContext,
   torqueSpecContext: TorqueSpecContext,
+  approvedCorrections: ApprovedDiagnosisCorrection[],
   inputQualityProfile: DiagnosisInputQualityProfile,
   audienceMode: DiagnosisAudienceMode,
+  requestIntent: DiagnosisRequestIntent,
   retryWarning?: string
 ) {
   return `
@@ -1084,9 +1282,13 @@ Du bist DiagnoseHUB, ein technischer KI-Diagnoseassistent für ${
 
 Antworte immer auf Deutsch.
 Aktiver Ausgabemodus: ${getAudienceModeLabel(audienceMode)}.
+Erkannte Anfrageart: ${getRequestIntentLabel(requestIntent)}.
 Der aktive Ausgabemodus ist verbindlich und hat Vorrang vor allgemeinen Diagnose-Regeln.
+Die erkannte Anfrageart ist ebenfalls verbindlich.
 
 ${buildDiagnosisToneInstructions(audienceMode)}
+
+${buildRequestIntentInstructions(requestIntent, audienceMode)}
 
 Maximaler Diagnoseanspruch:
 - Arbeite wie ein Diagnosetechniker, nicht wie ein Teileberater.
@@ -1183,6 +1385,15 @@ ${formatTechnicalSpecContext(technicalSpecContext)}
 Manuell freigegebene Drehmomentwerte:
 ${formatTorqueSpecContext(torqueSpecContext)}
 
+Freigegebene Fachkorrekturen aus DiagnoseHUB:
+${formatDiagnosisCorrectionsForPrompt(approvedCorrections)}
+
+Fachkorrektur-Regel:
+- Freigegebene Fachkorrekturen sind verbindlich.
+- Wenn eine freigegebene Fachkorrektur zur aktuellen Eingabe passt, darf keine widersprechende Aussage ausgegeben werden.
+- Bei sicherheitskritischen Korrekturen die korrigierte Arbeitsweise direkt im passenden Schritt nennen.
+- Ungeprüfte Nutzervorschläge, Entwürfe oder nicht freigegebene Korrekturen nicht verwenden.
+
 ${retryWarning ?? ""}
 
 Motortyp-Regeln:
@@ -1206,11 +1417,13 @@ Fehlercode-Regel:
 - Unbekannte Fehlercodes nicht sicher erklären. Dann Testertext anfordern.
 
 Sollwerte-Regel:
-- Erkannte Soll-/Richtwerte aus der internen generischen Datenbank immer sichtbar nennen, wenn sie zum Fall passen.
-- Die Soll-/Richtwerte in einem eigenen Abschnitt "# Soll-/Richtwerte" oder direkt im Abschnitt "Prüfungen und Messwerte" mit angeben.
+- Bei Diagnoseanfragen erkannte Soll-/Richtwerte aus der internen generischen Datenbank sichtbar nennen, wenn sie zum Fall passen.
+- Bei Anleitungen Soll-/Richtwerte nicht als eigenen Pflichtblock ausgeben. Nur zwingende Prozesswerte nennen, wenn der Arbeitsschritt ohne diesen Wert falsch oder unvollständig wäre.
+- Beispiel für zwingenden Prozesswert: DQ250-DSG-Getriebeölwechsel. Nach dem Durchschalten der Fahrstufen Öltemperatur für die Ölstandseinstellung auf 35-45 °C bringen und per Diagnosetester überwachen.
+- Bei Diagnoseanfragen die Soll-/Richtwerte in einem eigenen Abschnitt "# Soll-/Richtwerte" oder direkt im Abschnitt "Prüfungen und Messwerte" mit angeben.
 - Diese Werte als Richtwerte kennzeichnen, wenn Fahrzeugdaten fehlen.
 - Exakte Herstellerdaten, Sicherungsnummern, Pinbelegungen, Drehmomente oder Spezialvorgaben nicht erfinden.
-- Wenn keine passenden Werte vorhanden sind, kurz schreiben: "Keine passenden Sollwerte hinterlegt."
+- Bei Diagnoseanfragen ohne passende Werte kurz schreiben: "Keine passenden Sollwerte hinterlegt." Bei Anleitungen diesen Satz weglassen, wenn kein zwingender Wert nötig ist.
 - Wenn Modell, Baujahr, Motorcode, Lampentyp oder Systemvariante fehlen, kurz sagen, welche Daten die Antwort genauer machen.
 
 Drehmoment-Regel:
@@ -1452,10 +1665,12 @@ async function createDiagnosisAnswer(
   faultCodeContext: FaultCodeContext,
   technicalSpecContext: TechnicalSpecContext,
   torqueSpecContext: TorqueSpecContext,
+  approvedCorrections: ApprovedDiagnosisCorrection[],
   inputQualityProfile: DiagnosisInputQualityProfile,
   messages: ChatMessage[],
   input: string,
   audienceMode: DiagnosisAudienceMode,
+  requestIntent: DiagnosisRequestIntent,
   retryWarning?: string,
   modelOverride?: string
 ) {
@@ -1481,8 +1696,10 @@ async function createDiagnosisAnswer(
           faultCodeContext,
           technicalSpecContext,
           torqueSpecContext,
+          approvedCorrections,
           inputQualityProfile,
           audienceMode,
+          requestIntent,
           retryWarning
         ),
       },
@@ -1492,8 +1709,12 @@ async function createDiagnosisAnswer(
 Aktiver Ausgabemodus:
 ${getAudienceModeLabel(audienceMode)}
 
+Erkannte Anfrageart:
+${getRequestIntentLabel(requestIntent)}
+
 Wichtig:
 Halte dich an genau diesen Ausgabemodus und das dazugehörige Antwortformat.
+Wenn die Anfrageart "Anleitung" ist, liefere eine Anleitung und keine normale Diagnose.
 
 Bisheriger Diagnoseverlauf:
 ${formatHistory(messages) || "Noch kein Verlauf vorhanden."}
@@ -1523,10 +1744,12 @@ ${input}
         faultCodeContext,
         technicalSpecContext,
         torqueSpecContext,
+        approvedCorrections,
         inputQualityProfile,
         messages,
         input,
         audienceMode,
+        requestIntent,
         retryWarning,
         FALLBACK_DIAGNOSIS_MODEL
       );
@@ -1606,29 +1829,41 @@ export async function POST(request: Request) {
       usageControl.supabase,
       combinedContext
     );
+    const signalLibraryContext = detectSignalLibraryContext(combinedContext);
+    const signalLibraryPrompt =
+      formatSignalLibraryContextForPrompt(signalLibraryContext);
+    const diagnosisInput = signalLibraryPrompt
+      ? `${input}\n\n${signalLibraryPrompt}`
+      : input;
     const inputQualityProfile = buildDiagnosisInputQualityProfile(
       input,
       messages
+    );
+    const requestIntent = detectDiagnosisRequestIntent(input);
+    const approvedCorrections = await loadApprovedDiagnosisCorrections(
+      combinedContext
     );
 
     let diagnosisLibraryMatch: Awaited<
       ReturnType<typeof findSimilarDiagnosisLibraryEntry>
     > = null;
 
-    try {
-      diagnosisLibraryMatch = await findSimilarDiagnosisLibraryEntry(
-        combinedContext,
-        audienceMode,
-        {
-          limit: 1500,
-          minScore: audienceMode === "hobby" ? 74 : 72,
-        }
-      );
-    } catch (error) {
-      console.error(
-        "Gespeicherte Diagnosebibliothek konnte nicht geprüft werden:",
-        error
-      );
+    if (requestIntent === "diagnosis" && approvedCorrections.length === 0) {
+      try {
+        diagnosisLibraryMatch = await findSimilarDiagnosisLibraryEntry(
+          combinedContext,
+          audienceMode,
+          {
+            limit: 1500,
+            minScore: audienceMode === "hobby" ? 74 : 72,
+          }
+        );
+      } catch (error) {
+        console.error(
+          "Gespeicherte Diagnosebibliothek konnte nicht geprüft werden:",
+          error
+        );
+      }
     }
 
     if (diagnosisLibraryMatch) {
@@ -1668,6 +1903,7 @@ export async function POST(request: Request) {
           maxOutputTokens: 0,
           autoRetry: false,
           audienceMode,
+          requestIntent,
         },
         inputQuality: inputQualityProfile,
         usageLimit: buildUsageLimitPayload(
@@ -1682,14 +1918,35 @@ export async function POST(request: Request) {
       faultCodeContext,
       technicalSpecContext,
       torqueSpecContext,
+      approvedCorrections,
       inputQualityProfile,
       messages,
-      input,
-      audienceMode
+      diagnosisInput,
+      audienceMode,
+      requestIntent
     );
     let audienceModeRetryApplied = false;
+    let requestIntentRetryApplied = false;
+
+    if (!answerMatchesRequestIntent(result, requestIntent)) {
+      requestIntentRetryApplied = true;
+      result = await createDiagnosisAnswer(
+        engineContext,
+        faultCodeContext,
+        technicalSpecContext,
+        torqueSpecContext,
+        approvedCorrections,
+        inputQualityProfile,
+        messages,
+        diagnosisInput,
+        audienceMode,
+        requestIntent,
+        buildRequestIntentRetryWarning(requestIntent, audienceMode)
+      );
+    }
 
     if (
+      requestIntent === "diagnosis" &&
       shouldEnforceAudienceModeFormat(input, messages) &&
       !answerMatchesAudienceMode(result, audienceMode)
     ) {
@@ -1699,18 +1956,26 @@ export async function POST(request: Request) {
         faultCodeContext,
         technicalSpecContext,
         torqueSpecContext,
+        approvedCorrections,
         inputQualityProfile,
         messages,
-        input,
+        diagnosisInput,
         audienceMode,
+        requestIntent,
         buildAudienceModeRetryWarning(audienceMode)
       );
     }
 
     const inputQualityNote = `Datenqualität: ${inputQualityProfile.score}/100 (${inputQualityProfile.level}).`;
-    let qualityCheck = audienceModeRetryApplied
-      ? `Ausgabemodus korrigiert und Antwort neu erstellt. ${inputQualityNote}`
-      : `Antwort ohne technischen Konflikt erstellt. ${inputQualityNote}`;
+    let qualityCheck = requestIntentRetryApplied
+      ? `Anfrageart als ${getRequestIntentLabel(requestIntent)} korrigiert und Antwort neu erstellt. ${inputQualityNote}`
+      : audienceModeRetryApplied
+        ? `Ausgabemodus korrigiert und Antwort neu erstellt. ${inputQualityNote}`
+        : `Antwort ohne technischen Konflikt erstellt. ${inputQualityNote}`;
+
+    if (approvedCorrections.length > 0) {
+      qualityCheck = `${qualityCheck} Freigegebene Fachkorrekturen angewendet: ${approvedCorrections.length}.`;
+    }
 
     if (hasTechnicalConflict(engineContext.engineType, result)) {
       if (shouldAutoRetryDiagnosis()) {
@@ -1722,10 +1987,12 @@ export async function POST(request: Request) {
           faultCodeContext,
           technicalSpecContext,
           torqueSpecContext,
+          approvedCorrections,
           inputQualityProfile,
           messages,
-          input,
+          diagnosisInput,
           audienceMode,
+          requestIntent,
           `
 ACHTUNG: Die vorherige Antwort enthielt ein Bauteil, das zum erkannten Motortyp nicht passt.
 Erzeuge die Antwort neu und beachte den Motortyp zwingend.
@@ -1739,8 +2006,15 @@ Bei Benziner keine Glühkerzen oder Glühsteuergerät als Ursache oder Prüfpunk
       }
     }
 
+    result = enforceInstructionHeadingForAudience(
+      result,
+      audienceMode,
+      requestIntent
+    );
     result = appendAutomaticInputQualityBlock(result, inputQualityProfile);
-    result = appendAutomaticTechnicalSpecBlock(result, technicalSpecContext);
+    if (requestIntent !== "instruction") {
+      result = appendAutomaticTechnicalSpecBlock(result, technicalSpecContext);
+    }
     result = appendAutomaticTorqueSpecBlock(result, torqueSpecContext);
 
     let countAfter: number | null = null;
@@ -1779,6 +2053,12 @@ Bei Benziner keine Glühkerzen oder Glühsteuergerät als Ursache oder Prüfpunk
         maxOutputTokens: getDiagnosisMaxOutputTokens(),
         autoRetry: shouldAutoRetryDiagnosis(),
         audienceMode,
+        requestIntent,
+        appliedCorrections: approvedCorrections.map((correction) => ({
+          id: correction.id,
+          title: correction.title,
+          severity: correction.severity,
+        })),
       },
       inputQuality: inputQualityProfile,
       usageLimit: buildUsageLimitPayload(

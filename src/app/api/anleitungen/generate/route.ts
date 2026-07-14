@@ -576,9 +576,9 @@ function normalizeGuide(rawGuide: unknown, query: string): Guide {
     measurementPlan: normalizeStringArray(
       raw.measurementPlan,
       [
-        "Messwerte nur unter definiertem Betriebszustand bewerten.",
-        "Soll-/Istwerte dokumentieren und exakte Sollwerte nur aus Herstellerdaten oder geprüfter Datenquelle übernehmen.",
-        "Abweichung vor Teiletausch durch zweite Prüfung oder Plausibilitätscheck bestätigen.",
+        "Messwerte nur dokumentieren, wenn sie für diesen Arbeitsablauf wirklich entscheiden.",
+        "Zwingende Prozesswerte nur nennen, wenn der Schritt ohne diesen Wert fachlich nicht korrekt ausführbar ist.",
+        "Beispiel: Beim DQ250-DSG-Getriebeölwechsel nach dem Durchschalten der Fahrstufen Öltemperatur für die Ölstandseinstellung auf 35-45 °C bringen und per Diagnosetester überwachen.",
       ],
       8
     ),
@@ -745,6 +745,8 @@ DATENBASIS UND GENAUIGKEIT:
 - Wenn Hersteller, Modell, Baujahr, Motorcode, Getriebe, Antrieb, Systemvariante oder VIN fehlen, müssen fahrzeugabhängige Punkte als fahrzeugabhängig markiert werden.
 - Exakte Drehmomente, Drehwinkel, Füllmengen, Druckwerte, Spannungswerte, Pinbelegungen, Sicherungsnummern, Teilenummern, Spezialwerkzeugnummern und Arbeitswerte nur nennen, wenn sie ausdrücklich in der Eingabe stehen oder aus geprüften internen Daten stammen.
 - Da für diese Anfrage keine geprüfte Herstellerdatenbank mitgeliefert wird, solche exakten Werte im Zweifel nicht ausgeben, sondern "nach Herstellerdaten anhand VIN/Motorcode festlegen" schreiben.
+- Soll-/Richtwerte in Anleitungen nicht pauschal ausgeben. Sie sind nur relevant, wenn der Arbeitsschritt ohne diesen Wert fachlich falsch oder unvollständig wäre.
+- Zwingender Prozesswert-Beispiel: Beim DQ250-DSG-Getriebeölwechsel nach dem Durchschalten der Fahrstufen Öltemperatur für die Ölstandseinstellung auf 35-45 °C bringen und per Diagnosetester überwachen.
 - expectedResult darf allgemeine Sollzustände nennen, aber keine exakten Zahlenwerte raten.
 - vehicleApplicability muss klar sagen, ob die Anleitung nur ein allgemeiner Arbeits-/Diagnoseablauf ist oder für ein konkretes Fahrzeug/System gilt.
 - missingVehicleData muss genau die Daten nennen, die die Anleitung sicherer und genauer machen.
@@ -760,6 +762,7 @@ STRUKTUR:
 - Jedes Feld hat eine klare Aufgabe. Keine Inhalte doppelt in safetyNotes, initialChecks, steps und finalChecks wiederholen.
 - In steps immer nur eine konkrete Handlung pro Schritt.
 - Messung, Sollzustand, Entscheidung und Qualitätskontrolle nur dann füllen, wenn sie den Schritt wirklich klarer machen.
+- measurementPlan und expectedResult leer lassen, wenn kein konkreter Messwert, Sollzustand oder zwingender Prozesswert nötig ist.
 - Warnungen nur dort setzen, wo im konkreten Schritt ein echtes Risiko besteht.
 - Keine langen Textblöcke in einzelnen Feldern. Lieber mehrere kurze Einträge.
 

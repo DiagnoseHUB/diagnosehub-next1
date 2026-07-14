@@ -50,7 +50,7 @@ const plans: PricePlan[] = [
       "Gut zum Ausprobieren",
     ],
     cta: "Kostenlos starten",
-    href: "/lernen",
+    href: "/login?setup=profile",
     bestFor: "Erster Eindruck",
     highlighted: false,
     type: "link",
@@ -66,7 +66,7 @@ const plans: PricePlan[] = [
       "Folgefragen zählen mit",
       "150 gespeicherte Fälle",
       "Technische Prüfpläne und Fallstruktur",
-      "Kein Bauteilwissen und kein Lernportal",
+      "Ideal, wenn du nur Diagnose und Fallablage brauchst",
     ],
     cta: "Diagnose 150 aktivieren",
     bestFor: "Fälle bearbeiten",
@@ -85,7 +85,7 @@ const plans: PricePlan[] = [
       "Lernportal und Prüfungsfragen",
       "Bauteilwissen inklusive",
       "Service-Erinnerung inklusive",
-      "Für Werkstatt, Azubis und private Schrauber",
+      "Beste Wahl für Werkstatt, Azubis und private Schrauber",
     ],
     cta: "Komplett 150 aktivieren",
     bestFor: "Diagnose + Lernen",
@@ -123,7 +123,7 @@ const plans: PricePlan[] = [
       "HU/AU-Fälligkeit berechnen",
       "Hersteller-Serviceintervall nach Datum und km berücksichtigen",
       "E-Mail-Erinnerungen vorbereitet",
-      "Ideal als günstiger Privat-Einstieg",
+      "Ideal als günstiger Einstieg für private Fahrzeuge",
     ],
     cta: "Service aktivieren",
     href: "/service-erinnerung",
@@ -149,6 +149,28 @@ const comparisonItems = [
   },
 ];
 
+const decisionHelpers = [
+  {
+    title: "Du willst nur Fehlerfälle bearbeiten?",
+    text: "Nimm Diagnose 150. Das ist der klare Einstieg für Prüfpläne, Folgefragen und gespeicherte Fälle.",
+  },
+  {
+    title: "Du willst Lernen und Bauteilwissen direkt dabei haben?",
+    text: "Nimm Komplett 150. Das ist der rundeste Tarif, wenn Diagnose und Weiterbildung zusammengehören.",
+  },
+  {
+    title: "Du nutzt es täglich oder mit mehreren Fällen?",
+    text: "Nimm Unlimited, wenn du nicht auf Fallzahlen achten möchtest.",
+  },
+];
+
+const trustItems = [
+  "Zahlung und Abo-Verwaltung laufen über Stripe.",
+  "Du kannst mit Free prüfen, ob der Ablauf zu dir passt.",
+  "Gespeicherte Fälle bleiben am Account und sind später wieder auffindbar.",
+  "DiagnoseHUB ersetzt keine Herstellerfreigabe, macht den Prüfweg aber nachvollziehbarer.",
+];
+
 export default function PreisePage() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-950 transition-colors dark:bg-slate-950 dark:text-slate-100">
@@ -163,14 +185,30 @@ export default function PreisePage() {
               </p>
 
               <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950 dark:text-white sm:text-5xl">
-                Der passende Zugang für Diagnose, Lernen und Service.
+                Wähle den Tarif, der sich im Alltag wirklich lohnt.
               </h1>
 
               <p className="mt-4 max-w-3xl leading-7 text-slate-600 dark:text-slate-300">
-                Für Werkstätten, Azubis, Schulen und private Fahrzeughalter:
-                Starte klein und schalte genau die Funktionen frei, die du im
-                Alltag brauchst.
+                Starte kostenlos, arbeite bei Bedarf mit gespeicherten Fällen,
+                Prüfplänen, Lerninhalten und Bauteilwissen weiter. Der richtige
+                Tarif hängt davon ab, ob du nur diagnostizieren oder das ganze
+                System nutzen möchtest.
               </p>
+
+              <div className="mt-6 flex flex-wrap gap-3">
+                <Link
+                  href="/login?setup=profile"
+                  className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-blue-100 transition hover:bg-blue-700 dark:shadow-blue-950/30"
+                >
+                  Kostenlos testen
+                </Link>
+                <a
+                  href="#tarife"
+                  className="rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-black text-slate-800 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800"
+                >
+                  Tarife vergleichen
+                </a>
+              </div>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
@@ -190,7 +228,23 @@ export default function PreisePage() {
             </div>
           </section>
 
-          <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-5">
+          <section className="mb-8 grid gap-4 md:grid-cols-3">
+            {decisionHelpers.map((item) => (
+              <article
+                key={item.title}
+                className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+              >
+                <h2 className="text-lg font-black text-slate-950 dark:text-white">
+                  {item.title}
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                  {item.text}
+                </p>
+              </article>
+            ))}
+          </section>
+
+          <section id="tarife" className="grid gap-5 md:grid-cols-2 xl:grid-cols-5">
             {plans.map((plan) => (
               <article
                 key={plan.name}
@@ -278,6 +332,32 @@ export default function PreisePage() {
                 </div>
               </article>
             ))}
+          </section>
+
+          <section className="mt-8 grid gap-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-900 md:grid-cols-[0.8fr_1fr]">
+            <div>
+              <h2 className="text-2xl font-black text-slate-950 dark:text-white">
+                Was du vor dem Bezahlen wissen solltest
+              </h2>
+              <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                DiagnoseHUB soll kaufbar bleiben, ohne falsche Sicherheit zu verkaufen:
+                klare technische Hilfe, aber keine blinde Reparaturfreigabe.
+              </p>
+            </div>
+
+            <div className="grid gap-3">
+              {trustItems.map((item) => (
+                <div
+                  key={item}
+                  className="flex gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950"
+                >
+                  <span className="mt-1 h-5 w-5 shrink-0 rounded-full bg-blue-600" />
+                  <p className="text-sm font-semibold leading-6 text-slate-700 dark:text-slate-200">
+                    {item}
+                  </p>
+                </div>
+              ))}
+            </div>
           </section>
 
           <section className="mt-8 grid gap-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-900 md:grid-cols-3">

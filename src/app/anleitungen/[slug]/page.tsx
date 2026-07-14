@@ -4,6 +4,7 @@ import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import InstructionStepVisual from "@/components/InstructionStepVisual";
 import PrintButton from "../../../components/PrintButton";
+import ProtocolPrintButton from "@/components/ProtocolPrintButton";
 import TrainingMode from "@/components/TrainingMode";
 import { getInstructionBySlug, instructions } from "../../../data/instructions";
 import type { InstructionGuide } from "../../../types/instruction";
@@ -129,7 +130,10 @@ export default async function InstructionDetailPage({
               ← Zurück zu den Anleitungen
             </Link>
 
-            <PrintButton />
+            <div className="flex flex-wrap gap-3">
+              <ProtocolPrintButton instruction={instruction} />
+              <PrintButton />
+            </div>
           </div>
 
           <header className="rounded-[2rem] border border-slate-200 bg-white p-8 shadow-xl transition-colors dark:border-slate-800 dark:bg-slate-900">

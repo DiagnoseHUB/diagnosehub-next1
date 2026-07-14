@@ -28,6 +28,57 @@ export type FaultCodeContext = {
   summary: string;
 };
 
+export type DiagnosisWorkspace = {
+  symptoms?: Array<{
+    id: string;
+    text: string;
+    createdAt: string;
+  }>;
+  measurements?: Array<{
+    id: string;
+    label: string;
+    value: string;
+    unit: string;
+    note: string;
+    createdAt: string;
+  }>;
+  mediaAssets?: Array<{
+    id: string;
+    name: string;
+    mediaType: "image" | "video";
+    mimeType: string;
+    sizeBytes: number;
+    analysisText?: string;
+    createdAt: string;
+  }>;
+  mediaAnalyses?: Array<{
+    id: string;
+    summary: string;
+    analysis: Record<string, unknown>;
+    createdAt: string;
+  }>;
+  guidedSteps?: Array<{
+    id: string;
+    title: string;
+    prompt: string;
+    why: string;
+    passNext: string;
+    failNext: string;
+    status: "open" | "passed" | "failed" | "skipped";
+    resultNote?: string;
+    createdAt: string;
+  }>;
+  liveData?: Array<{
+    id: string;
+    summary: string;
+    rows: unknown[];
+    anomalies: unknown[];
+    nextChecks: string[];
+    createdAt: string;
+  }>;
+  knowledgeStatus?: "none" | "draft" | "saved" | "archived";
+};
+
 export type SavedDiagnosisCase = {
   id: string;
   title: string;
@@ -37,6 +88,7 @@ export type SavedDiagnosisCase = {
   engineContext: EngineContext | null;
   faultCodeContext: FaultCodeContext | null;
   qualityCheck: string;
+  workspace?: DiagnosisWorkspace;
 };
 
 export type DiagnosisCaseDatabaseRow = {
@@ -47,6 +99,7 @@ export type DiagnosisCaseDatabaseRow = {
   engine_context: EngineContext | null;
   fault_code_context: FaultCodeContext | null;
   quality_check: string;
+  workspace?: DiagnosisWorkspace | null;
   created_at: string;
   updated_at: string;
 };
@@ -63,6 +116,7 @@ export function convertDatabaseRowToSavedCase(
     engineContext: row.engine_context || null,
     faultCodeContext: row.fault_code_context || null,
     qualityCheck: row.quality_check || "",
+    workspace: row.workspace || {},
   };
 }
 
@@ -78,6 +132,7 @@ export function convertSavedCaseToDatabasePayload(
     engine_context: savedCase.engineContext,
     fault_code_context: savedCase.faultCodeContext,
     quality_check: savedCase.qualityCheck,
+    workspace: savedCase.workspace || {},
   };
 }
 

@@ -13,6 +13,7 @@ import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import InstructionStepVisual from "@/components/InstructionStepVisual";
 import InstructionCard from "../../components/InstructionCard";
+import ProtocolPrintButton from "@/components/ProtocolPrintButton";
 import { instructions } from "../../data/instructions";
 import type {
   InstructionCategory,
@@ -732,13 +733,16 @@ function GeneratedInstructionPanel({
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-800 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800 print:hidden"
-        >
-          Drucken
-        </button>
+        <div className="flex flex-wrap gap-3">
+          <ProtocolPrintButton instruction={instruction} />
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-800 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800 print:hidden"
+          >
+            Drucken
+          </button>
+        </div>
       </div>
 
       <div className="mb-6 flex flex-wrap gap-2">

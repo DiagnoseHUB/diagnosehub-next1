@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
@@ -285,24 +284,20 @@ function Header() {
       <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/95 text-slate-950 backdrop-blur-xl transition-colors dark:border-slate-800/90 dark:bg-slate-950/95 dark:text-slate-100">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="flex min-h-16 items-center justify-between gap-3">
-            <Link href="/" className="group flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm transition duration-200 group-hover:-translate-y-0.5 group-hover:border-blue-300 dark:border-slate-700 dark:bg-slate-900 dark:group-hover:border-blue-500/70">
-                <Image
-                  src="/diagnosehub-logo.png"
-                  alt="DiagnoseHUB Logo"
-                  width={48}
-                  height={48}
-                  priority
-                  className="h-full w-full object-contain"
-                />
-              </div>
-
-              <div>
-                <p className="text-base font-black leading-tight tracking-tight text-slate-950 transition-colors dark:text-white">
-                  DiagnoseHUB
+            <Link
+              href="/"
+              aria-label="DiagnoseHUB Startseite"
+              className="group flex min-w-0 items-center"
+            >
+              <div className="leading-none">
+                <p className="text-[1.35rem] font-black uppercase text-slate-950 transition-colors group-hover:text-blue-700 dark:text-white dark:group-hover:text-blue-300 sm:text-[1.6rem]">
+                  Diagnose
+                  <span className="text-blue-600 transition-colors dark:text-blue-400">
+                    HUB
+                  </span>
                 </p>
-                <p className="hidden text-xs font-semibold text-slate-600 transition-colors dark:text-slate-400 sm:block">
-                  Diagnose, Lernen und Service
+                <p className="mt-1 hidden text-[0.63rem] font-black uppercase text-slate-500 transition-colors dark:text-slate-400 lg:block">
+                  KI-gestützte Fahrzeugdiagnose
                 </p>
               </div>
             </Link>

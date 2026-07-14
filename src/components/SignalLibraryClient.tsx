@@ -277,7 +277,7 @@ export default function SignalLibraryClient() {
       // Komfortfunktion. Wenn Session Storage blockiert ist, bleibt die Bibliothek nutzbar.
     }
 
-    window.location.href = "/#diagnose";
+    window.location.href = "/diagnose";
   }
 
   return (

@@ -1105,7 +1105,7 @@ export default function PrüfprotokollPage() {
 
           <div className="flex flex-wrap gap-3">
             <Link
-              href="/#diagnose"
+              href="/diagnose"
               className="rounded-xl border border-slate-700 px-5 py-3 font-semibold text-slate-300 transition hover:bg-slate-800"
             >
               Zur Diagnose
@@ -1141,7 +1141,7 @@ export default function PrüfprotokollPage() {
             </p>
 
             <Link
-              href="/#diagnose"
+              href="/diagnose"
               className="mt-6 inline-flex rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white transition hover:bg-blue-500"
             >
               Diagnose starten

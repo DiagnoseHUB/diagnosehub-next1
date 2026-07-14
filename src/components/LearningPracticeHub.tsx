@@ -258,7 +258,7 @@ export default function LearningPracticeHub() {
       // Die Navigation funktioniert trotzdem, nur ohne vorausgefüllten Text.
     }
 
-    window.location.assign("/#diagnose");
+    window.location.assign("/diagnose");
   }
 
   return (

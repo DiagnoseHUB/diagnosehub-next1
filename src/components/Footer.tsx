@@ -6,11 +6,11 @@ import PublicOnly from "@/components/PublicOnly";
 const productLinks = [
   {
     label: "Diagnose starten",
-    href: "/#diagnose",
+    href: "/diagnose",
   },
   {
-    label: "Dashboard",
-    href: "/dashboard",
+    label: "Account",
+    href: "/dashboard#account",
   },
   {
     label: "Lernen",
@@ -93,14 +93,14 @@ function Footer() {
               Strukturierte Diagnose statt Teilewerfen.
             </h2>
             <p className="mt-3 max-w-3xl leading-7 text-slate-600 dark:text-slate-300">
-              Starte einen Fall, öffne dein Dashboard oder gib Feedback direkt
+              Starte einen Fall, öffne deinen Account oder gib Feedback direkt
               an die Entwicklung.
             </p>
           </div>
 
           <div className="flex flex-wrap gap-3">
             <Link
-              href="/#diagnose"
+              href="/diagnose"
               className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white transition hover:bg-blue-500"
             >
               Diagnose starten

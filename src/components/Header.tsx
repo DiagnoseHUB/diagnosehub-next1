@@ -23,7 +23,7 @@ type HeaderLink = {
 };
 
 const primaryNavigationLinks: HeaderLink[] = [
-  { label: "Dashboard", href: "/dashboard" },
+  { label: "Diagnose", href: "/diagnose" },
   { label: "Lernen", href: "/lernen" },
   { label: "Teilemarkt", href: "/teilemarkt" },
   { label: "Forum", href: "/forum" },
@@ -283,20 +283,20 @@ function Header() {
       <DeviceAccessGuard />
       <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/95 text-slate-950 backdrop-blur-xl transition-colors dark:border-slate-800/90 dark:bg-slate-950/95 dark:text-slate-100">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <div className="flex min-h-16 items-center justify-between gap-3">
+          <div className="flex min-h-20 items-center justify-between gap-3 py-2">
             <Link
               href="/"
               aria-label="DiagnoseHUB Startseite"
-              className="group flex min-w-0 items-center"
+              className="group flex shrink-0 items-center"
             >
               <div className="leading-none">
-                <p className="text-[1.35rem] font-black uppercase text-slate-950 transition-colors group-hover:text-blue-700 dark:text-white dark:group-hover:text-blue-300 sm:text-[1.6rem]">
+                <p className="whitespace-nowrap text-[1.35rem] font-black uppercase leading-none text-slate-950 transition-colors group-hover:text-blue-700 dark:text-white dark:group-hover:text-blue-300 sm:text-[1.6rem]">
                   Diagnose
                   <span className="text-blue-600 transition-colors dark:text-blue-400">
                     HUB
                   </span>
                 </p>
-                <p className="mt-1 hidden text-[0.63rem] font-black uppercase text-slate-500 transition-colors dark:text-slate-400 lg:block">
+                <p className="mt-1.5 hidden whitespace-nowrap text-[0.63rem] font-black uppercase leading-none text-slate-500 transition-colors dark:text-slate-400 lg:block">
                   KI-gestützte Fahrzeugdiagnose
                 </p>
               </div>
@@ -319,7 +319,7 @@ function Header() {
               <ThemeToggle />
 
               <Link
-                href="/login"
+                href={demoAccount ? "/dashboard#account" : "/login"}
                 className={
                   demoAccount
                     ? "rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-bold text-blue-800 transition hover:border-blue-500 hover:bg-blue-600 hover:text-white dark:border-blue-500/40 dark:bg-blue-500/10 dark:text-blue-200 dark:hover:bg-blue-500 dark:hover:text-white"
@@ -354,12 +354,14 @@ function Header() {
                 </button>
               )}
 
-              <Link
-                href="/#diagnose"
-                className="rounded-xl bg-slate-950 px-3.5 py-2 text-sm font-black text-white shadow-sm transition hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500"
-              >
-                Diagnose
-              </Link>
+              {!demoAccount && (
+                <Link
+                  href="/diagnose"
+                  className="rounded-xl bg-slate-950 px-3.5 py-2 text-sm font-black text-white shadow-sm transition hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500"
+                >
+                  Diagnose
+                </Link>
+              )}
             </div>
 
             <div className="flex items-center gap-2 md:hidden">
@@ -382,7 +384,7 @@ function Header() {
                   <nav className="mx-auto grid max-w-7xl gap-3 px-4 py-5 sm:px-6">
                     {demoAccount && (
                       <Link
-                        href="/login"
+                        href="/dashboard#account"
                         onClick={closeMobileMenu}
                         className="rounded-2xl border border-blue-300 bg-blue-50 px-5 py-4 transition-colors dark:border-blue-500/40 dark:bg-blue-500/10"
                       >
@@ -407,7 +409,7 @@ function Header() {
                     )}
 
                     <Link
-                      href="/#diagnose"
+                      href="/diagnose"
                       onClick={closeMobileMenu}
                       className="rounded-2xl bg-blue-600 px-5 py-3.5 text-center font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-500 dark:shadow-blue-950/40"
                     >

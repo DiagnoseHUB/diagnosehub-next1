@@ -40,7 +40,7 @@ const quickActions = [
     title: "Fehler strukturiert prüfen",
     description:
       "Fahrzeug, Fehlercode, Symptom oder Messwert eingeben und einen geordneten Prüfplan erhalten.",
-    href: "/#diagnose",
+    href: "/diagnose",
     cta: "Diagnose starten",
   },
   {
@@ -48,8 +48,8 @@ const quickActions = [
     title: "Fälle wiederfinden",
     description:
       "Eigene Diagnosefälle, Nutzung, Tarif und Profil an einem zentralen Ort prüfen.",
-    href: "/dashboard",
-    cta: "Zum Dashboard",
+    href: "/dashboard#account",
+    cta: "Zum Account",
   },
   {
     step: "03",
@@ -88,7 +88,7 @@ const workflowSteps = [
   {
     title: "Dokumentation",
     description:
-      "Fälle lassen sich speichern und später im Dashboard oder Prüfprotokoll wiederverwenden.",
+      "Fälle lassen sich speichern und später im Account oder Prüfprotokoll wiederverwenden.",
   },
 ];
 
@@ -295,15 +295,16 @@ export default function HomePage() {
             <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <p className="text-sm font-black uppercase tracking-[0.24em] text-blue-700 dark:text-blue-300">
-                  KI-Diagnose
+                  KI-Diagnose & Anleitung
                 </p>
                 <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950 dark:text-white sm:text-4xl">
-                  Fehlerfall eingeben
+                  Fehlerfall oder Anleitung suchen
                 </h2>
                 <p className="mt-3 max-w-3xl leading-7 text-slate-600 dark:text-slate-300">
-                  Schreibe den Fall so, wie du ihn in der Werkstatt oder am
-                  Fahrzeug vor dir hast. Fehlercode, Motorcode und bereits
-                  geprüfte Punkte helfen am meisten.
+                  Schreibe den Fall oder die gewünschte Arbeit so, wie du sie
+                  in der Werkstatt oder am Fahrzeug vor dir hast. Fehlercode,
+                  Motorcode, Arbeitsschritt und bereits geprüfte Punkte helfen
+                  am meisten.
                 </p>
               </div>
             </div>

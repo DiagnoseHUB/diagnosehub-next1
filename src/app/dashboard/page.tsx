@@ -15,7 +15,6 @@ import {
 import {
   deleteDiagnosisCaseFromSupabase,
   loadDiagnosisCasesFromSupabase,
-  migrateLocalDiagnosisCasesToSupabase,
   type SavedDiagnosisCase,
 } from "@/services/diagnosisCasesSupabase";
 import {
@@ -329,18 +328,23 @@ function DashboardCard({
 }
 
 function Section({
+  id,
   title,
   description,
   right,
   children,
 }: {
+  id?: string;
   title: string;
   description?: string;
   right?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-900/70 dark:shadow-blue-950/20">
+    <section
+      id={id}
+      className="scroll-mt-28 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-900/70 dark:shadow-blue-950/20"
+    >
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
           <h2 className="text-2xl font-black text-slate-950 dark:text-white">
@@ -431,7 +435,7 @@ function LoginRequired() {
       <main className="mx-auto max-w-5xl px-6 py-16">
         <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
           <p className="text-sm font-black uppercase tracking-[0.3em] text-blue-700 dark:text-blue-300">
-            DiagnoseHUB Dashboard
+            DiagnoseHUB Account
           </p>
 
           <h1 className="mt-4 text-4xl font-black tracking-tight text-slate-950 dark:text-white md:text-5xl">
@@ -439,10 +443,10 @@ function LoginRequired() {
           </h1>
 
           <p className="mt-5 max-w-3xl leading-8 text-slate-600 dark:text-slate-300">
-            Das Dashboard zeigt Nutzerprofil, Fallhistorie und
-            Nutzungszähler. Dafür brauchst du eine
-            aktive Anmeldung. Lokale Alt-Daten werden hier bewusst nicht
-            mehr als Dashboard angezeigt.
+            Der Account-Bereich zeigt Nutzerprofil, Freigaben, Fallhistorie
+            und Nutzungszähler. Dafür brauchst du eine aktive Anmeldung.
+            Lokale Alt-Daten werden hier bewusst nicht mehr als Accountdaten
+            angezeigt.
           </p>
 
           <div className="mt-8 flex flex-wrap gap-3">
@@ -454,7 +458,7 @@ function LoginRequired() {
             </Link>
 
             <Link
-              href="/#diagnose"
+              href="/diagnose"
               className="rounded-2xl border border-slate-300 bg-white px-6 py-3 font-black text-slate-800 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
             >
               Zur Diagnose
@@ -554,7 +558,7 @@ export default function DashboardPage() {
 
       await Promise.all([
         loadWorkshopProfile(currentUser),
-        loadSupabaseCases(currentUser, false),
+        loadSupabaseCases(currentUser),
         loadSupabaseUsage(currentUser),
         currentSession
           ? loadSafetyAccountProfile(currentSession)
@@ -613,15 +617,17 @@ export default function DashboardPage() {
 
       await Promise.all([
         loadWorkshopProfile(session.user),
-        loadSupabaseCases(session.user, false),
+        loadSupabaseCases(session.user),
         loadSupabaseUsage(session.user),
         loadSafetyAccountProfile(session),
       ]);
 
       setAuthChecked(true);
     } catch (error) {
-      console.error("Dashboard konnte nicht geladen werden:", error);
-      setError(`Dashboard konnte nicht geladen werden: ${getErrorMessage(error)}`);
+      console.error("Account-Bereich konnte nicht geladen werden:", error);
+      setError(
+        `Account-Bereich konnte nicht geladen werden: ${getErrorMessage(error)}`
+      );
       setAuthChecked(true);
     } finally {
       setProfileLoading(false);
@@ -697,21 +703,11 @@ export default function DashboardPage() {
     }
   }
 
-  async function loadSupabaseCases(currentUser: User, migrateLocal: boolean) {
+  async function loadSupabaseCases(currentUser: User) {
     setCaseLoading(true);
     setDiagnosisCases(loadLocalDiagnosisCases(currentUser.id));
 
     try {
-      const localCases = loadLocalDiagnosisCases(currentUser.id);
-
-      if (migrateLocal && localCases.length > 0) {
-        await migrateLocalDiagnosisCasesToSupabase(
-          supabase,
-          currentUser,
-          localCases
-        );
-      }
-
       const remoteCases = await loadDiagnosisCasesFromSupabase(
         supabase,
         currentUser
@@ -779,25 +775,12 @@ export default function DashboardPage() {
 
     await Promise.all([
       loadWorkshopProfile(user),
-      loadSupabaseCases(user, false),
+      loadSupabaseCases(user),
       loadSupabaseUsage(user),
       session ? loadSafetyAccountProfile(session) : Promise.resolve(),
     ]);
 
-    setSuccess("Dashboard wurde neu geladen.");
-  }
-
-  async function migrateLocalCasesNow() {
-    if (!user) {
-      setError("Zum Übernehmen lokaler Fälle musst du eingeloggt sein.");
-      return;
-    }
-
-    setSuccess("");
-    setError("");
-
-    await loadSupabaseCases(user, true);
-    setSuccess("Lokale Diagnosefälle wurden übernommen.");
+    setSuccess("Account-Bereich wurde neu geladen.");
   }
 
   async function deleteDiagnosisCase(caseId: string) {
@@ -865,7 +848,7 @@ export default function DashboardPage() {
       return;
     }
 
-    window.location.href = "/#diagnose";
+    window.location.href = "/diagnose";
   }
 
   function clearCurrentCase() {
@@ -999,11 +982,11 @@ export default function DashboardPage() {
         <main className="mx-auto max-w-7xl px-6 py-16">
           <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
             <p className="text-sm font-black uppercase tracking-[0.3em] text-blue-700 dark:text-blue-300">
-              DiagnoseHUB Dashboard
+              DiagnoseHUB Account
             </p>
 
             <h1 className="mt-4 text-4xl font-black text-slate-950 dark:text-white">
-              Dashboard wird geladen...
+              Account wird geladen...
             </h1>
 
             <p className="mt-4 leading-8 text-slate-600 dark:text-slate-300">
@@ -1033,12 +1016,13 @@ export default function DashboardPage() {
             </p>
 
             <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950 dark:text-white md:text-5xl">
-              Dashboard
+              Account & Übersicht
             </h1>
 
             <p className="mt-4 max-w-3xl leading-8 text-slate-600 dark:text-slate-300">
-              Übersicht über Nutzerprofil, Diagnosefälle und Nutzungszähler.
-              Dieses Dashboard ist nur mit aktiver Anmeldung sichtbar.
+              Nutzerprofil, Freigaben, Diagnosefälle, Nutzung und
+              Account-Verwaltung an einem Ort. Dieser Bereich ist nur mit
+              aktiver Anmeldung sichtbar.
             </p>
           </div>
 
@@ -1049,7 +1033,7 @@ export default function DashboardPage() {
               disabled={isLoading}
               className="rounded-2xl border border-slate-300 bg-white px-5 py-3 font-bold text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
             >
-              {isLoading ? "Lädt..." : "Dashboard neu laden"}
+              {isLoading ? "Lädt..." : "Account neu laden"}
             </button>
 
             <button
@@ -1077,13 +1061,13 @@ export default function DashboardPage() {
         <div className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {[
             {
-              title: "Neue Diagnose",
-              text: "Direkt einen neuen Fehlerfall starten.",
-              href: "/#diagnose",
+              title: "Diagnose oder Anleitung",
+              text: "Fehler prüfen oder eine konkrete Anleitung erstellen.",
+              href: "/diagnose",
             },
             {
-              title: "Profil prüfen",
-              text: "Name, Betrieb/Firma und Tarif ansehen.",
+              title: "Account einrichten",
+              text: "Profil, Rolle und Freigaben bearbeiten.",
               href: "/login?setup=profile",
             },
             {
@@ -1111,6 +1095,27 @@ export default function DashboardPage() {
             </Link>
           ))}
         </div>
+
+        <nav
+          aria-label="Account-Bereiche"
+          className="mb-8 flex flex-wrap gap-2 rounded-3xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-slate-900/80"
+        >
+          {[
+            { label: "Account", href: "#account" },
+            { label: "Freigaben", href: "#freigaben" },
+            { label: "Nutzung", href: "#nutzung" },
+            { label: "Fälle", href: "#faelle" },
+            { label: "Löschen", href: "#account-loeschen" },
+          ].map((item) => (
+            <a
+              key={item.href}
+              href={item.href}
+              className="rounded-2xl px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-blue-50 hover:text-blue-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+            >
+              {item.label}
+            </a>
+          ))}
+        </nav>
 
         <div className="mb-8 grid gap-5 md:grid-cols-2 xl:grid-cols-5">
           <DashboardCard
@@ -1162,11 +1167,12 @@ export default function DashboardPage() {
 
         <div className="space-y-8">
           <Section
+            id="account"
             title="Nutzerprofil"
-            description="Diese Daten kommen bevorzugt aus deinem Konto und werden für Header, Dashboard und Prüfprotokoll genutzt."
+            description="Diese Daten kommen aus deinem Account und werden für Header, Diagnose, Prüfprotokoll und interne Freigaben genutzt."
             right={
               <a
-                href="/login"
+                href="/login?setup=profile"
                 className="rounded-2xl bg-blue-600 px-5 py-3 font-bold text-white transition hover:bg-blue-500"
               >
                 Profil bearbeiten
@@ -1212,6 +1218,7 @@ export default function DashboardPage() {
           </Section>
 
           <Section
+            id="freigaben"
             title="Sicherheitsprofil"
             description="Aktuelle Konto-Einstufung für sicherheitskritische Inhalte."
             right={
@@ -1302,6 +1309,7 @@ export default function DashboardPage() {
           <RoleVerificationAccountPanel />
 
           <Section
+            id="nutzung"
             title="Nutzungszähler"
             description="Der Monatszähler wird bei Login aus deinem Konto geladen und bei Diagnoseanfragen serverseitig erhöht."
             right={
@@ -1340,6 +1348,7 @@ export default function DashboardPage() {
 
           {latestCase && (
             <Section
+              id="letzter-fall"
               title="Letzter Fall"
               description="Schnellzugriff auf den zuletzt aktualisierten Diagnosefall."
               right={
@@ -1367,30 +1376,22 @@ export default function DashboardPage() {
           )}
 
           <Section
+            id="faelle"
             title="Diagnosefälle"
-            description="Gespeicherte Fälle. Lokale Alt-Fälle können übernommen werden."
+            description="Gespeicherte Fälle aus deinem Account."
             right={
               <>
                 <button
                   type="button"
-                  onClick={() => user && loadSupabaseCases(user, false)}
+                  onClick={() => user && loadSupabaseCases(user)}
                   disabled={caseLoading}
                   className="rounded-2xl border border-slate-300 bg-white px-5 py-3 font-bold text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
                 >
                   Fälle neu laden
                 </button>
 
-                <button
-                  type="button"
-                  onClick={migrateLocalCasesNow}
-                  disabled={caseLoading}
-                  className="rounded-2xl border border-green-200 bg-green-50 px-5 py-3 font-bold text-green-700 transition hover:bg-green-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 dark:border-green-500/40 dark:bg-green-500/10 dark:text-green-300 dark:hover:bg-green-500"
-                >
-                  Lokale Fälle übernehmen
-                </button>
-
                 <Link
-                  href="/#diagnose"
+                  href="/diagnose"
                   className="rounded-2xl bg-blue-600 px-5 py-3 font-bold text-white transition hover:bg-blue-500"
                 >
                   Neuen Fall starten
@@ -1476,6 +1477,7 @@ export default function DashboardPage() {
           </Section>
 
           <Section
+            id="account-loeschen"
             title="Account löschen"
             description="Diesen Schritt bitte nur nutzen, wenn der DiagnoseHUB-Account wirklich vollständig entfernt werden soll."
           >

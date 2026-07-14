@@ -447,7 +447,7 @@ export default function TorqueSpecManager() {
           </div>
 
           <Link
-            href="/#diagnose"
+            href="/diagnose"
             className="inline-flex w-fit rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white transition hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500"
           >
             Zur Diagnose

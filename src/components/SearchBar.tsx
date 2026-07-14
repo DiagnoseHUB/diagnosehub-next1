@@ -1266,7 +1266,6 @@ export default function SearchBar() {
   const [diagnosisUsage, setDiagnosisUsage] = useState<DiagnosisUsage>(
     getInitialDiagnosisUsage(),
   );
-  const [copySuccess, setCopySuccess] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [openedCaseId, setOpenedCaseId] = useState<string | null>(null);
   const [copiedMessageIndex, setCopiedMessageIndex] = useState<number | null>(
@@ -1994,7 +1993,6 @@ ${instructionFinalHeading}`,
     setError("");
     setQualityCheck("");
     setTechnicalSpecContext(null);
-    setCopySuccess(false);
     setSaveSuccess(false);
     setCopiedMessageIndex(null);
 
@@ -2068,7 +2066,6 @@ ${instructionFinalHeading}`,
     setFaultCodeContext(null);
     setTechnicalSpecContext(null);
     setQualityCheck("");
-    setCopySuccess(false);
     setSaveSuccess(false);
     setCopiedMessageIndex(null);
     setOpenedCaseId(null);
@@ -2084,7 +2081,6 @@ ${instructionFinalHeading}`,
     }
 
     setSaveDetailsOpen(true);
-    setCopySuccess(false);
     setSaveSuccess(false);
     setCopiedMessageIndex(null);
     setError("");
@@ -2100,7 +2096,6 @@ ${instructionFinalHeading}`,
         `Speichern ist im ${currentPlan.label}-Plan nicht enthalten. Für gespeicherte Fälle brauchst du Pro.`,
       );
       setSaveSuccess(false);
-      setCopySuccess(false);
       setCopiedMessageIndex(null);
       return;
     }
@@ -2110,7 +2105,6 @@ ${instructionFinalHeading}`,
         `Falllimit erreicht: Im ${currentPlan.label}-Plan können aktuell ${currentPlan.savedCaseLimit} Fälle gespeichert werden.`,
       );
       setSaveSuccess(false);
-      setCopySuccess(false);
       setCopiedMessageIndex(null);
       return;
     }
@@ -2171,7 +2165,6 @@ ${instructionFinalHeading}`,
 
     setSaveSuccess(true);
     setSaveDetailsOpen(false);
-    setCopySuccess(false);
     setCopiedMessageIndex(null);
     setError("");
 
@@ -2197,7 +2190,6 @@ ${instructionFinalHeading}`,
     setSearch("");
     setSaveDetailsOpen(false);
     setError("");
-    setCopySuccess(false);
     setSaveSuccess(false);
     setCopiedMessageIndex(null);
 
@@ -2342,34 +2334,10 @@ ${chatText}
 `;
   }
 
-  async function copyCaseReport() {
-    if (messages.length === 0) {
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(buildCaseReport());
-      setCopySuccess(true);
-      setSaveSuccess(false);
-      setCopiedMessageIndex(null);
-      setError("");
-
-      window.setTimeout(() => {
-        setCopySuccess(false);
-      }, 2500);
-    } catch (error) {
-      console.error(error);
-      setError(
-        "Fallbericht konnte nicht in die Zwischenablage kopiert werden.",
-      );
-    }
-  }
-
   async function copySingleMessage(content: string, index: number) {
     try {
       await navigator.clipboard.writeText(content);
       setCopiedMessageIndex(index);
-      setCopySuccess(false);
       setSaveSuccess(false);
       setError("");
 
@@ -2717,20 +2685,11 @@ ${chatText}
                 : "Fall speichern"}
           </button>
 
-          <button
-            type="button"
-            onClick={copyCaseReport}
-            disabled={messages.length === 0}
-            className="rounded-xl border border-slate-700 px-5 py-3 font-bold text-slate-300 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Bericht kopieren
-          </button>
         </div>
 
-        {(copySuccess || saveSuccess) && (
+        {saveSuccess && (
           <div className="mt-4 rounded-2xl border border-green-500/30 bg-green-500/10 p-4 text-sm font-semibold text-green-300">
-            {copySuccess && "Fallbericht wurde kopiert."}
-            {saveSuccess && "Fall wurde gespeichert."}
+            Fall wurde gespeichert.
           </div>
         )}
       </div>

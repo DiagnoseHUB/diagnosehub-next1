@@ -154,7 +154,7 @@ export default function StripeSuccessStatus() {
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link
-              href="/#diagnose"
+              href="/diagnose"
               className="rounded-2xl bg-blue-600 px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-blue-700"
             >
               Zur KI-Diagnose

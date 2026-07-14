@@ -606,7 +606,7 @@ export default function LoginPage() {
               openRequiredProfileSetup(
                 profile,
                 nextSession.user,
-                "Erstelle jetzt dein Nutzerprofil. Danach sind Dashboard, Diagnose und Service sauber mit deinem Account verbunden."
+                "Erstelle jetzt dein Nutzerprofil. Danach sind Account, Diagnose und Service sauber miteinander verbunden."
               );
             }
           })();
@@ -1124,7 +1124,7 @@ export default function LoginPage() {
       setProfileGuidance("");
 
       showSuccess(
-        "Nutzerprofil wurde gespeichert. Header, Dashboard und Diagnose nutzen diese Daten."
+        "Nutzerprofil wurde gespeichert. Header, Account und Diagnose nutzen diese Daten."
       );
     } catch (error) {
       setError(
@@ -1197,7 +1197,7 @@ export default function LoginPage() {
       await loadWorkshopProfile(user);
       notifyWorkshopProfileChanged();
       showSuccess(
-        "Sicherheitsprofil wurde gespeichert. Die Anzeige im Dashboard nutzt diese Einstufung."
+        "Sicherheitsprofil wurde gespeichert. Die Anzeige im Account nutzt diese Einstufung."
       );
     } catch (error) {
       setError(
@@ -1456,14 +1456,14 @@ export default function LoginPage() {
 
               <div className="mt-6 flex flex-wrap gap-3">
                 <Link
-                  href="/dashboard"
+                  href="/dashboard#account"
                   className="rounded-2xl bg-blue-600 px-5 py-3 font-bold text-white transition hover:bg-blue-500"
                 >
-                  Zum Dashboard
+                  Zum Account
                 </Link>
 
                 <Link
-                  href="/#diagnose"
+                  href="/diagnose"
                   className="rounded-2xl border border-slate-300 bg-white px-5 py-3 font-bold text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
                 >
                   Zur Diagnose
@@ -1755,7 +1755,7 @@ export default function LoginPage() {
               )}
 
               <p className="mt-3 leading-7 text-slate-600 dark:text-slate-300">
-                Das Profil verbindet deinen Login mit Dashboard, Diagnose,
+                Das Profil verbindet deinen Login mit Account, Diagnose,
                 gespeicherten Fällen, Service-Erinnerung und deiner zentralen
                 Qualifikation. Betrieb/Firma ist optional und kann für private
                 Nutzer leer bleiben.

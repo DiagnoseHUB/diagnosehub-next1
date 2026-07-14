@@ -14,7 +14,7 @@ export default function WerkstaettenLandingPage() {
       intro="DiagnoseHUB unterstützt freie Werkstätten bei Diagnosefällen: Fehlercode, Symptom, Motorcode oder Messwerte eingeben und daraus einen nachvollziehbaren Prüfplan erstellen."
       primaryCta={{
         label: "Diagnose starten",
-        href: "/#diagnose",
+        href: "/diagnose",
       }}
       secondaryCta={{
         label: "Tarife ansehen",
